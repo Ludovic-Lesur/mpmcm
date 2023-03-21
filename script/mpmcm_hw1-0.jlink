@@ -1,0 +1,6 @@
+r
+loadfile hw1-0/mpmcm.hex
+verifyfile hw1-0/mpmcm.hex
+r
+g
+qc
