@@ -86,6 +86,7 @@ void RCC_IRQHandler     					(void) __attribute__ ((weak, alias("Default_Handler
 void EXTI0_IRQHandler						(void) __attribute__ ((weak, alias("Default_Handler")));
 void EXTI1_IRQHandler						(void) __attribute__ ((weak, alias("Default_Handler")));
 void EXTI2_IRQHandler						(void) __attribute__ ((weak, alias("Default_Handler")));
+void EXTI3_IRQHandler						(void) __attribute__ ((weak, alias("Default_Handler")));
 void EXTI4_IRQHandler						(void) __attribute__ ((weak, alias("Default_Handler")));
 void DMA1_CH1_IRQHandler					(void) __attribute__ ((weak, alias("Default_Handler")));
 void DMA1_CH2_IRQHandler					(void) __attribute__ ((weak, alias("Default_Handler")));
@@ -211,6 +212,7 @@ const pFunc __Vectors[] __attribute__ ((section(".vectors"))) = {
   EXTI0_IRQHandler,
   EXTI1_IRQHandler,
   EXTI2_IRQHandler,
+  EXTI3_IRQHandler,
   EXTI4_IRQHandler,
   DMA1_CH1_IRQHandler,
   DMA1_CH2_IRQHandler,
