@@ -9,6 +9,7 @@
 #define __ERROR_H__
 
 // Peripherals.
+#include "iwdg.h"
 #include "rcc.h"
 
 /*** ERROR structures ***/
@@ -18,7 +19,8 @@ typedef enum {
 	ERROR_BUSY,
 	ERROR_SIGFOX_RC,
 	// Peripherals.
-	ERROR_BASE_RCC = 0x0100,
+	ERROR_BASE_IWDG = 0x0100,
+	ERROR_BASE_RCC = (ERROR_BASE_IWDG + IWDG_ERROR_BASE_LAST),
 	// Last index.
 	ERROR_BASE_LAST = (ERROR_BASE_RCC + RCC_ERROR_BASE_LAST)
 } ERROR_t;
