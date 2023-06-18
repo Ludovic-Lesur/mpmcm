@@ -12,6 +12,7 @@
 #include "iwdg.h"
 #include "lptim.h"
 #include "mapping.h"
+#include "measure.h"
 #include "mode.h"
 #include "nvic.h"
 #include "pwr.h"
@@ -23,7 +24,7 @@
 
 static void _MPMCM_init_hw(void) {
 	// Local variables.
-	ADC_status_t adc_status = ADC_SUCCESS;
+	MEASURE_status_t measure_status = MEASURE_SUCCESS;
 #ifndef DEBUG
 	IWDG_status_t iwdg_status = IWDG_SUCCESS;
 #endif
@@ -48,9 +49,9 @@ static void _MPMCM_init_hw(void) {
 	IWDG_reload();
 	// Init peripherals.
 	LPTIM1_init();
-	TIM6_init();
-	adc_status = ADC_init();
-	ADC_error_check();
+	// Init mains measurements block.
+	measure_status = MEASURE_init();
+	MEASURE_error_check();
 }
 
 /*** MAIN function ***/
@@ -63,21 +64,13 @@ int main(void) {
 	// Init board.
 	_MPMCM_init_hw();
 	// Local variables.
-	ADC_status_t adc_status = ADC_SUCCESS;
-	// Init LED.
-	GPIO_configure(&GPIO_LED_RED, GPIO_MODE_OUTPUT, GPIO_TYPE_PUSH_PULL, GPIO_SPEED_LOW, GPIO_PULL_NONE);
-	GPIO_configure(&GPIO_LED_GREEN, GPIO_MODE_OUTPUT, GPIO_TYPE_PUSH_PULL, GPIO_SPEED_LOW, GPIO_PULL_NONE);
-	GPIO_configure(&GPIO_LED_BLUE, GPIO_MODE_OUTPUT, GPIO_TYPE_PUSH_PULL, GPIO_SPEED_LOW, GPIO_PULL_NONE);
-	GPIO_write(&GPIO_LED_RED, 1);
-	GPIO_write(&GPIO_LED_GREEN, 1);
-	GPIO_write(&GPIO_LED_BLUE, 1);
-	// Start ADC.
-	adc_status = ADC_start();
-	ADC_error_check();
-	// Blink LED.
+	MEASURE_status_t measure_status = MEASURE_SUCCESS;
+	// Main loop.
 	while (1) {
-		GPIO_toggle(&GPIO_LED_BLUE);
-		LPTIM1_delay_milliseconds(1000, LPTIM_DELAY_MODE_ACTIVE);
+		// Mains measurements task.
+		measure_status = MEASURE_task();
+		MEASURE_error_check();
+		// Reload watchdog.
 		IWDG_reload();
 	}
 	return 0;

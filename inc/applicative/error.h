@@ -10,9 +10,11 @@
 
 // Peripherals.
 #include "adc.h"
-#include "iwdg.h"*
+#include "iwdg.h"
 #include "lptim.h"
 #include "rcc.h"
+// Applicative.
+#include "measure.h"
 
 /*** ERROR structures ***/
 
@@ -23,8 +25,10 @@ typedef enum {
 	ERROR_BASE_IWDG = (ERROR_BASE_ADC + ADC_ERROR_BASE_LAST),
 	ERROR_BASE_LPTIM1 = (ERROR_BASE_IWDG + IWDG_ERROR_BASE_LAST),
 	ERROR_BASE_RCC = (ERROR_BASE_LPTIM1 + LPTIM_ERROR_BASE_LAST),
+	// Applicative.
+	ERROR_BASE_MEASURE = (ERROR_BASE_RCC + RCC_ERROR_BASE_LAST),
 	// Last index.
-	ERROR_BASE_LAST = (ERROR_BASE_RCC + RCC_ERROR_BASE_LAST)
+	ERROR_BASE_LAST = (ERROR_BASE_MEASURE + MEASURE_ERROR_BASE_LAST)
 } ERROR_t;
 
 /*** ERROR functions ***/

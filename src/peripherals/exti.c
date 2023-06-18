@@ -10,6 +10,7 @@
 #include "exti_reg.h"
 #include "gpio.h"
 #include "mapping.h"
+#include "measure.h"
 #include "nvic.h"
 #include "rcc_reg.h"
 #include "syscfg_reg.h"
@@ -27,6 +28,17 @@ static volatile uint32_t* EXTI_RTSR;
 static volatile uint32_t* EXTI_FTSR;
 
 /*** EXTI local functions ***/
+
+/* EXTI2 INTERRUPT HANDLER (ZERO CROSS PULSE INPUT).
+ * @param:	None.
+ * @return:	None.
+ */
+void __attribute__((optimize("-O0"))) EXTI2_IRQHandler(void) {
+	// Set flag in measure block.
+	MEASURE_set_zero_cross_flag();
+	// Clear flag.
+	EXTI -> PR1 |= (0b1 << GPIO_ZERO_CROSS_PULSE.pin);
+}
 
 /* SELECT PROPER IMR REGISTER.
  * @param:	None.

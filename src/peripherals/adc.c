@@ -12,7 +12,6 @@
 #include "lptim.h"
 #include "mapping.h"
 #include "rcc_reg.h"
-#include "tim.h"
 
 #include "nvic.h"
 
@@ -54,14 +53,6 @@ static const ADC_channels_t ADC2_REGULAR_CHANNELS[ADC_REGULAR_CHANNEL_SEQUENCE_L
 };
 
 /*** ADC local functions ***/
-
-void __attribute__((optimize("-O0"))) ADC1_2_IRQHandler(void) {
-	// EOC.
-	if (((ADC1 -> ISR) & (0b1 << 2)) != 0) {
-		// Clear flag.
-		ADC1 -> ISR |= (0b1 << 2);
-	}
-}
 
 /* INIT SINGLE ADC.
  * @param ADC:					ADC peripheral to calibrate.
@@ -108,6 +99,8 @@ ADC_status_t _ADC_init(ADC_registers_t* ADC, ADC_channels_t* ADC_REGULAR_CHANNEL
 	// Event 0b01101 = TIM6_TRGO.
 	ADC -> CFGR |= (0b01 << 10);
 	ADC -> CFGR |= (0b01101 << 5);
+	// Enable circular DMA.
+	ADC -> CFGR |= (0b11 << 0);
 	// Sampling time.
 	// 247.5 ADC clock cycles on 12 bits resolution with Fadc=8MHz: Tconv=32.5µs per channel.
 	// For 4 channels regular group (4 voltage / current pairs): Tconv=130µs < 200µs (5kHz sampling frequency).
@@ -221,6 +214,9 @@ ADC_status_t ADC_init(void) {
 	// No prescaler (Fadc = 8Mhz).
 	ADCCR12 -> CCR &= ~(0b1111 << 18);
 	ADCCR12 -> CCR &= ~(0b11 << 16);
+	// Use independant circular DMA channel for each ADC.
+	ADCCR12 -> CCR &= ~(0b11 << 14);
+	ADCCR12 -> CCR |= (0b1 << 13);
 	// Dual mode (regular simultaneous only).
 	ADCCR12 -> CCR |= (0b00110 << 0);
 	// Common initialization of master and slave ADCs.
@@ -228,9 +224,6 @@ ADC_status_t ADC_init(void) {
 	if (status != ADC_SUCCESS) goto errors;
 	status = _ADC_init(ADC2, (ADC_channels_t*) ADC2_REGULAR_CHANNELS);
 	if (status != ADC_SUCCESS) goto errors;
-	// Enable interrupts.
-	ADC1 -> IER |= (0b1 << 2);
-	NVIC_enable_interrupt(NVIC_INTERRUPT_ADC1_2);
 errors:
 	return status;
 }
@@ -252,8 +245,6 @@ ADC_status_t ADC_start(void) {
 	if (status != ADC_SUCCESS) goto errors;
 	status = _ADC_start(ADC2);
 	if (status != ADC_SUCCESS) goto errors;
-	// Start trigger.
-	TIM6_start();
 errors:
 	return status;
 }
@@ -265,8 +256,6 @@ errors:
 ADC_status_t ADC_stop(void) {
 	// Local variables.
 	ADC_status_t status = ADC_SUCCESS;
-	// Stop trigger.
-	TIM6_stop();
 	// Stop ongoing conversion.
 	status = _ADC_stop(ADC1);
 	if (status != ADC_SUCCESS) goto errors;
