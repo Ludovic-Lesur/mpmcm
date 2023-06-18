@@ -10,6 +10,8 @@
 #include "error.h"
 #include "gpio.h"
 #include "mapping.h"
+#include "nvic.h"
+#include "pwr.h"
 #include "rcc_reg.h"
 #include "types.h"
 
@@ -23,6 +25,17 @@
 #ifdef RCC_MCO
 static const GPIO_pin_t GPIO_MCO = (GPIO_pin_t) {GPIOA, 0, 8, 0}; // AF0 = MCO.
 #endif
+
+/*** RCC local functions ***/
+
+/* RCC INTERRUPT HANDLER.
+ * @param:	None.
+ * @return:	None.
+ */
+void RCC_IRQHandler(void) {
+	// Clear all flags.
+	RCC -> CICR |= (0b11 << 0);
+}
 
 /*** RCC functions ***/
 
@@ -56,13 +69,14 @@ RCC_status_t RCC_init(void) {
 		// Wait for HSERDY='1' or timeout.
 		loop_count++;
 		if (loop_count > RCC_TIMEOUT_COUNT) {
-			// Reset flag.
-			hse_ready = 0;
 			// Store error in stack.
 			ERROR_stack_add(ERROR_BASE_RCC + RCC_ERROR_HSE_READY);
 			// Turn TCXO off.
 			GPIO_write(&GPIO_TCXO_POWER_ENABLE, 0);
 			RCC -> CR &= ~(0b1 << 16); // Disable HSE (HSEON='0').
+			// Reset flag and exit.
+			hse_ready = 0;
+			break;
 		}
 	}
 	// Configure PLL.
@@ -109,8 +123,41 @@ RCC_status_t RCC_init(void) {
 		}
 	}
 	// Disable HSI.
-	RCC -> CR &= ~(0b1 << 8); // Disable MSI (HSION='0').
+	RCC -> CR &= ~(0b1 << 8); // HSION='0'.
 errors:
 	return status;
 }
 
+/* ENABLE INTERNAL LOW SPEED OSCILLATOR (38kHz INTERNAL RC).
+ * @param:	None.
+ * @return:	None.
+ */
+void RCC_enable_lsi(void) {
+	// Enable LSI.
+	RCC -> CSR |= (0b1 << 0); // LSION='1'.
+	// Enable interrupt.
+	RCC -> CIER |= (0b1 << 0);
+	NVIC_enable_interrupt(NVIC_INTERRUPT_RCC);
+	// Wait for LSI to be stable.
+	while (((RCC -> CSR) & (0b1 << 1)) == 0) {
+		__asm volatile ("wfi"); // Wait For Interrupt core instruction.
+	}
+	NVIC_disable_interrupt(NVIC_INTERRUPT_RCC);
+}
+
+/* ENABLE EXTERNAL LOW SPEED OSCILLATOR (32.768kHz QUARTZ).
+ * @param:	None.
+ * @return:	None.
+ */
+void RCC_enable_lse(void) {
+	// Enable LSE (32.768kHz crystal).
+	RCC -> BDCR |= (0b1 << 0); // LSEON='1'.
+	// Enable interrupt.
+	RCC -> CIER |= (0b1 << 1);
+	NVIC_enable_interrupt(NVIC_INTERRUPT_RCC);
+	// Wait for LSE to be stable.
+	while (((RCC -> BDCR) & (0b1 << 1)) == 0) {
+		__asm volatile ("wfi"); // Wait For Interrupt core instruction.
+	}
+	NVIC_disable_interrupt(NVIC_INTERRUPT_RCC);
+}

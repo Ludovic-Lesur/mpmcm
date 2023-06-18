@@ -9,18 +9,20 @@
 #define __ERROR_H__
 
 // Peripherals.
-#include "iwdg.h"
+#include "adc.h"
+#include "iwdg.h"*
+#include "lptim.h"
 #include "rcc.h"
 
 /*** ERROR structures ***/
 
 typedef enum {
 	SUCCESS = 0,
-	ERROR_BUSY,
-	ERROR_SIGFOX_RC,
 	// Peripherals.
-	ERROR_BASE_IWDG = 0x0100,
-	ERROR_BASE_RCC = (ERROR_BASE_IWDG + IWDG_ERROR_BASE_LAST),
+	ERROR_BASE_ADC = 0x0100,
+	ERROR_BASE_IWDG = (ERROR_BASE_ADC + ADC_ERROR_BASE_LAST),
+	ERROR_BASE_LPTIM1 = (ERROR_BASE_IWDG + IWDG_ERROR_BASE_LAST),
+	ERROR_BASE_RCC = (ERROR_BASE_LPTIM1 + LPTIM_ERROR_BASE_LAST),
 	// Last index.
 	ERROR_BASE_LAST = (ERROR_BASE_RCC + RCC_ERROR_BASE_LAST)
 } ERROR_t;

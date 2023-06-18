@@ -132,7 +132,7 @@ void SPI3_IRQHandler						(void) __attribute__ ((weak, alias("Default_Handler"))
 void UART4_IRQHandler						(void) __attribute__ ((weak, alias("Default_Handler")));
 void UART5_IRQHandler						(void) __attribute__ ((weak, alias("Default_Handler")));
 void TIM6_DAC1_3_IRQHandler					(void) __attribute__ ((weak, alias("Default_Handler")));
-void TIM6_DAC2_4_IRQHandler					(void) __attribute__ ((weak, alias("Default_Handler")));
+void TIM7_DAC2_4_IRQHandler					(void) __attribute__ ((weak, alias("Default_Handler")));
 void DMA2_CH1_IRQHandler					(void) __attribute__ ((weak, alias("Default_Handler")));
 void DMA2_CH2_IRQHandler					(void) __attribute__ ((weak, alias("Default_Handler")));
 void DMA2_CH3_IRQHandler					(void) __attribute__ ((weak, alias("Default_Handler")));
@@ -258,7 +258,7 @@ const pFunc __Vectors[] __attribute__ ((section(".vectors"))) = {
   UART4_IRQHandler,
   UART5_IRQHandler,
   TIM6_DAC1_3_IRQHandler,
-  TIM6_DAC2_4_IRQHandler,
+  TIM7_DAC2_4_IRQHandler,
   DMA2_CH1_IRQHandler,
   DMA2_CH2_IRQHandler,
   DMA2_CH3_IRQHandler,
