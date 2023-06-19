@@ -54,8 +54,36 @@ static const ADC_channels_t ADC2_REGULAR_CHANNELS[ADC_REGULAR_CHANNEL_SEQUENCE_L
 
 /*** ADC local functions ***/
 
+/* CALIBRATE ADC.
+ * @param ADC:		ADC peripheral to calibrate.
+ * @return status:	Function execution status.
+ */
+ADC_status_t _ADC_calibrate(ADC_registers_t* ADC) {
+	// Local variables.
+	ADC_status_t status = ADC_SUCCESS;
+	LPTIM_status_t lptim1_status = LPTIM_SUCCESS;
+	uint32_t loop_count = 0;
+	// Start calibration in single-ended mode.
+	ADC -> CR &= ~(0b1 << 30);
+	ADC -> CR |= (0b1 << 31);
+	// Wait for calibration to complete.
+	loop_count = 0;
+	while (((ADC -> CR) & (0b1 << 31)) != 0) {
+		// Wait until calibration is done or timeout.
+		loop_count++;
+		if (loop_count > ADC_TIMEOUT_COUNT) {
+			status = ADC_ERROR_CALIBRATION;
+			goto errors;
+		}
+	}
+	lptim1_status = LPTIM1_delay_milliseconds(5, LPTIM_DELAY_MODE_ACTIVE);
+	LPTIM1_status_check(ADC_ERROR_BASE_LPTIM1);
+errors:
+	return status;
+}
+
 /* INIT SINGLE ADC.
- * @param ADC:					ADC peripheral to calibrate.
+ * @param ADC:					ADC peripheral to init.
  * @param ADC_REGULAR_CHANNELS:	List of regulator channels to convert.
  * @return status:				Function execution status.
  */
@@ -63,7 +91,6 @@ ADC_status_t _ADC_init(ADC_registers_t* ADC, ADC_channels_t* ADC_REGULAR_CHANNEL
 	// Local variables.
 	ADC_status_t status = ADC_SUCCESS;
 	LPTIM_status_t lptim1_status = LPTIM_SUCCESS;
-	uint32_t loop_count = 0;
 	uint8_t idx = 0;
 	// Check parameters.
 	if ((ADC == NULL) || (ADC_REGULAR_CHANNELS == NULL)) {
@@ -78,12 +105,6 @@ ADC_status_t _ADC_init(ADC_registers_t* ADC, ADC_channels_t* ADC_REGULAR_CHANNEL
 	if (((ADC -> CR) & (0b1 << 0)) != 0) {
 		ADC -> CR |= (0b1 << 1); // ADDIS='1'.
 	}
-	// Exit deep power down.
-	ADC -> CR &= ~(0b1 << 29);
-	// Enable voltage regulator.
-	ADC -> CR |= (0b1 << 28);
-	lptim1_status = LPTIM1_delay_milliseconds(5, LPTIM_DELAY_MODE_ACTIVE);
-	LPTIM1_status_check(ADC_ERROR_BASE_LPTIM1);
 	// Reset registers.
 	ADC -> CFGR = 0x80000000;
 	ADC -> CFGR2 = 0x00000000;
@@ -126,19 +147,12 @@ ADC_status_t _ADC_init(ADC_registers_t* ADC, ADC_channels_t* ADC_REGULAR_CHANNEL
 		ADC -> OFR[idx] |= 0b1 << 31;
 	}
 #endif
-	// Start calibration in single-ended mode.
-	ADC -> CR &= ~(0b1 << 30);
-	ADC -> CR |= (0b1 << 31);
-	// Wait for calibration to complete.
-	loop_count = 0;
-	while (((ADC -> CR) & (0b1 << 31)) != 0) {
-		// Wait until calibration is done or timeout.
-		loop_count++;
-		if (loop_count > ADC_TIMEOUT_COUNT) {
-			status = ADC_ERROR_CALIBRATION;
-			goto errors;
-		}
-	}
+	// Exit deep power down.
+	ADC -> CR &= ~(0b1 << 29);
+	// Enable voltage regulator.
+	ADC -> CR |= (0b1 << 28);
+	lptim1_status = LPTIM1_delay_milliseconds(10, LPTIM_DELAY_MODE_ACTIVE);
+	LPTIM1_status_check(ADC_ERROR_BASE_LPTIM1);
 errors:
 	return status;
 }
@@ -177,7 +191,7 @@ ADC_status_t _ADC_stop(ADC_registers_t* ADC) {
 	ADC_status_t status = ADC_SUCCESS;
 	uint32_t loop_count = 0;
 	// Stop ongoing conversions.
-	ADC1 -> CR |= (0b1 << 4);
+	ADC -> CR |= (0b1 << 4);
 	// Wait for ongoing conversions to complete.
 	while (((ADC -> CR) & (0b1 << 4)) != 0) {
 		// Wait command completion or timeout.
@@ -210,6 +224,11 @@ ADC_status_t ADC_init(void) {
 	GPIO_configure(&GPIO_ACI2_SAMPLING, GPIO_MODE_ANALOG, GPIO_TYPE_OPEN_DRAIN, GPIO_SPEED_LOW, GPIO_PULL_NONE);
 	GPIO_configure(&GPIO_ACI3_SAMPLING, GPIO_MODE_ANALOG, GPIO_TYPE_OPEN_DRAIN, GPIO_SPEED_LOW, GPIO_PULL_NONE);
 	GPIO_configure(&GPIO_ACI4_SAMPLING, GPIO_MODE_ANALOG, GPIO_TYPE_OPEN_DRAIN, GPIO_SPEED_LOW, GPIO_PULL_NONE);
+	// Common initialization of master and slave ADCs.
+	status = _ADC_init(ADC1, (ADC_channels_t*) ADC1_REGULAR_CHANNELS);
+	if (status != ADC_SUCCESS) goto errors;
+	status = _ADC_init(ADC2, (ADC_channels_t*) ADC2_REGULAR_CHANNELS);
+	if (status != ADC_SUCCESS) goto errors;
 	// ADC clocked on PLL (adc_ker_ck).
 	// No prescaler (Fadc = 8Mhz).
 	ADCCR12 -> CCR &= ~(0b1111 << 18);
@@ -219,12 +238,40 @@ ADC_status_t ADC_init(void) {
 	ADCCR12 -> CCR |= (0b1 << 13);
 	// Dual mode (regular simultaneous only).
 	ADCCR12 -> CCR |= (0b00110 << 0);
-	// Common initialization of master and slave ADCs.
-	status = _ADC_init(ADC1, (ADC_channels_t*) ADC1_REGULAR_CHANNELS);
+	// Calibration.
+	status = _ADC_calibrate(ADC1);
 	if (status != ADC_SUCCESS) goto errors;
-	status = _ADC_init(ADC2, (ADC_channels_t*) ADC2_REGULAR_CHANNELS);
+	status = _ADC_calibrate(ADC2);
 	if (status != ADC_SUCCESS) goto errors;
 errors:
+	return status;
+}
+
+/* TURN ANALOG FRONT-END ON.
+ * @param:			None.
+ * @return status:	Function execution status.
+ */
+ADC_status_t ADC_power_on(void) {
+	// Local variables.
+	ADC_status_t status = ADC_SUCCESS;
+	LPTIM_status_t lptim1_status = LPTIM_SUCCESS;
+	// Turn analog front-end on.
+	GPIO_write(&GPIO_ANA_POWER_ENABLE, 1);
+	lptim1_status = LPTIM1_delay_milliseconds(100, LPTIM_DELAY_MODE_ACTIVE);
+	LPTIM1_status_check(ADC_ERROR_BASE_LPTIM1);
+errors:
+	return status;
+}
+
+/* TURN ANALOG FRONT-END OFF.
+ * @param:			None.
+ * @return status:	Function execution status.
+ */
+ADC_status_t ADC_power_off(void) {
+	// Local variables.
+	ADC_status_t status = ADC_SUCCESS;
+	// Turn analog front-end on.
+	GPIO_write(&GPIO_ANA_POWER_ENABLE, 0);
 	return status;
 }
 
@@ -235,11 +282,6 @@ errors:
 ADC_status_t ADC_start(void) {
 	// Local variables.
 	ADC_status_t status = ADC_SUCCESS;
-	LPTIM_status_t lptim1_status = LPTIM_SUCCESS;
-	// Turn analog front-end on.
-	GPIO_write(&GPIO_ANA_POWER_ENABLE, 1);
-	lptim1_status = LPTIM1_delay_milliseconds(5, LPTIM_DELAY_MODE_ACTIVE);
-	LPTIM1_status_check(ADC_ERROR_BASE_LPTIM1);
 	// Enable ADCs.
 	status = _ADC_start(ADC1);
 	if (status != ADC_SUCCESS) goto errors;
@@ -262,7 +304,5 @@ ADC_status_t ADC_stop(void) {
 	status = _ADC_stop(ADC2);
 	if (status != ADC_SUCCESS) goto errors;
 errors:
-	// Turn analog front-end off.
-	GPIO_write(&GPIO_ANA_POWER_ENABLE, 0);
 	return status;
 }

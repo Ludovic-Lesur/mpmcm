@@ -121,6 +121,9 @@ MEASURE_status_t MEASURE_init(void) {
 	ADC_status_check(MEASURE_ERROR_BASE_ADC);
 	// Init timer.
 	TIM6_init();
+	// Turn analog front-end on to enable zero cross detector.
+	status = ADC_power_on();
+	ADC_status_check(MEASURE_ERROR_BASE_ADC);
 errors:
 	return status;
 }
@@ -185,7 +188,9 @@ MEASURE_status_t MEASURE_task(void) {
 		}
 		// Check DMA timeout flag.
 		if (measure_ctx.flags.dma_timeout != 0) {
-			// Start measure.
+			// Clear flag.
+			measure_ctx.flags.dma_timeout = 0;
+			// Stop measure.
 			status = _MEASURE_stop();
 			if (status != MEASURE_SUCCESS) goto errors;
 			// Update state.
