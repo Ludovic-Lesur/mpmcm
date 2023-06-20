@@ -121,9 +121,6 @@ MEASURE_status_t MEASURE_init(void) {
 	ADC_status_check(MEASURE_ERROR_BASE_ADC);
 	// Init timer.
 	TIM6_init();
-	// Turn analog front-end on to enable zero cross detector.
-	status = ADC_power_on();
-	ADC_status_check(MEASURE_ERROR_BASE_ADC);
 errors:
 	return status;
 }

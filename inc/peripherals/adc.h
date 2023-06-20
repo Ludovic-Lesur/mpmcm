@@ -30,9 +30,6 @@ typedef enum {
 
 ADC_status_t ADC_init(void);
 
-ADC_status_t ADC_power_on(void);
-ADC_status_t ADC_power_off(void);
-
 ADC_status_t ADC_start(void);
 ADC_status_t ADC_stop(void);
 

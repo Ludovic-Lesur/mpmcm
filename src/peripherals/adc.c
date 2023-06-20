@@ -24,6 +24,9 @@
 #define ADC_OFFSET_12_BITS						((ADC_FULL_SCALE_12_BITS / 2) + 1)
 #define ADC_NUMBER_OF_OFFSETS					4
 
+#define ADC_SMPR_CHANNEL_THRESHOLD				10
+#define ADC_SAMPLING_TIME						0b110
+
 #define ADC_VBIAS_COMPENSATION
 
 /*** ADC local structures ***/
@@ -54,6 +57,24 @@ static const ADC_channels_t ADC2_REGULAR_CHANNELS[ADC_REGULAR_CHANNEL_SEQUENCE_L
 
 /*** ADC local functions ***/
 
+/* ENABLE ADC INTERNAL REGULATOR.
+ * @param ADC:		ADC peripheral to enable.
+ * @return status:	Function execution status.
+ */
+ADC_status_t _ADC_enable_regulator(ADC_registers_t* ADC) {
+	// Local variables.
+	ADC_status_t status = ADC_SUCCESS;
+	LPTIM_status_t lptim1_status = LPTIM_SUCCESS;
+	// Exit deep power down.
+	ADC -> CR &= ~(0b1 << 29);
+	// Enable voltage regulator.
+	ADC -> CR |= (0b1 << 28);
+	lptim1_status = LPTIM1_delay_milliseconds(10, LPTIM_DELAY_MODE_ACTIVE);
+	LPTIM1_status_check(ADC_ERROR_BASE_LPTIM1);
+errors:
+	return status;
+}
+
 /* CALIBRATE ADC.
  * @param ADC:		ADC peripheral to calibrate.
  * @return status:	Function execution status.
@@ -76,7 +97,7 @@ ADC_status_t _ADC_calibrate(ADC_registers_t* ADC) {
 			goto errors;
 		}
 	}
-	lptim1_status = LPTIM1_delay_milliseconds(5, LPTIM_DELAY_MODE_ACTIVE);
+	lptim1_status = LPTIM1_delay_milliseconds(10, LPTIM_DELAY_MODE_ACTIVE);
 	LPTIM1_status_check(ADC_ERROR_BASE_LPTIM1);
 errors:
 	return status;
@@ -90,7 +111,6 @@ errors:
 ADC_status_t _ADC_init(ADC_registers_t* ADC, ADC_channels_t* ADC_REGULAR_CHANNELS) {
 	// Local variables.
 	ADC_status_t status = ADC_SUCCESS;
-	LPTIM_status_t lptim1_status = LPTIM_SUCCESS;
 	uint8_t idx = 0;
 	// Check parameters.
 	if ((ADC == NULL) || (ADC_REGULAR_CHANNELS == NULL)) {
@@ -105,11 +125,6 @@ ADC_status_t _ADC_init(ADC_registers_t* ADC, ADC_channels_t* ADC_REGULAR_CHANNEL
 	if (((ADC -> CR) & (0b1 << 0)) != 0) {
 		ADC -> CR |= (0b1 << 1); // ADDIS='1'.
 	}
-	// Reset registers.
-	ADC -> CFGR = 0x80000000;
-	ADC -> CFGR2 = 0x00000000;
-	ADC -> SMPR1 = 0x00000000;
-	ADC -> SMPR2 = 0x00000000;
 	// Single conversion mode.
 	ADC -> CFGR &= ~(0b1 << 13);
 	ADC -> CFGR &= ~(0b1 << 16);
@@ -120,19 +135,26 @@ ADC_status_t _ADC_init(ADC_registers_t* ADC, ADC_channels_t* ADC_REGULAR_CHANNEL
 	// Event 0b01101 = TIM6_TRGO.
 	ADC -> CFGR |= (0b01 << 10);
 	ADC -> CFGR |= (0b01101 << 5);
+	// Overwritte register in case of overrun.
+	ADC -> CFGR |= (0b1 << 12);
 	// Enable circular DMA.
 	ADC -> CFGR |= (0b11 << 0);
 	// Sampling time.
 	// 247.5 ADC clock cycles on 12 bits resolution with Fadc=8MHz: Tconv=32.5µs per channel.
 	// For 4 channels regular group (4 voltage / current pairs): Tconv=130µs < 200µs (5kHz sampling frequency).
-	for (idx=0 ; idx<10 ; idx++) {
-		ADC -> SMPR1 |= (0b110 << (3 * idx));
-	}
-	for (idx=0 ; idx<9 ; idx++) {
-		ADC -> SMPR2 |= (0b110 << (3 * idx));
+	for (idx=0 ; idx<ADC_REGULAR_CHANNEL_SEQUENCE_LENGTH ; idx++) {
+		// Check channel.
+		if (ADC_REGULAR_CHANNELS[idx] < ADC_SMPR_CHANNEL_THRESHOLD) {
+			ADC -> SMPR1 |= (ADC_SAMPLING_TIME << (3 * ADC_REGULAR_CHANNELS[idx]));
+		}
+		else {
+			ADC -> SMPR2 |= (ADC_SAMPLING_TIME << (3 * (ADC_REGULAR_CHANNELS[idx] - ADC_SMPR_CHANNEL_THRESHOLD)));
+		}
 	}
 	// Regular sequence definition.
+	// Length.
 	ADC -> SQR1 = ((ADC_REGULAR_CHANNEL_SEQUENCE_LENGTH - 1) & 0x0000000F);
+	// Channels sequence.
 	for (idx=0 ; idx<ADC_REGULAR_CHANNEL_SEQUENCE_LENGTH ; idx++) {
 		ADC -> SQR[idx >> 2] |= (ADC_REGULAR_CHANNELS[idx] << (6 * ((idx % 4) + 1)));
 	}
@@ -147,12 +169,6 @@ ADC_status_t _ADC_init(ADC_registers_t* ADC, ADC_channels_t* ADC_REGULAR_CHANNEL
 		ADC -> OFR[idx] |= 0b1 << 31;
 	}
 #endif
-	// Exit deep power down.
-	ADC -> CR &= ~(0b1 << 29);
-	// Enable voltage regulator.
-	ADC -> CR |= (0b1 << 28);
-	lptim1_status = LPTIM1_delay_milliseconds(10, LPTIM_DELAY_MODE_ACTIVE);
-	LPTIM1_status_check(ADC_ERROR_BASE_LPTIM1);
 errors:
 	return status;
 }
@@ -214,6 +230,7 @@ ADC_status_t _ADC_stop(ADC_registers_t* ADC) {
 ADC_status_t ADC_init(void) {
 	// Local variables.
 	ADC_status_t status = ADC_SUCCESS;
+	LPTIM_status_t lptim1_status = LPTIM_SUCCESS;
 	// Enable peripheral clock (PLLP).
 	RCC -> CCIPR |= (0b01 << 28);
 	RCC -> AHB2ENR |= (0b1 << 13);
@@ -224,54 +241,35 @@ ADC_status_t ADC_init(void) {
 	GPIO_configure(&GPIO_ACI2_SAMPLING, GPIO_MODE_ANALOG, GPIO_TYPE_OPEN_DRAIN, GPIO_SPEED_LOW, GPIO_PULL_NONE);
 	GPIO_configure(&GPIO_ACI3_SAMPLING, GPIO_MODE_ANALOG, GPIO_TYPE_OPEN_DRAIN, GPIO_SPEED_LOW, GPIO_PULL_NONE);
 	GPIO_configure(&GPIO_ACI4_SAMPLING, GPIO_MODE_ANALOG, GPIO_TYPE_OPEN_DRAIN, GPIO_SPEED_LOW, GPIO_PULL_NONE);
-	// Common initialization of master and slave ADCs.
-	status = _ADC_init(ADC1, (ADC_channels_t*) ADC1_REGULAR_CHANNELS);
-	if (status != ADC_SUCCESS) goto errors;
-	status = _ADC_init(ADC2, (ADC_channels_t*) ADC2_REGULAR_CHANNELS);
-	if (status != ADC_SUCCESS) goto errors;
-	// ADC clocked on PLL (adc_ker_ck).
-	// No prescaler (Fadc = 8Mhz).
-	ADCCR12 -> CCR &= ~(0b1111 << 18);
+	// Turn analog fonrt-end on to have VREF+ for calibration.
+	GPIO_write(&GPIO_ANA_POWER_ENABLE, 1);
+	lptim1_status = LPTIM1_delay_milliseconds(100, LPTIM_DELAY_MODE_ACTIVE);
+	LPTIM1_status_check(ADC_ERROR_BASE_LPTIM1);
+	// Use adc_ker_ck.
 	ADCCR12 -> CCR &= ~(0b11 << 16);
+	// ADC clocked on PLL with no prescaler -> Fadc = 8Mhz.
+	ADCCR12 -> CCR &= ~(0b1111 << 18);
 	// Use independant circular DMA channel for each ADC.
 	ADCCR12 -> CCR &= ~(0b11 << 14);
 	ADCCR12 -> CCR |= (0b1 << 13);
 	// Dual mode (regular simultaneous only).
 	ADCCR12 -> CCR |= (0b00110 << 0);
+	// Common initialization of master and slave ADCs.
+	status = _ADC_init(ADC1, (ADC_channels_t*) ADC1_REGULAR_CHANNELS);
+	if (status != ADC_SUCCESS) goto errors;
+	status = _ADC_init(ADC2, (ADC_channels_t*) ADC2_REGULAR_CHANNELS);
+	if (status != ADC_SUCCESS) goto errors;
+	// Enable regulator.
+	status = _ADC_enable_regulator(ADC1);
+	if (status != ADC_SUCCESS) goto errors;
+	status = _ADC_enable_regulator(ADC2);
+	if (status != ADC_SUCCESS) goto errors;
 	// Calibration.
 	status = _ADC_calibrate(ADC1);
 	if (status != ADC_SUCCESS) goto errors;
 	status = _ADC_calibrate(ADC2);
 	if (status != ADC_SUCCESS) goto errors;
 errors:
-	return status;
-}
-
-/* TURN ANALOG FRONT-END ON.
- * @param:			None.
- * @return status:	Function execution status.
- */
-ADC_status_t ADC_power_on(void) {
-	// Local variables.
-	ADC_status_t status = ADC_SUCCESS;
-	LPTIM_status_t lptim1_status = LPTIM_SUCCESS;
-	// Turn analog front-end on.
-	GPIO_write(&GPIO_ANA_POWER_ENABLE, 1);
-	lptim1_status = LPTIM1_delay_milliseconds(100, LPTIM_DELAY_MODE_ACTIVE);
-	LPTIM1_status_check(ADC_ERROR_BASE_LPTIM1);
-errors:
-	return status;
-}
-
-/* TURN ANALOG FRONT-END OFF.
- * @param:			None.
- * @return status:	Function execution status.
- */
-ADC_status_t ADC_power_off(void) {
-	// Local variables.
-	ADC_status_t status = ADC_SUCCESS;
-	// Turn analog front-end on.
-	GPIO_write(&GPIO_ANA_POWER_ENABLE, 0);
 	return status;
 }
 
