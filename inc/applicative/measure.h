@@ -28,7 +28,7 @@ MEASURE_status_t MEASURE_init(void);
 MEASURE_status_t MEASURE_task(void);
 
 void MEASURE_set_zero_cross_flag(void);
-void MEASURE_set_dma_timeout_flag(void);
+void MEASURE_set_dma_transfer_end_flag(void);
 
 #define MEASURE_status_check(error_base) { if (measure_status != MEASURE_SUCCESS) { status = error_base + measure_status; goto errors; }}
 #define MEASURE_error_check() { ERROR_status_check(measure_status, MEASURE_SUCCESS, ERROR_BASE_MEASURE); }

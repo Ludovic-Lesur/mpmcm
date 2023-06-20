@@ -18,7 +18,6 @@
 /*** ADC local macros ***/
 
 #define ADC_TIMEOUT_COUNT						1000000
-#define ADC_REGULAR_CHANNEL_SEQUENCE_LENGTH		4
 
 #define ADC_FULL_SCALE_12_BITS					4095
 #define ADC_OFFSET_12_BITS						((ADC_FULL_SCALE_12_BITS / 2) + 1)
@@ -41,14 +40,14 @@ typedef enum {
 
 /*** ADC local global variables ***/
 
-static const ADC_channels_t ADC1_REGULAR_CHANNELS[ADC_REGULAR_CHANNEL_SEQUENCE_LENGTH] = {
+static const ADC_channels_t ADC1_REGULAR_CHANNELS[ADC_NUMBER_OF_ACI_CHANNELS] = {
 	ADC_CHANNEL_ACV_SAMPLING,
 	ADC_CHANNEL_ACV_SAMPLING,
 	ADC_CHANNEL_ACV_SAMPLING,
 	ADC_CHANNEL_ACV_SAMPLING
 };
 
-static const ADC_channels_t ADC2_REGULAR_CHANNELS[ADC_REGULAR_CHANNEL_SEQUENCE_LENGTH] = {
+static const ADC_channels_t ADC2_REGULAR_CHANNELS[ADC_NUMBER_OF_ACI_CHANNELS] = {
 	ADC_CHANNEL_ACI1_SAMPLING,
 	ADC_CHANNEL_ACI2_SAMPLING,
 	ADC_CHANNEL_ACI3_SAMPLING,
@@ -142,7 +141,7 @@ ADC_status_t _ADC_init(ADC_registers_t* ADC, ADC_channels_t* ADC_REGULAR_CHANNEL
 	// Sampling time.
 	// 247.5 ADC clock cycles on 12 bits resolution with Fadc=8MHz: Tconv=32.5µs per channel.
 	// For 4 channels regular group (4 voltage / current pairs): Tconv=130µs < 200µs (5kHz sampling frequency).
-	for (idx=0 ; idx<ADC_REGULAR_CHANNEL_SEQUENCE_LENGTH ; idx++) {
+	for (idx=0 ; idx<ADC_NUMBER_OF_ACI_CHANNELS ; idx++) {
 		// Check channel.
 		if (ADC_REGULAR_CHANNELS[idx] < ADC_SMPR_CHANNEL_THRESHOLD) {
 			ADC -> SMPR1 |= (ADC_SAMPLING_TIME << (3 * ADC_REGULAR_CHANNELS[idx]));
@@ -153,14 +152,14 @@ ADC_status_t _ADC_init(ADC_registers_t* ADC, ADC_channels_t* ADC_REGULAR_CHANNEL
 	}
 	// Regular sequence definition.
 	// Length.
-	ADC -> SQR1 = ((ADC_REGULAR_CHANNEL_SEQUENCE_LENGTH - 1) & 0x0000000F);
+	ADC -> SQR1 = ((ADC_NUMBER_OF_ACI_CHANNELS - 1) & 0x0000000F);
 	// Channels sequence.
-	for (idx=0 ; idx<ADC_REGULAR_CHANNEL_SEQUENCE_LENGTH ; idx++) {
+	for (idx=0 ; idx<ADC_NUMBER_OF_ACI_CHANNELS ; idx++) {
 		ADC -> SQR[idx >> 2] |= (ADC_REGULAR_CHANNELS[idx] << (6 * ((idx % 4) + 1)));
 	}
 #ifdef ADC_VBIAS_COMPENSATION
 	// Configure VBIAS offset.
-	for (idx=0 ; idx<ADC_REGULAR_CHANNEL_SEQUENCE_LENGTH ; idx++) {
+	for (idx=0 ; idx<ADC_NUMBER_OF_ACI_CHANNELS ; idx++) {
 		// Check index.
 		if (idx >= ADC_NUMBER_OF_OFFSETS) break;
 		// Program offset.

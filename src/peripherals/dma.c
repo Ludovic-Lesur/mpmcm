@@ -22,6 +22,10 @@ typedef enum {
 	DMA_CHANNEL_INDEX_ADC2 = 1
 } DMA_channel_index_t;
 
+/*** DMA local global variables ***/
+
+static dma_buffer_size = 0;
+
 /*** DMA local functions ***/
 
 /* DMA1 CHANNEL 1 INTERRUPT HANDLER.
@@ -30,7 +34,7 @@ typedef enum {
  */
 void __attribute__((optimize("-O0"))) DMA1_CH1_IRQHandler(void) {
 	// Set flag
-	MEASURE_set_dma_timeout_flag();
+	MEASURE_set_dma_transfer_end_flag();
 	// Clear flags.
 	DMA1 -> IFCR |= 0x0000000F;
 }
@@ -41,7 +45,7 @@ void __attribute__((optimize("-O0"))) DMA1_CH1_IRQHandler(void) {
  */
 void __attribute__((optimize("-O0"))) DMA1_CH2_IRQHandler(void) {
 	// Set flag
-	MEASURE_set_dma_timeout_flag();
+	MEASURE_set_dma_transfer_end_flag();
 	// Clear flags.
 	DMA1 -> IFCR |= 0x000000F0;
 }
@@ -57,14 +61,13 @@ void DMA1_init() {
 	RCC -> AHB1ENR |= (0b101 << 0);
 	// Memory and peripheral sizes = 16bits.
 	// Memory increment enabled.
-	// Circular mode.
 	// Read from peripheral.
 	// Transfer complete interrupt enable.
 	// Configure ADC1 channel.
-	(DMA1 -> CHx[DMA_CHANNEL_INDEX_ADC1]).CCR |= (0b01 << 10) | (0b01 << 8) | (0b1 << 7) | (0b1 << 5) | (0b1 << 1);
+	(DMA1 -> CHx[DMA_CHANNEL_INDEX_ADC1]).CCR |= (0b01 << 10) | (0b01 << 8) | (0b1 << 7) | (0b1 << 1);
 	(DMA1 -> CHx[DMA_CHANNEL_INDEX_ADC1]).CPAR = (uint32_t) &(ADC1 -> DR);
 	// Configure ADC1 channel.
-	(DMA1 -> CHx[DMA_CHANNEL_INDEX_ADC2]).CCR |= (0b01 << 10) | (0b01 << 8) | (0b1 << 7) | (0b1 << 5) | (0b1 << 1);
+	(DMA1 -> CHx[DMA_CHANNEL_INDEX_ADC2]).CCR |= (0b01 << 10) | (0b01 << 8) | (0b1 << 7) | (0b1 << 1);
 	(DMA1 -> CHx[DMA_CHANNEL_INDEX_ADC2]).CPAR = (uint32_t) &(ADC2 -> DR);
 	// Configure DMA multiplexer.
 	DMAMUX -> CxCR[DMA_CHANNEL_INDEX_ADC1] = 5;
@@ -84,6 +87,8 @@ void DMA1_set_destination_address(uint32_t adc1_buffer_address, uint32_t adc2_bu
 	// Set current buffer address for ADC2.
 	(DMA1 -> CHx[DMA_CHANNEL_INDEX_ADC2]).CNDTR = adc_buffer_size;
 	(DMA1 -> CHx[DMA_CHANNEL_INDEX_ADC2]).CMAR = adc2_buffer_address;
+	// Store buffer size locally.
+	dma_buffer_size = adc_buffer_size;
 }
 
 /* START DMA1 TRANSFER.
@@ -114,4 +119,15 @@ void DMA1_stop(void) {
 	NVIC_disable_interrupt(NVIC_INTERRUPT_DMA1_CH2);
 	// Clear all flags.
 	DMA1 -> IFCR |= 0x000000FF;
+}
+
+/* GET THE NUMBER OF DATA THA HAVE BEING TRANSFERED.
+ * @param adc1_buffer_size:	Pointer to short that will contain number of transferred data on ADC1 channel.
+ * @param adc2_buffer_size:	Pointer to short that will contain number of transferred data on ADC2 channel.
+ * @return:					None.
+ */
+void DMA1_get_number_of_transfered_data(uint16_t* adc1_buffer_size, uint16_t* adc2_buffer_size) {
+	// Read registers.
+	(*adc1_buffer_size) = (dma_buffer_size - ((DMA1 -> CHx[DMA_CHANNEL_INDEX_ADC1]).CNDTR));
+	(*adc2_buffer_size) = (dma_buffer_size - ((DMA1 -> CHx[DMA_CHANNEL_INDEX_ADC2]).CNDTR));
 }

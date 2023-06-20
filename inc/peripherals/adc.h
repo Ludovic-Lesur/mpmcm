@@ -13,7 +13,8 @@
 
 /*** ADC macros ***/
 
-#define ADC_SAMPLING_PERIOD_US	200
+#define ADC_NUMBER_OF_ACI_CHANNELS	4
+#define ADC_SAMPLING_PERIOD_US		200
 
 /*** ADC structures ***/
 
