@@ -11,6 +11,7 @@
 #include "gpio.h"
 #include "iwdg.h"
 #include "lptim.h"
+#include "lpuart.h"
 #include "mapping.h"
 #include "measure.h"
 #include "mode.h"
@@ -49,6 +50,7 @@ static void _MPMCM_init_hw(void) {
 	IWDG_reload();
 	// Init peripherals.
 	LPTIM1_init();
+	LPUART1_init(0x1C);
 	// Init mains measurements block.
 	measure_status = MEASURE_init();
 	MEASURE_error_check();

@@ -168,7 +168,7 @@ void FDCAN2_IT1_IRQHandler					(void) __attribute__ ((weak, alias("Default_Handl
 void FDCAN3_IT0_IRQHandler					(void) __attribute__ ((weak, alias("Default_Handler")));
 void FDCAN3_IT1_IRQHandler					(void) __attribute__ ((weak, alias("Default_Handler")));
 void RNG_IRQHandler							(void) __attribute__ ((weak, alias("Default_Handler")));
-void LPUART_IRQHandler						(void) __attribute__ ((weak, alias("Default_Handler")));
+void LPUART1_IRQHandler						(void) __attribute__ ((weak, alias("Default_Handler")));
 void I2C3_EV_IRQHandler						(void) __attribute__ ((weak, alias("Default_Handler")));
 void I2C3_ER_IRQHandler						(void) __attribute__ ((weak, alias("Default_Handler")));
 void DMAMUX_IRQHandler						(void) __attribute__ ((weak, alias("Default_Handler")));
@@ -294,7 +294,7 @@ const pFunc __Vectors[] __attribute__ ((section(".vectors"))) = {
   FDCAN3_IT0_IRQHandler,
   FDCAN3_IT1_IRQHandler,
   RNG_IRQHandler,
-  LPUART_IRQHandler,
+  LPUART1_IRQHandler,
   I2C3_EV_IRQHandler,
   I2C3_ER_IRQHandler,
   DMAMUX_IRQHandler,
