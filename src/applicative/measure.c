@@ -23,16 +23,6 @@
 #define MEASURE_MAINS_PERIOD_US				20000
 #define MEASURE_ZERO_CROSS_PER_PERIOD		2
 
-// Expressed in number of periods.
-#define MEASURE_INTEGRATION_BUFFER_SIZE		((1000 * MEASURE_INTEGRATION_PERIOD_MS) / (MEASURE_MAINS_PERIOD_US))
-
-// Note: factor 2 is used to add a margin to the buffer length (2 mains periods long instead of 1).
-// Buffer switch is triggered by the zero cross detection instead of a fixed number of samples.
-#define MEASURE_PERIOD_BUFFER_SIZE			(2 * (MEASURE_MAINS_PERIOD_US / ADC_SAMPLING_PERIOD_US))
-
-#define MEASURE_PERIOD_DMA_BUFFER_SIZE		(ADC_NUMBER_OF_ACI_CHANNELS * MEASURE_PERIOD_BUFFER_SIZE)
-#define MEASURE_PERIOD_DMA_BUFFER_DEPTH		2
-
 #define MEASURE_TRANSFORMER_GAIN			30
 #define MEASURE_TRANSFORMER_ATTEN			10
 #define MEASURE_ACV_FACTOR					((MEASURE_TRANSFORMER_GAIN * MEASURE_TRANSFORMER_ATTEN * ADC_VREF_MV) / (ADC_FULL_SCALE))
@@ -40,6 +30,13 @@
 #define MEASURE_SCT013_GAIN					20
 #define MEASURE_SCT013_ATTEN				1
 #define MEASURE_ACI_FACTOR					((MEASURE_SCT013_GAIN * MEASURE_SCT013_ATTEN * ADC_VREF_MV) / (ADC_FULL_SCALE))
+
+// Note: factor 2 is used to add a margin to the buffer length (2 mains periods long instead of 1).
+// Buffer switch is triggered by the zero cross detection instead of a fixed number of samples.
+#define MEASURE_PERIOD_BUFFER_SIZE			(2 * (MEASURE_MAINS_PERIOD_US / ADC_SAMPLING_PERIOD_US))
+
+#define MEASURE_PERIOD_DMA_BUFFER_SIZE		(ADC_NUMBER_OF_ACI_CHANNELS * MEASURE_PERIOD_BUFFER_SIZE)
+#define MEASURE_PERIOD_DMA_BUFFER_DEPTH		2
 
 #define MEASURE_POWER_FACTOR_MULTIPLIER		1000
 
@@ -142,7 +139,7 @@ static MEASURE_context_t measure_ctx;
  * @param:	None.
  * @return:	None.
  */
-static void _MEASURE_switch_dma_buffer(void) {
+static inline void _MEASURE_switch_dma_buffer(void) {
 	// Stop DMA.
 	DMA1_stop();
 	// Retrieve number of transfered data.
@@ -203,34 +200,11 @@ errors:
 	return status;
 }
 
-/* CREATE AC BUFFER FROM RAW BUFFER.
- * @param ac_channel_index:	AC line index.
- * @return status:			Function execution status.
- */
-static MEASURE_status_t _MEASURE_compute_channel_buffer(uint8_t ac_channel_index) {
-	// Local variables.
-	MEASURE_status_t status = MEASURE_SUCCESS;
-	uint16_t idx = 0;
-	// Check index.
-	if (ac_channel_index >= ADC_NUMBER_OF_ACI_CHANNELS) {
-		status = MEASURE_ERROR_AC_LINE_INDEX;
-		goto errors;
-	}
-	// Data loop.
-	for (idx=0 ; idx<(measure_data.period_acxx_buffer_size) ; idx++) {
-		// Copy data.
-		measure_data.period_acvx_buffer[idx] = (int32_t) measure_data.acv_sampling[measure_data.acv_sampling_read_idx].data[(ADC_NUMBER_OF_ACI_CHANNELS * idx) + ac_channel_index];
-		measure_data.period_acix_buffer[idx] = (int32_t) measure_data.aci_sampling[measure_data.aci_sampling_read_idx].data[(ADC_NUMBER_OF_ACI_CHANNELS * idx) + ac_channel_index];
-	}
-errors:
-	return status;
-}
-
 /* RESET ALL CHANNELS RESULTS.
  * @param:	None.
  * @return:	None.
  */
-static void _MEASURE_reset_results(void) {
+static inline void _MEASURE_reset_results(void) {
 	// Local variables.
 	uint8_t ac_channel_idx = 0;
 	// Channels loop.
@@ -300,6 +274,7 @@ MEASURE_status_t MEASURE_task(void) {
 	uint16_t acv_buffer_size = 0;
 	uint16_t aci_buffer_size = 0;
 	uint8_t ac_channel_idx = 0;
+	uint32_t idx = 0;
 	// Perform state machine.
 	switch (measure_ctx.state) {
 	case MEASURE_STATE_STOPPED:
@@ -356,13 +331,16 @@ MEASURE_status_t MEASURE_task(void) {
 		// Get size.
 		acv_buffer_size = ((measure_data.acv_sampling[measure_data.acv_sampling_read_idx].size) / (ADC_NUMBER_OF_ACI_CHANNELS));
 		aci_buffer_size = ((measure_data.aci_sampling[measure_data.acv_sampling_read_idx].size) / (ADC_NUMBER_OF_ACI_CHANNELS));
-		// Get the minimum size between voltage and current.
+		// Take the minimum size between voltage and current.
 		measure_data.period_acxx_buffer_size = (acv_buffer_size < aci_buffer_size) ? acv_buffer_size : aci_buffer_size;
 		// Processing each channel.
 		for (ac_channel_idx=0 ; ac_channel_idx<ADC_NUMBER_OF_ACI_CHANNELS ; ac_channel_idx++) {
 			// Compute channel buffer.
-			status = _MEASURE_compute_channel_buffer(ac_channel_idx);
-			if (status != MEASURE_SUCCESS) goto errors;
+			for (idx=0 ; idx<(measure_data.period_acxx_buffer_size) ; idx++) {
+				// Copy data.
+				measure_data.period_acvx_buffer[idx] = (int32_t) measure_data.acv_sampling[measure_data.acv_sampling_read_idx].data[(ADC_NUMBER_OF_ACI_CHANNELS * idx) + ac_channel_idx];
+				measure_data.period_acix_buffer[idx] = (int32_t) measure_data.aci_sampling[measure_data.aci_sampling_read_idx].data[(ADC_NUMBER_OF_ACI_CHANNELS * idx) + ac_channel_idx];
+			}
 			// Instantaneous power.
 			arm_mult_q31(measure_data.period_acvx_buffer, measure_data.period_acix_buffer, measure_data.period_acpx_buffer, measure_data.period_acxx_buffer_size);
 			// Active power.
