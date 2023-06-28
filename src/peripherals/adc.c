@@ -12,8 +12,7 @@
 #include "lptim.h"
 #include "mapping.h"
 #include "rcc_reg.h"
-
-#include "nvic.h"
+#include "types.h"
 
 /*** ADC local macros ***/
 
@@ -60,7 +59,7 @@ static const ADC_channels_t ADC2_REGULAR_CHANNELS[ADC_NUMBER_OF_ACI_CHANNELS] = 
  * @param ADC:		ADC peripheral to enable.
  * @return status:	Function execution status.
  */
-ADC_status_t _ADC_enable_regulator(ADC_registers_t* ADC) {
+static ADC_status_t _ADC_enable_regulator(ADC_registers_t* ADC) {
 	// Local variables.
 	ADC_status_t status = ADC_SUCCESS;
 	LPTIM_status_t lptim1_status = LPTIM_SUCCESS;
@@ -78,7 +77,7 @@ errors:
  * @param ADC:		ADC peripheral to calibrate.
  * @return status:	Function execution status.
  */
-ADC_status_t _ADC_calibrate(ADC_registers_t* ADC) {
+static ADC_status_t _ADC_calibrate(ADC_registers_t* ADC) {
 	// Local variables.
 	ADC_status_t status = ADC_SUCCESS;
 	LPTIM_status_t lptim1_status = LPTIM_SUCCESS;
@@ -107,7 +106,7 @@ errors:
  * @param ADC_REGULAR_CHANNELS:	List of regulator channels to convert.
  * @return status:				Function execution status.
  */
-ADC_status_t _ADC_init(ADC_registers_t* ADC, ADC_channels_t* ADC_REGULAR_CHANNELS) {
+static ADC_status_t _ADC_init(ADC_registers_t* ADC, ADC_channels_t* ADC_REGULAR_CHANNELS) {
 	// Local variables.
 	ADC_status_t status = ADC_SUCCESS;
 	uint8_t idx = 0;
@@ -176,7 +175,7 @@ errors:
  * @param ADC:		ADC peripheral to start.
  * @return status:	Function execution status.
  */
-ADC_status_t _ADC_start(ADC_registers_t* ADC) {
+static ADC_status_t _ADC_start(ADC_registers_t* ADC) {
 	// Local variables.
 	ADC_status_t status = ADC_SUCCESS;
 	uint32_t loop_count = 0;
@@ -201,7 +200,7 @@ errors:
  * @param ADC:		ADC peripheral to start.
  * @return status:	Function execution status.
  */
-ADC_status_t _ADC_stop(ADC_registers_t* ADC) {
+static ADC_status_t _ADC_stop(ADC_registers_t* ADC) {
 	// Local variables.
 	ADC_status_t status = ADC_SUCCESS;
 	uint32_t loop_count = 0;

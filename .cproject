@@ -52,14 +52,19 @@
 									<listOptionValue builtIn="false" value="__START=main"/>
 									<listOptionValue builtIn="false" value="MCU_CATEGORY_2"/>
 									<listOptionValue builtIn="false" value="HW1_0"/>
+									<listOptionValue builtIn="false" value="__GNUC_PYTHON__"/>
+									<listOptionValue builtIn="false" value="ARM_MATH_DSP"/>
 								</option>
 								<option IS_BUILTIN_EMPTY="false" IS_VALUE_EMPTY="false" id="ilg.gnuarmeclipse.managedbuild.cross.option.assembler.include.paths.953551726" name="Include paths (-I)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.assembler.include.paths" useByScannerDiscovery="true" valueType="includePath">
 									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/inc&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/inc/registers&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/inc/peripherals&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/inc/utils&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/inc/components&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/inc/applicative&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/inc/dsp&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/inc/utils&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/../xm/inc/dinfox&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/inc/nodes&quot;"/>
 								</option>
 								<inputType id="ilg.gnuarmeclipse.managedbuild.cross.tool.assembler.input.2026372331" superClass="ilg.gnuarmeclipse.managedbuild.cross.tool.assembler.input"/>
 							</tool>
@@ -70,14 +75,19 @@
 									<listOptionValue builtIn="false" value="__START=main"/>
 									<listOptionValue builtIn="false" value="MCU_CATEGORY_2"/>
 									<listOptionValue builtIn="false" value="HW1_0"/>
+									<listOptionValue builtIn="false" value="__GNUC_PYTHON__"/>
+									<listOptionValue builtIn="false" value="ARM_MATH_DSP"/>
 								</option>
 								<option IS_BUILTIN_EMPTY="false" IS_VALUE_EMPTY="false" id="ilg.gnuarmeclipse.managedbuild.cross.option.c.compiler.include.paths.954853377" name="Include paths (-I)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.c.compiler.include.paths" useByScannerDiscovery="true" valueType="includePath">
 									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/inc&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/inc/registers&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/inc/peripherals&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/inc/utils&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/inc/components&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/inc/applicative&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/inc/dsp&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/inc/utils&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/../xm/inc/dinfox&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/inc/nodes&quot;"/>
 								</option>
 								<inputType id="ilg.gnuarmeclipse.managedbuild.cross.tool.c.compiler.input.2068312002" superClass="ilg.gnuarmeclipse.managedbuild.cross.tool.c.compiler.input"/>
 							</tool>
@@ -112,6 +122,10 @@
 							</tool>
 						</toolChain>
 					</folderInfo>
+					<sourceEntries>
+						<entry excluding="dinfox" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
+						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="dinfox"/>
+					</sourceEntries>
 				</configuration>
 			</storageModule>
 			<storageModule moduleId="org.eclipse.cdt.core.externalSettings"/>

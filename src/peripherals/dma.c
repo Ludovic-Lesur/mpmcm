@@ -24,7 +24,7 @@ typedef enum {
 
 /*** DMA local global variables ***/
 
-static dma_buffer_size = 0;
+static uint16_t dma_buffer_size = 0;
 
 /*** DMA local functions ***/
 

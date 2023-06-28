@@ -35,7 +35,7 @@ static volatile uint32_t* EXTI_FTSR;
  */
 void __attribute__((optimize("-O0"))) EXTI2_IRQHandler(void) {
 	// Set flag in measure block.
-	MEASURE_set_zero_cross_flag();
+	MEASURE_increment_zero_cross_count();
 	// Clear flag.
 	EXTI -> PR1 |= (0b1 << GPIO_ZERO_CROSS_PULSE.pin);
 }
