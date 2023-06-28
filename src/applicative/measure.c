@@ -20,13 +20,8 @@
 
 /*** MEASURE local macros ***/
 
-#define MEASURE_INTEGRATION_PERIOD_MS		1000
-
 #define MEASURE_MAINS_PERIOD_US				20000
 #define MEASURE_ZERO_CROSS_PER_PERIOD		2
-
-#define MEASURE_OVERALL_PERIOD_SECONDS		360
-#define MEASURE_HOUR_BUFFER_SIZE			((MEASURE_OVERALL_PERIOD_SECONDS * 1000) / (MEASURE_INTEGRATION_PERIOD_MS))
 
 // Expressed in number of periods.
 #define MEASURE_INTEGRATION_BUFFER_SIZE		((1000 * MEASURE_INTEGRATION_PERIOD_MS) / (MEASURE_MAINS_PERIOD_US))
@@ -67,13 +62,6 @@ typedef struct {
 } MEASURE_buffer_t;
 
 typedef struct {
-	int32_t min;
-	int32_t max;
-	int32_t rolling_mean;
-	uint32_t number_of_samples;
-} MEASURE_result_t;
-
-typedef struct {
 	// Raw buffer filled by ADC and DMA for 1 period.
 	MEASURE_buffer_t acv_sampling[MEASURE_PERIOD_DMA_BUFFER_DEPTH];
 	uint8_t acv_sampling_read_idx;
@@ -92,11 +80,7 @@ typedef struct {
 	int32_t period_apparent_power;
 	int32_t period_power_factor;
 	// Results.
-	MEASURE_result_t active_power[ADC_NUMBER_OF_ACI_CHANNELS];
-	MEASURE_result_t rms_voltage[ADC_NUMBER_OF_ACI_CHANNELS];
-	MEASURE_result_t rms_current[ADC_NUMBER_OF_ACI_CHANNELS];
-	MEASURE_result_t apparent_power[ADC_NUMBER_OF_ACI_CHANNELS];
-	MEASURE_result_t power_factor[ADC_NUMBER_OF_ACI_CHANNELS];
+	MEASURE_channel_result_t result[ADC_NUMBER_OF_ACI_CHANNELS];
 } MEASURE_data_t;
 
 typedef struct {
@@ -123,12 +107,24 @@ static MEASURE_context_t measure_ctx;
 	result.number_of_samples = 0; \
 }
 
+/* COPY RESULT.
+ * @param source:		Source result structure.
+ * @param destination:	Destination result structure.
+ * @return:				None.
+ */
+#define _MEASURE_copy_result(source, destination) { \
+	destination.min = source.min; \
+	destination.max = source.max; \
+	destination.rolling_mean = source.rolling_mean; \
+	destination.number_of_samples = source.number_of_samples; \
+}
+
 /* UPDATE RESULT WITH NEW SAMPLE.
  * @param result:		Result structure to update.
  * @param new_sample:	New value to take into account.
  * @return:				None.
  */
-#define _MEASURE_update_result(result, new_sample) { \
+#define _MEASURE_result_add_sample(result, new_sample) { \
 	/* Min */ \
 	if (new_sample < result.min) { \
 		result.min = new_sample; \
@@ -240,11 +236,11 @@ static void _MEASURE_reset_results(void) {
 	// Channels loop.
 	for (ac_channel_idx=0 ; ac_channel_idx<ADC_NUMBER_OF_ACI_CHANNELS ; ac_channel_idx++) {
 		// Clear all results.
-		_MEASURE_reset_result(measure_data.active_power[ac_channel_idx]);
-		_MEASURE_reset_result(measure_data.rms_voltage[ac_channel_idx]);
-		_MEASURE_reset_result(measure_data.rms_current[ac_channel_idx]);
-		_MEASURE_reset_result(measure_data.apparent_power[ac_channel_idx]);
-		_MEASURE_reset_result(measure_data.power_factor[ac_channel_idx]);
+		_MEASURE_reset_result(measure_data.result[ac_channel_idx].active_power);
+		_MEASURE_reset_result(measure_data.result[ac_channel_idx].rms_voltage);
+		_MEASURE_reset_result(measure_data.result[ac_channel_idx].rms_current);
+		_MEASURE_reset_result(measure_data.result[ac_channel_idx].apparent_power);
+		_MEASURE_reset_result(measure_data.result[ac_channel_idx].power_factor);
 	}
 }
 
@@ -379,11 +375,11 @@ MEASURE_status_t MEASURE_task(void) {
 			// Power factor.
 			measure_data.period_power_factor = (measure_data.period_active_power * MEASURE_POWER_FACTOR_MULTIPLIER) / (measure_data.period_apparent_power);
 			// Update results.
-			_MEASURE_update_result(measure_data.active_power[ac_channel_idx], measure_data.period_active_power);
-			_MEASURE_update_result(measure_data.rms_voltage[ac_channel_idx], measure_data.period_rms_voltage);
-			_MEASURE_update_result(measure_data.rms_current[ac_channel_idx], measure_data.period_rms_current);
-			_MEASURE_update_result(measure_data.apparent_power[ac_channel_idx], measure_data.period_apparent_power);
-			_MEASURE_update_result(measure_data.power_factor[ac_channel_idx], measure_data.period_power_factor);
+			_MEASURE_result_add_sample(measure_data.result[ac_channel_idx].active_power, measure_data.period_active_power);
+			_MEASURE_result_add_sample(measure_data.result[ac_channel_idx].rms_voltage, measure_data.period_rms_voltage);
+			_MEASURE_result_add_sample(measure_data.result[ac_channel_idx].rms_current, measure_data.period_rms_current);
+			_MEASURE_result_add_sample(measure_data.result[ac_channel_idx].apparent_power, measure_data.period_apparent_power);
+			_MEASURE_result_add_sample(measure_data.result[ac_channel_idx].power_factor, measure_data.period_power_factor);
 		}
 		// Update read indexes.
 		measure_data.acv_sampling_read_idx = ((measure_data.acv_sampling_read_idx + 1) % MEASURE_PERIOD_DMA_BUFFER_DEPTH);
@@ -395,6 +391,35 @@ MEASURE_status_t MEASURE_task(void) {
 		status = MEASURE_ERROR_STATE;
 		goto errors;
 	}
+errors:
+	return status;
+}
+
+/* READ MAINS MEASUREMENTS.
+ * @param ac_channel_index:	AC channel index to read.
+ * @param data:				Pointer to the result structure.
+ * @return status:			Function execution status.
+ */
+MEASURE_status_t MEASURE_get_ac_channel_data(uint8_t ac_channel_index, MEASURE_channel_result_t* ac_channel_data) {
+	// Local variables.
+	MEASURE_status_t status = MEASURE_SUCCESS;
+	// Check parameters.
+	if (ac_channel_data) {
+		status = MEASURE_ERROR_NULL_PARAMETER;
+		goto errors;
+	}
+	if (ac_channel_index >= ADC_NUMBER_OF_ACI_CHANNELS) {
+		status = MEASURE_ERROR_AC_LINE_INDEX;
+		goto errors;
+	}
+	// Copy data.
+	_MEASURE_copy_result(measure_data.result[ac_channel_index].active_power, (ac_channel_data -> active_power));
+	_MEASURE_copy_result(measure_data.result[ac_channel_index].rms_voltage, (ac_channel_data -> rms_voltage));
+	_MEASURE_copy_result(measure_data.result[ac_channel_index].rms_current, (ac_channel_data -> rms_current));
+	_MEASURE_copy_result(measure_data.result[ac_channel_index].apparent_power, (ac_channel_data -> apparent_power));
+	_MEASURE_copy_result(measure_data.result[ac_channel_index].power_factor, (ac_channel_data -> power_factor));
+	// Reset data.
+	_MEASURE_reset_results();
 errors:
 	return status;
 }
