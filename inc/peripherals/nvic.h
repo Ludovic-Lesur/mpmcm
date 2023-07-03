@@ -122,6 +122,11 @@ typedef enum {
 	NVIC_PRIORITY_MIN = 255
 } NVIC_priority_t;
 
+typedef enum {
+	NVIC_PRIORITY_EXTI2 = NVIC_PRIORITY_MAX,
+	NVIC_PRIORITY_RTC_WKUP
+} NVIC_priority_list_t;
+
 /*** NVIC functions ***/
 
 void NVIC_init(void);

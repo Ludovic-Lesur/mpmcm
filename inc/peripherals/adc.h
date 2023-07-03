@@ -14,7 +14,8 @@
 /*** ADC macros ***/
 
 #define ADC_VREF_MV					2500
-#define ADC_FULL_SCALE				4095
+#define ADC_RESOLUTION_BITS			12
+#define ADC_FULL_SCALE				((1 << ADC_RESOLUTION_BITS) - 1)
 
 #define ADC_NUMBER_OF_ACI_CHANNELS	4
 #define ADC_SAMPLING_PERIOD_US		200

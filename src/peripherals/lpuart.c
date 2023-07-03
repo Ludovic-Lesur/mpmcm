@@ -12,6 +12,7 @@
 #include "lbus.h"
 #include "lpuart_reg.h"
 #include "mapping.h"
+#include "mode.h"
 #include "node_common.h"
 #include "nvic.h"
 #include "rcc.h"
@@ -20,7 +21,11 @@
 
 /*** LPUART local macros ***/
 
+#ifdef HIGH_SPEED_LOG
+#define LPUART_BAUD_RATE 		115200
+#else
 #define LPUART_BAUD_RATE 		1200
+#endif
 #define LPUART_TIMEOUT_COUNT	100000
 //#define LPUART_USE_NRE
 
@@ -87,8 +92,13 @@ LPUART_status_t LPUART1_init(NODE_address_t self_address) {
 		// Do not exit, just store error and apply mask.
 		status = LPUART_ERROR_LBUS_ADDRESS;
 	}
+#ifdef HIGH_SPEED_LOG
+	// Select SYSCLK as clock source.
+	RCC -> CCIPR |= (0b01 << 10); // LPUART1SEL='01'.
+#else
 	// Select LSE as clock source.
 	RCC -> CCIPR |= (0b11 << 10); // LPUART1SEL='11'.
+#endif
 	// Enable peripheral clock.
 	RCC -> APB1ENR2 |= (0b1 << 0); // LPUARTEN='1'.
 	// Configure TX and RX GPIOs.
@@ -108,7 +118,13 @@ LPUART_status_t LPUART1_init(NODE_address_t self_address) {
 	LPUART1 -> CR2 |= (self_address << 24) | (0b1 << 4);
 	LPUART1 -> CR3 |= 0x00805000;
 	// Baud rate.
+#ifdef HIGH_SPEED_LOG
+	LPUART1 -> PRESC |= 0b0110;
+	brr = ((RCC_SYSCLK_KHZ * 1000) / (12));
+	brr *= 256;
+#else
 	brr = (RCC_LSE_FREQUENCY_HZ * 256);
+#endif
 	brr /= LPUART_BAUD_RATE;
 	LPUART1 -> BRR = (brr & 0x000FFFFF); // BRR = (256*fCK)/(baud rate). See p.730 of RM0377 datasheet.
 	// Configure interrupt.

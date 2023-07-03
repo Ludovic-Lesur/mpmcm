@@ -16,6 +16,8 @@
 void AT_BUS_init(NODE_address_t self_address);
 void AT_BUS_task(void);
 void AT_BUS_fill_rx_buffer(uint8_t rx_byte);
-void AT_BUS_print_test_result(uint8_t status, int16_t rssi);
+#ifdef HIGH_SPEED_LOG
+void AT_BUS_high_speed_log(void);
+#endif
 
 #endif /* __AT_BUS_H__ */

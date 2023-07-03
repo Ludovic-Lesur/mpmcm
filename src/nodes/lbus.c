@@ -9,6 +9,7 @@
 
 #include "at_bus.h"
 #include "lpuart.h"
+#include "mode.h"
 #include "node_common.h"
 #include "types.h"
 
@@ -68,6 +69,7 @@ LBUS_status_t LBUS_send(uint8_t* data, uint32_t data_size_bytes) {
 	// Local variables.
 	LBUS_status_t status = LBUS_SUCCESS;
 	LPUART_status_t lpuart1_status = LPUART_SUCCESS;
+#ifndef HIGH_SPEED_LOG
 	uint8_t lbus_header[LBUS_FRAME_FIELD_INDEX_DATA];
 	// Build address header.
 	lbus_header[LBUS_FRAME_FIELD_INDEX_DESTINATION_ADDRESS] = (lbus_ctx.master_address | LBUS_DESTINATION_ADDRESS_MARKER);
@@ -75,6 +77,7 @@ LBUS_status_t LBUS_send(uint8_t* data, uint32_t data_size_bytes) {
 	// Send header.
 	lpuart1_status = LPUART1_send(lbus_header, LBUS_FRAME_FIELD_INDEX_DATA);
 	LPUART1_status_check(LBUS_ERROR_BASE_LPUART);
+#endif
 	// Send command.
 	lpuart1_status = LPUART1_send(data, data_size_bytes);
 	LPUART1_status_check(LBUS_ERROR_BASE_LPUART);

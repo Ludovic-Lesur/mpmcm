@@ -7,6 +7,7 @@
 
 #include "exti.h"
 
+#include "error.h"
 #include "exti_reg.h"
 #include "gpio.h"
 #include "mapping.h"
@@ -133,7 +134,7 @@ void EXTI_init(void) {
  */
 void EXTI_configure_gpio(const GPIO_pin_t* gpio, EXTI_trigger_t trigger) {
 	// Compute registers and bit index.
-	uint8_t line = (0b1 << (gpio -> pin));
+	uint8_t line = (gpio -> pin);
 	uint8_t line_idx = (line % EXTI_LINES_PER_REGISTER);
 	_EXTI_SELECT_IMR();
 	// Select GPIO port.

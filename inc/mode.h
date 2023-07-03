@@ -10,6 +10,7 @@
 
 /*** Debug mode ***/
 
-//#define DEBUG		// Use programming pins for debug purpose if defined.
+//#define DEBUG				// Disable watchdog for debug purpose if defined.
+//#define HIGH_SPEED_LOG	// Use 115200 raw transmission on RS485 bus.
 
 #endif /* __MODE_H__ */

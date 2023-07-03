@@ -32,18 +32,17 @@ typedef struct {
 } MEASURE_result_t;
 
 typedef struct {
-	MEASURE_result_t active_power;
-	MEASURE_result_t rms_voltage;
-	MEASURE_result_t rms_current;
-	MEASURE_result_t apparent_power;
+	MEASURE_result_t active_power_mw;
+	MEASURE_result_t rms_voltage_mv;
+	MEASURE_result_t rms_current_ma;
+	MEASURE_result_t apparent_power_mva;
 	MEASURE_result_t power_factor;
 } MEASURE_channel_result_t;
 
 /*** MEASURE functions ***/
 
 MEASURE_status_t MEASURE_init(void);
-MEASURE_status_t MEASURE_task(void);
-
+MEASURE_status_t MEASURE_process(void);
 MEASURE_status_t MEASURE_get_ac_channel_data(uint8_t ac_channel_index, MEASURE_channel_result_t* ac_channel_data);
 
 void MEASURE_increment_zero_cross_count(void);

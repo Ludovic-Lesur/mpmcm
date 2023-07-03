@@ -11,6 +11,7 @@
 #include "dinfox.h"
 #include "error.h"
 #include "lbus.h"
+#include "measure.h"
 #include "mode.h"
 #include "node_common.h"
 #include "parser.h"
@@ -145,6 +146,9 @@ static void _AT_BUS_reply_send(void) {
 	LBUS_status_t lbus_status = LBUS_SUCCESS;
 	// Add ending character.
 	_AT_BUS_reply_add_char(AT_BUS_FRAME_END);
+#ifdef HIGH_SPEED_LOG
+	_AT_BUS_reply_add_char(STRING_CHAR_LF);
+#endif
 	// Send reply.
 	lbus_status = LBUS_send((uint8_t*) at_bus_ctx.reply, at_bus_ctx.reply_size);
 	LBUS_error_check();
@@ -384,19 +388,37 @@ void AT_BUS_fill_rx_buffer(uint8_t rx_byte) {
 	}
 }
 
-/* PRINT SIGFOX LIBRARY RESULT.
- * @param test_result:	Test result.
- * @param rssi:			Downlink signal rssi in dBm.
+#ifdef HIGH_SPEED_LOG
+/* PRINT MEASUREMENTS RESULT ON RS485 INTERFACE.
+ * @param:	None.
+ * @return:	None.
  */
-void AT_BUS_print_test_result(uint8_t test_result, int16_t rssi_dbm) {
-	// Check result.
-	if (test_result == 0) {
-		_AT_BUS_reply_add_string("Test failed.");
-	}
-	else {
-		_AT_BUS_reply_add_string("Test passed. RSSI=");
-		_AT_BUS_reply_add_value(rssi_dbm, STRING_FORMAT_DECIMAL, 0);
-		_AT_BUS_reply_add_string("dBm");
-	}
+void AT_BUS_high_speed_log(void) {
+	// Local variables.
+	MEASURE_channel_result_t channel_result;
+	// Get measurements.
+	MEASURE_get_ac_channel_data(0, &channel_result);
+	// Print data.
+	_AT_BUS_reply_add_string("Pact = ");
+	_AT_BUS_reply_add_value(channel_result.active_power_mw.rolling_mean, STRING_FORMAT_DECIMAL, 0);
+	_AT_BUS_reply_add_string(" mW");
+	_AT_BUS_reply_send();
+	_AT_BUS_reply_add_string("Urms = ");
+	_AT_BUS_reply_add_value(channel_result.rms_voltage_mv.rolling_mean, STRING_FORMAT_DECIMAL, 0);
+	_AT_BUS_reply_add_string(" mV");
+	_AT_BUS_reply_send();
+	_AT_BUS_reply_add_string("Irms = ");
+	_AT_BUS_reply_add_value(channel_result.rms_current_ma.rolling_mean, STRING_FORMAT_DECIMAL, 0);
+	_AT_BUS_reply_add_string(" mA");
+	_AT_BUS_reply_send();
+	_AT_BUS_reply_add_string("Papp = ");
+	_AT_BUS_reply_add_value(channel_result.apparent_power_mva.rolling_mean, STRING_FORMAT_DECIMAL, 0);
+	_AT_BUS_reply_add_string(" mVA");
+	_AT_BUS_reply_send();
+	_AT_BUS_reply_add_string("PF = ");
+	_AT_BUS_reply_add_value(channel_result.power_factor.rolling_mean, STRING_FORMAT_DECIMAL, 0);
+	_AT_BUS_reply_send();
+	_AT_BUS_reply_add_string(" ");
 	_AT_BUS_reply_send();
 }
+#endif
