@@ -99,8 +99,11 @@ typedef struct {
 
 /*** MEASURE local global variables ***/
 
+static const GPIO_pin_t* MEASURE_GPIO_ACI_DETECT[ADC_NUMBER_OF_ACI_CHANNELS] = {&GPIO_ACI1_DETECT, &GPIO_ACI2_DETECT, &GPIO_ACI3_DETECT, &GPIO_ACI4_DETECT};
+
 static volatile MEASURE_sampling_t measure_sampling;
 static MEASURE_data_t measure_data __attribute__((section(".bss_ccmsram")));
+
 static volatile MEASURE_context_t measure_ctx;
 
 /*** MEASURE local functions ***/
@@ -330,6 +333,10 @@ static MEASURE_status_t _MEASURE_internal_process(void) {
 				// Copy samples by channel and convert to Q31 type.
 				measure_data.period_acvx_buffer_q31[idx] = (measure_sampling.acv[measure_sampling.acv_read_idx].data[(ADC_NUMBER_OF_ACI_CHANNELS * idx) + ac_channel_idx]) << MEASURE_Q31_SHIFT_ADC;
 				measure_data.period_acix_buffer_q31[idx] = (measure_sampling.aci[measure_sampling.aci_read_idx].data[(ADC_NUMBER_OF_ACI_CHANNELS * idx) + ac_channel_idx]) << MEASURE_Q31_SHIFT_ADC;
+				// Force current to 0 if sensor is not connected.
+				if (GPIO_read(MEASURE_GPIO_ACI_DETECT[ac_channel_idx]) == 0) {
+					measure_data.period_acix_buffer_q31[idx] = 0;
+				}
 			}
 			// Mean voltage and current.
 			arm_mean_q31(measure_data.period_acvx_buffer_q31, measure_data.period_acxx_buffer_size, &mean_voltage_q31);
@@ -356,9 +363,10 @@ static MEASURE_status_t _MEASURE_internal_process(void) {
 			rms_current_ma = (int32_t) (temp_s64 / MEASURE_ACI_FACTOR_DEN);
 			// Apparent power.
 			temp_s64 = (int64_t) rms_voltage_mv * (int64_t) rms_current_ma;
-			apparent_power_mva = (int32_t) (temp_s64 / 1000);
+			apparent_power_mva = (int32_t) ((temp_s64) / ((int64_t) 1000));
 			// Power factor.
-			power_factor = (apparent_power_mva != 0) ? ((MEASURE_POWER_FACTOR_MULTIPLIER * active_power_mw) / apparent_power_mva) : 0;
+			temp_s64 = (int64_t) MEASURE_POWER_FACTOR_MULTIPLIER * (int64_t) active_power_mw;
+			power_factor = (apparent_power_mva != 0) ? (int32_t) ((temp_s64) / ((int64_t) apparent_power_mva)) : 0;
 			// Update results.
 			_MEASURE_result_add_sample(measure_data.result[ac_channel_idx].active_power_mw, active_power_mw);
 			_MEASURE_result_add_sample(measure_data.result[ac_channel_idx].rms_voltage_mv, rms_voltage_mv);
@@ -390,9 +398,14 @@ MEASURE_status_t MEASURE_init(void) {
 	// Local variables.
 	MEASURE_status_t status = MEASURE_SUCCESS;
 	ADC_status_t adc_status = ADC_SUCCESS;
+	uint8_t idx = 0;
 	// Init context.
 	measure_ctx.state = MEASURE_STATE_STOPPED;
 	_MEASURE_reset_all_channels_results();
+	// Init current sensors detector.
+	for (idx=0 ; idx<ADC_NUMBER_OF_ACI_CHANNELS ; idx++) {
+		GPIO_configure(MEASURE_GPIO_ACI_DETECT[idx], GPIO_MODE_INPUT, GPIO_TYPE_PUSH_PULL, GPIO_SPEED_LOW, GPIO_PULL_NONE);
+	}
 	// Init zero cross pulse GPIO.
 	GPIO_configure(&GPIO_ZERO_CROSS_PULSE, GPIO_MODE_INPUT, GPIO_TYPE_PUSH_PULL, GPIO_SPEED_LOW, GPIO_PULL_NONE);
 	EXTI_configure_gpio(&GPIO_ZERO_CROSS_PULSE, EXTI_TRIGGER_RISING_EDGE);
