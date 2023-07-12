@@ -24,7 +24,7 @@
 #define MEASURE_ZERO_CROSS_PER_PERIOD		2
 
 #define MEASURE_TRANSFORMER_GAIN			30 // Unit mV/mV.
-#define MEASURE_TRANSFORMER_ATTEN			10 // Unit mV/mV.
+#define MEASURE_TRANSFORMER_ATTEN			11 // Unit mV/mV.
 #define MEASURE_ACV_FACTOR_NUM				((int64_t) MEASURE_TRANSFORMER_GAIN * (int64_t) MEASURE_TRANSFORMER_ATTEN * (int64_t) ADC_VREF_MV)
 #define MEASURE_ACV_FACTOR_DEN				((int64_t) ADC_FULL_SCALE)
 
@@ -143,26 +143,26 @@ static volatile MEASURE_context_t measure_ctx;
 		result.max = new_sample; \
 	} \
 	/* Rolling mean */ \
-	result.rolling_mean = ((result.rolling_mean * result.number_of_samples) + new_sample) / (result.number_of_samples + 1); \
+	temp_s64 = ((int64_t) result.rolling_mean * (int64_t) result.number_of_samples) + (int64_t) new_sample; \
+	result.rolling_mean = (int32_t) ((temp_s64) / ((int64_t) (result.number_of_samples + 1))); \
 	result.number_of_samples++; \
 }
 
-/* SWITCH DMA BUFFER.
+/* RESET MEASURE CONTEXT.
  * @param:	None.
  * @return:	None.
  */
-static inline void _MEASURE_switch_dma_buffer(void) {
-	// Stop DMA.
-	DMA1_stop();
-	// Retrieve number of transfered data.
-	DMA1_get_number_of_transfered_data((uint16_t*) &(measure_sampling.acv[measure_sampling.acv_write_idx].size), (uint16_t*) &(measure_sampling.aci[measure_sampling.acv_write_idx].size));
-	// Update write indexes.
-	measure_sampling.acv_write_idx = ((measure_sampling.acv_write_idx + 1) % MEASURE_PERIOD_DMA_BUFFER_DEPTH);
-	measure_sampling.aci_write_idx = ((measure_sampling.aci_write_idx + 1) % MEASURE_PERIOD_DMA_BUFFER_DEPTH);
-	// Set new address.
+static void _MEASURE_reset(void) {
+	// Reset indexes.
+	measure_sampling.acv_write_idx = 0;
+	measure_sampling.acv_read_idx = 0;
+	measure_sampling.aci_write_idx = 0;
+	measure_sampling.aci_read_idx = 0;
+	// Reset flags.
+	measure_ctx.zero_cross_count = 0;
+	measure_ctx.dma_transfer_end_flag = 0;
+	// Set DMA address.
 	DMA1_set_destination_address((uint32_t) &(measure_sampling.acv[measure_sampling.acv_write_idx].data), (uint32_t) &(measure_sampling.aci[measure_sampling.aci_write_idx].data), MEASURE_PERIOD_DMA_BUFFER_SIZE);
-	// Restart DMA.
-	DMA1_start();
 }
 
 /* START MAINS MEASUREMENTS.
@@ -173,16 +173,7 @@ static MEASURE_status_t _MEASURE_start(void) {
 	// Local variables.
 	MEASURE_status_t status = MEASURE_SUCCESS;
 	ADC_status_t adc_status = ADC_SUCCESS;
-	// Reset indexed.
-	measure_sampling.acv_write_idx = 0;
-	measure_sampling.acv_read_idx = 0;
-	measure_sampling.aci_write_idx = 0;
-	measure_sampling.aci_read_idx = 0;
-	// Reset flags.
-	measure_ctx.zero_cross_count = 0;
-	measure_ctx.dma_transfer_end_flag = 0;
 	// Start DMA.
-	DMA1_set_destination_address((uint32_t) &(measure_sampling.acv[measure_sampling.acv_write_idx].data), (uint32_t) &(measure_sampling.aci[measure_sampling.aci_write_idx].data), MEASURE_PERIOD_DMA_BUFFER_SIZE);
 	DMA1_start();
 	// Start ADC.
 	adc_status = ADC_start();
@@ -208,6 +199,29 @@ static MEASURE_status_t _MEASURE_stop(void) {
 	ADC_status_check(MEASURE_ERROR_BASE_ADC);
 	// Stop DMA.
 	DMA1_stop();
+errors:
+	return status;
+}
+
+/* SWITCH DMA BUFFER.
+ * @param:	None.
+ * @return:	None.
+ */
+static MEASURE_status_t _MEASURE_switch_dma_buffer(void) {
+	// Local variables.
+	MEASURE_status_t status = MEASURE_SUCCESS;
+	// Stop ADC and DMA.
+	status = _MEASURE_stop();
+	if (status != MEASURE_SUCCESS) goto errors;
+	// Retrieve number of transfered data.
+	DMA1_get_number_of_transfered_data((uint16_t*) &(measure_sampling.acv[measure_sampling.acv_write_idx].size), (uint16_t*) &(measure_sampling.aci[measure_sampling.acv_write_idx].size));
+	// Update write indexes.
+	measure_sampling.acv_write_idx = ((measure_sampling.acv_write_idx + 1) % MEASURE_PERIOD_DMA_BUFFER_DEPTH);
+	measure_sampling.aci_write_idx = ((measure_sampling.aci_write_idx + 1) % MEASURE_PERIOD_DMA_BUFFER_DEPTH);
+	// Set new address.
+	DMA1_set_destination_address((uint32_t) &(measure_sampling.acv[measure_sampling.acv_write_idx].data), (uint32_t) &(measure_sampling.aci[measure_sampling.aci_write_idx].data), MEASURE_PERIOD_DMA_BUFFER_SIZE);
+	// Restart DMA.
+	status = _MEASURE_start();
 errors:
 	return status;
 }
@@ -252,7 +266,9 @@ static MEASURE_status_t _MEASURE_internal_process(void) {
 	uint32_t aci_buffer_size = 0;
 	uint8_t ac_channel_idx = 0;
 	int32_t active_power_mw = 0;
+	q31_t mean_voltage_q31 = 0;
 	int32_t rms_voltage_mv = 0;
+	q31_t mean_current_q31 = 0;
 	int32_t rms_current_ma = 0;
 	int32_t apparent_power_mva = 0;
 	int32_t power_factor = 0;
@@ -272,6 +288,8 @@ static MEASURE_status_t _MEASURE_internal_process(void) {
 		if (measure_ctx.zero_cross_count > MEASURE_ZERO_CROSS_PER_PERIOD) {
 			// Clear flag.
 			measure_ctx.zero_cross_count = 0;
+			// Reset context.
+			_MEASURE_reset();
 			// Start measure.
 			status = _MEASURE_start();
 			if (status != MEASURE_SUCCESS) goto errors;
@@ -293,7 +311,8 @@ static MEASURE_status_t _MEASURE_internal_process(void) {
 			measure_ctx.zero_cross_count = 0;
 #endif
 			// Switch to next buffer.
-			_MEASURE_switch_dma_buffer();
+			status = _MEASURE_switch_dma_buffer();
+			if (status != MEASURE_SUCCESS) goto errors;
 			// Update state.
 			measure_ctx.state = MEASURE_STATE_PERIOD_PROCESS;
 		}
@@ -312,22 +331,32 @@ static MEASURE_status_t _MEASURE_internal_process(void) {
 				measure_data.period_acvx_buffer_q31[idx] = (measure_sampling.acv[measure_sampling.acv_read_idx].data[(ADC_NUMBER_OF_ACI_CHANNELS * idx) + ac_channel_idx]) << MEASURE_Q31_SHIFT_ADC;
 				measure_data.period_acix_buffer_q31[idx] = (measure_sampling.aci[measure_sampling.aci_read_idx].data[(ADC_NUMBER_OF_ACI_CHANNELS * idx) + ac_channel_idx]) << MEASURE_Q31_SHIFT_ADC;
 			}
+			// Mean voltage and current.
+			arm_mean_q31(measure_data.period_acvx_buffer_q31, measure_data.period_acxx_buffer_size, &mean_voltage_q31);
+			arm_mean_q31(measure_data.period_acix_buffer_q31, measure_data.period_acxx_buffer_size, &mean_current_q31);
+			// DC removal.
+			for (idx=0 ; idx<(measure_data.period_acxx_buffer_size) ; idx++) {
+				measure_data.period_acvx_buffer_q31[idx] -= mean_voltage_q31;
+				measure_data.period_acix_buffer_q31[idx] -= mean_current_q31;
+			}
 			// Instantaneous power.
 			arm_mult_q31(measure_data.period_acvx_buffer_q31, measure_data.period_acix_buffer_q31, measure_data.period_acpx_buffer_q31, measure_data.period_acxx_buffer_size);
 			// Active power.
 			arm_mean_q31(measure_data.period_acpx_buffer_q31, measure_data.period_acxx_buffer_size, &(measure_data.period_active_power_q31));
-			temp_s64 = MEASURE_ACP_FACTOR_NUM * (int64_t) (measure_data.period_active_power_q31 >> MEASURE_Q31_SHIFT_MULT);
+			temp_s64 = (int64_t) (measure_data.period_active_power_q31 >> MEASURE_Q31_SHIFT_MULT);
+			temp_s64 *= MEASURE_ACP_FACTOR_NUM;
 			active_power_mw = (int32_t) (temp_s64 / MEASURE_ACP_FACTOR_DEN);
-			// RMS voltage and current.
+			// RMS voltage.
 			arm_rms_q31(measure_data.period_acvx_buffer_q31, measure_data.period_acxx_buffer_size, &(measure_data.period_rms_voltage_q31));
 			temp_s64 = MEASURE_ACV_FACTOR_NUM * (int64_t) (measure_data.period_rms_voltage_q31 >> MEASURE_Q31_SHIFT_ADC);
 			rms_voltage_mv = (int32_t) (temp_s64 / MEASURE_ACV_FACTOR_DEN);
 			// RMS current.
 			arm_rms_q31(measure_data.period_acix_buffer_q31, measure_data.period_acxx_buffer_size, &(measure_data.period_rms_current_q31));
 			temp_s64 = MEASURE_ACI_FACTOR_NUM * (int64_t) (measure_data.period_rms_current_q31 >> MEASURE_Q31_SHIFT_ADC);
-			rms_current_ma = (int32_t) ((temp_s64) / ((int64_t) MEASURE_ACI_FACTOR_DEN));
+			rms_current_ma = (int32_t) (temp_s64 / MEASURE_ACI_FACTOR_DEN);
 			// Apparent power.
-			apparent_power_mva = ((rms_voltage_mv / 1000) * rms_current_ma);
+			temp_s64 = (int64_t) rms_voltage_mv * (int64_t) rms_current_ma;
+			apparent_power_mva = (int32_t) (temp_s64 / 1000);
 			// Power factor.
 			power_factor = (apparent_power_mva != 0) ? ((MEASURE_POWER_FACTOR_MULTIPLIER * active_power_mw) / apparent_power_mva) : 0;
 			// Update results.
