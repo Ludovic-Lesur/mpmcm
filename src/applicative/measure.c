@@ -25,13 +25,16 @@
 
 #define MEASURE_TRANSFORMER_GAIN			30 // Unit mV/mV.
 #define MEASURE_TRANSFORMER_ATTEN			10 // Unit mV/mV.
-#define MEASURE_ACV_FACTOR					((MEASURE_TRANSFORMER_GAIN * MEASURE_TRANSFORMER_ATTEN * ADC_VREF_MV) / (ADC_FULL_SCALE))
+#define MEASURE_ACV_FACTOR_NUM				((int64_t) MEASURE_TRANSFORMER_GAIN * (int64_t) MEASURE_TRANSFORMER_ATTEN * (int64_t) ADC_VREF_MV)
+#define MEASURE_ACV_FACTOR_DEN				((int64_t) ADC_FULL_SCALE)
 
 #define MEASURE_SCT013_GAIN					20 // Unit mA/mV.
 #define MEASURE_SCT013_ATTEN				1 // Unit mV/mV
-#define MEASURE_ACI_FACTOR					((MEASURE_SCT013_GAIN * MEASURE_SCT013_ATTEN * ADC_VREF_MV) / (ADC_FULL_SCALE))
+#define MEASURE_ACI_FACTOR_NUM				((int64_t) MEASURE_SCT013_GAIN * (int64_t) MEASURE_SCT013_ATTEN * (int64_t) ADC_VREF_MV)
+#define MEASURE_ACI_FACTOR_DEN				((int64_t) ADC_FULL_SCALE)
 
-#define MEASURE_ACP_FACTOR					((MEASURE_ACV_FACTOR * MEASURE_ACI_FACTOR) / 1000) // To get mW from mV and mA.
+#define MEASURE_ACP_FACTOR_NUM				(MEASURE_ACV_FACTOR_NUM * MEASURE_ACI_FACTOR_NUM)
+#define MEASURE_ACP_FACTOR_DEN				(MEASURE_ACV_FACTOR_DEN * MEASURE_ACI_FACTOR_DEN * (int64_t) 1000) // To get mW from mV and mA.
 
 // Note: factor 2 is used to add a margin to the buffer length (2 mains periods long instead of 1).
 // Buffer switch is triggered by the zero cross detection instead of a fixed number of samples.
@@ -253,6 +256,7 @@ static MEASURE_status_t _MEASURE_internal_process(void) {
 	int32_t rms_current_ma = 0;
 	int32_t apparent_power_mva = 0;
 	int32_t power_factor = 0;
+	int64_t temp_s64 = 0;
 	uint32_t idx = 0;
 	// Perform state machine.
 	switch (measure_ctx.state) {
@@ -312,12 +316,16 @@ static MEASURE_status_t _MEASURE_internal_process(void) {
 			arm_mult_q31(measure_data.period_acvx_buffer_q31, measure_data.period_acix_buffer_q31, measure_data.period_acpx_buffer_q31, measure_data.period_acxx_buffer_size);
 			// Active power.
 			arm_mean_q31(measure_data.period_acpx_buffer_q31, measure_data.period_acxx_buffer_size, &(measure_data.period_active_power_q31));
-			active_power_mw = (MEASURE_ACP_FACTOR * (measure_data.period_active_power_q31 >> MEASURE_Q31_SHIFT_MULT));
+			temp_s64 = MEASURE_ACP_FACTOR_NUM * (int64_t) (measure_data.period_active_power_q31 >> MEASURE_Q31_SHIFT_MULT);
+			active_power_mw = (int32_t) (temp_s64 / MEASURE_ACP_FACTOR_DEN);
 			// RMS voltage and current.
 			arm_rms_q31(measure_data.period_acvx_buffer_q31, measure_data.period_acxx_buffer_size, &(measure_data.period_rms_voltage_q31));
+			temp_s64 = MEASURE_ACV_FACTOR_NUM * (int64_t) (measure_data.period_rms_voltage_q31 >> MEASURE_Q31_SHIFT_ADC);
+			rms_voltage_mv = (int32_t) (temp_s64 / MEASURE_ACV_FACTOR_DEN);
+			// RMS current.
 			arm_rms_q31(measure_data.period_acix_buffer_q31, measure_data.period_acxx_buffer_size, &(measure_data.period_rms_current_q31));
-			rms_voltage_mv = (MEASURE_ACV_FACTOR * (measure_data.period_rms_voltage_q31 >> MEASURE_Q31_SHIFT_ADC));
-			rms_current_ma = (MEASURE_ACI_FACTOR * (measure_data.period_rms_current_q31 >> MEASURE_Q31_SHIFT_ADC));
+			temp_s64 = MEASURE_ACI_FACTOR_NUM * (int64_t) (measure_data.period_rms_current_q31 >> MEASURE_Q31_SHIFT_ADC);
+			rms_current_ma = (int32_t) ((temp_s64) / ((int64_t) MEASURE_ACI_FACTOR_DEN));
 			// Apparent power.
 			apparent_power_mva = ((rms_voltage_mv / 1000) * rms_current_ma);
 			// Power factor.
