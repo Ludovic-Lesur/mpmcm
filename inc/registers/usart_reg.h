@@ -10,8 +10,23 @@
 
 #include "types.h"
 
-/*** USARTx registers ***/
+/*** USART REG macros ***/
 
+// Peripherals base address.
+#define USART1	((USART_registers_t*) ((uint32_t) 0x40013800))
+#define USART2	((USART_registers_t*) ((uint32_t) 0x40004400))
+#define USART3	((USART_registers_t*) ((uint32_t) 0x40004800))
+#define UART4	((USART_registers_t*) ((uint32_t) 0x40004C00))
+#if (defined MCU_CATEGORY_3) || (MCU_CATEGORY_4)
+#define UART5	((USART_registers_t*) ((uint32_t) 0x40005000))
+#endif
+
+/*** USART REG structures ***/
+
+/*!******************************************************************
+ * \enum USART_registers_t
+ * \brief USART registers map.
+ *******************************************************************/
 typedef struct {
 	volatile uint32_t CR1;    	// USART control register 1.
 	volatile uint32_t CR2;    	// USART control register 2.
@@ -26,15 +41,5 @@ typedef struct {
 	volatile uint32_t TDR;    	// USART transmit data register.
 	volatile uint32_t PRESC;	// USART prescaler register.
 } USART_registers_t;
-
-/*** USARTx base addresses ***/
-
-#define USART1	((USART_registers_t*) ((uint32_t) 0x40013800))
-#define USART2	((USART_registers_t*) ((uint32_t) 0x40004400))
-#define USART3	((USART_registers_t*) ((uint32_t) 0x40004800))
-#define UART4	((USART_registers_t*) ((uint32_t) 0x40004C00))
-#if (defined MCU_CATEGORY_3) || (MCU_CATEGORY_4)
-#define UART5	((USART_registers_t*) ((uint32_t) 0x40005000))
-#endif
 
 #endif /* __USART_REG_H__ */

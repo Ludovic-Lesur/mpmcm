@@ -10,8 +10,17 @@
 
 #include "types.h"
 
-/*** SYSCFG registers ***/
+/*** SYSCFG REG macros ***/
 
+// Peripheral base address.
+#define SYSCFG	((SYSCFG_registers_t*) ((uint32_t) 0x40010000))
+
+/*** SYSCFG REG structures ***/
+
+/*!******************************************************************
+ * \enum SYSCFG_registers_t
+ * \brief SYSCFG registers map.
+ *******************************************************************/
 typedef struct {
 	volatile uint32_t MEMRMP;    	// SYSCFG memory remap register.
 	volatile uint32_t CFGR1;    	// SYSCFG configuration register 1.
@@ -21,9 +30,5 @@ typedef struct {
 	volatile uint32_t SWPR;   		// SYSCFG CCM SRAM write protection register.
 	volatile uint32_t SKR;   		// SYSCFG CCM SRAM write key register.
 } SYSCFG_registers_t;
-
-/*** SYSCFG base address ***/
-
-#define SYSCFG	((SYSCFG_registers_t*) ((uint32_t) 0x40010000))
 
 #endif /* __SYSCFG_REG_H__ */

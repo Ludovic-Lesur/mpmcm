@@ -10,8 +10,17 @@
 
 #include "types.h"
 
-/*** LPTIM registers ***/
+/*** LPTIM REG macros ***/
 
+// Peripheral base address.
+#define LPTIM1	((LPTIM_registers_t*) ((uint32_t) 0x40007C00))
+
+/*** LPTIM REG structures ***/
+
+/*!******************************************************************
+ * \enum LPTIM_registers_t
+ * \brief LPTIM registers map.
+ *******************************************************************/
 typedef struct {
 	volatile uint32_t ISR;    	// LPTIM interrupt and status register.
 	volatile uint32_t ICR;   	// LPTIM interrupt clear register.
@@ -23,9 +32,5 @@ typedef struct {
 	volatile uint32_t CNT;     	// LPTIM counter register.
 	volatile uint32_t OR;     	// LPTIM option register.
 } LPTIM_registers_t;
-
-/*** LPTIM base address ***/
-
-#define LPTIM1	((LPTIM_registers_t*) ((uint32_t) 0x40007C00))
 
 #endif /* __LPTIM_REG_H__ */

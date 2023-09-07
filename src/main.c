@@ -29,6 +29,7 @@
 static void _MPMCM_init_hw(void) {
 	// Local variables.
 	MEASURE_status_t measure_status = MEASURE_SUCCESS;
+	RCC_status_t rcc_status = RCC_SUCCESS;
 	RTC_status_t rtc_status = RTC_SUCCESS;
 #ifndef DEBUG
 	IWDG_status_t iwdg_status = IWDG_SUCCESS;
@@ -37,34 +38,32 @@ static void _MPMCM_init_hw(void) {
 	ERROR_stack_init();
 	// Init memory.
 	NVIC_init();
+	// Init power module and clock tree.
+	RCC_init();
+	PWR_init();
 	// Init GPIOs.
 	GPIO_init();
 	EXTI_init();
-	// Init clock and power modules.
-	RCC_init();
-	PWR_init();
-	// Reset RTC.
-	RTC_reset();
-	// Start oscillators.
-	RCC_enable_lsi();
-	RCC_enable_lse();
-	// Start independent watchdog.
 #ifndef DEBUG
+	// Start independent watchdog.
 	iwdg_status = IWDG_init();
-	IWDG_error_check();
-#endif
+	IWDG_stack_error();
 	IWDG_reload();
-	// RTC.
+#endif
+	// High speed oscillator.
+	rcc_status = RCC_switch_to_pll();
+	RCC_stack_error();
+	// Init RTC.
 	rtc_status = RTC_init();
-	RTC_error_check();
-	// Init peripherals.
+	RTC_stack_error();
+	// Init delay timer.
 	LPTIM1_init();
-	LPUART1_init(0x1C);
-	// Init LBUS layer.
-	LBUS_init(0x1C);
-	// Init mains measurements block.
+	// Init components.
+	POWER_init();
 	measure_status = MEASURE_init();
-	MEASURE_error_check();
+	MEASURE_stack_error();
+	// Init AT BUS interface.
+	AT_BUS_init();
 }
 
 /*** MAIN function ***/
@@ -81,10 +80,12 @@ int main(void) {
 	// Main loop.
 	while (1) {
 		// Enter sleep mode.
-		__asm volatile ("wfi");
+		IWDG_reload();
+		PWR_enter_sleep_mode();
+		IWDG_reload();
 		// Process measure.
 		measure_status = MEASURE_process();
-		MEASURE_error_check();
+		MEASURE_stack_error();
 		// Check RTC flag.
 		if (RTC_get_wakeup_timer_flag() != 0) {
 			// Clear flag.
@@ -95,8 +96,6 @@ int main(void) {
 		}
 		// Process AT bus link.
 		AT_BUS_task();
-		// Reload watchdog.
-		IWDG_reload();
 	}
 	return 0;
 }

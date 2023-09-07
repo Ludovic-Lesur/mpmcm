@@ -22,24 +22,68 @@
 
 /*** ADC structures ***/
 
+/*!******************************************************************
+ * \enum ADC_status_t
+ * \brief ADC driver error codes.
+ *******************************************************************/
 typedef enum {
+	// Driver errors.
 	ADC_SUCCESS = 0,
 	ADC_ERROR_NULL_PARAMETER,
+	ADC_ERROR_DISABLE_TIMEOUT,
 	ADC_ERROR_CALIBRATION,
-	ADC_ERROR_READY,
+	ADC_ERROR_READY_TIMEOUT,
+	// Low level drivers errors.
 	ADC_ERROR_BASE_LPTIM1 = 0x0100,
+	// Last base value.
 	ADC_ERROR_BASE_LAST = (ADC_ERROR_BASE_LPTIM1 + LPTIM_ERROR_BASE_LAST)
 } ADC_status_t;
 
 /*** ADC functions ***/
 
+/*!******************************************************************
+ * \fn ADC_status_t ADC_init(void)
+ * \brief Init ADC peripheral.
+ * \param[in]  	none
+ * \param[out] 	none
+ * \retval		Function execution status.
+ *******************************************************************/
 ADC_status_t ADC_init(void);
 
+/*!******************************************************************
+ * \fn void ADC_de_init(void)
+ * \brief Release ADC peripheral.
+ * \param[in]  	none
+ * \param[out] 	none
+ * \retval		Function execution status.
+ *******************************************************************/
+ADC_status_t ADC_de_init(void);
+
+/*!******************************************************************
+ * \fn ADC_status_t ADC_start(void)
+ * \brief Start ADC continuous conversions.
+ * \param[in]  	none
+ * \param[out] 	none
+ * \retval		Function execution status.
+ *******************************************************************/
 ADC_status_t ADC_start(void);
+
+/*!******************************************************************
+ * \fn ADC_status_t ADC_stop(void)
+ * \brief Stop ADC continuous conversions.
+ * \param[in]  	none
+ * \param[out] 	none
+ * \retval		Function execution status.
+ *******************************************************************/
 ADC_status_t ADC_stop(void);
 
-#define ADC_status_check(error_base) { if (adc_status != ADC_SUCCESS) { status = error_base + adc_status; goto errors; }}
-#define ADC_error_check() { ERROR_status_check(adc_status, ADC_SUCCESS, ERROR_BASE_ADC); }
-#define ADC_error_check_print() { ERROR_status_check_print(adc_status, ADC_SUCCESS, ERROR_BASE_ADC); }
+/*******************************************************************/
+#define ADC_exit_error(error_base) { if (adc_status != ADC_SUCCESS) { status = (error_base + adc_status); goto errors; } }
+
+/*******************************************************************/
+#define ADC_stack_error(void) { if (adc1_status != ADC_SUCCESS) { ERROR_stack_add(ERROR_BASE_ADC + adc_status); } }
+
+/*******************************************************************/
+#define ADC_stack_exit_error(error_code) { if (adc_status != ADC_SUCCESS) { ERROR_stack_add(ERROR_BASE_ADC + adc_status); status = error_code; goto errors; }
 
 #endif /* __ADC_H__ */

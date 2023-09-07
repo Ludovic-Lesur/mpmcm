@@ -10,8 +10,17 @@
 
 #include "types.h"
 
-/*** DMA registers ***/
+/*** DMAMUX REG macros ***/
 
+// Peripheral base address.
+#define DMAMUX	((DMAMUX_registers_t*) ((uint32_t) 0x40020800))
+
+/*** DMAMUX REG structures ***/
+
+/*!******************************************************************
+ * \enum DMAMUX_registers_t
+ * \brief DMAMUX registers map.
+ *******************************************************************/
 typedef struct {
 	volatile uint32_t CxCR[16];			// DMAMUX request line multiplexer line x configuration register.
 	volatile uint32_t RESERVED0[16];	// Reserved 0x40-0x7C.
@@ -23,9 +32,5 @@ typedef struct {
 	volatile uint32_t RGSR;
 	volatile uint32_t RGCFR;
 } DMAMUX_registers_t;
-
-/*** DMA base address ***/
-
-#define DMAMUX	((DMAMUX_registers_t*) ((uint32_t) 0x40020800))
 
 #endif /* __DMAMUX_REG_H__ */

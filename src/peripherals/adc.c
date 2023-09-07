@@ -29,6 +29,7 @@
 
 /*** ADC local structures ***/
 
+/*******************************************************************/
 typedef enum {
 	ADC_CHANNEL_ACV_SAMPLING = 1,
 	ADC_CHANNEL_ACI1_SAMPLING = 2,
@@ -55,10 +56,7 @@ static const ADC_channels_t ADC2_REGULAR_CHANNELS[ADC_NUMBER_OF_ACI_CHANNELS] = 
 
 /*** ADC local functions ***/
 
-/* ENABLE ADC INTERNAL REGULATOR.
- * @param ADC:		ADC peripheral to enable.
- * @return status:	Function execution status.
- */
+/*******************************************************************/
 static ADC_status_t _ADC_enable_regulator(ADC_registers_t* ADC) {
 	// Local variables.
 	ADC_status_t status = ADC_SUCCESS;
@@ -68,15 +66,12 @@ static ADC_status_t _ADC_enable_regulator(ADC_registers_t* ADC) {
 	// Enable voltage regulator.
 	ADC -> CR |= (0b1 << 28);
 	lptim1_status = LPTIM1_delay_milliseconds(10, LPTIM_DELAY_MODE_ACTIVE);
-	LPTIM1_status_check(ADC_ERROR_BASE_LPTIM1);
+	LPTIM1_exit_error(ADC_ERROR_BASE_LPTIM1);
 errors:
 	return status;
 }
 
-/* CALIBRATE ADC.
- * @param ADC:		ADC peripheral to calibrate.
- * @return status:	Function execution status.
- */
+/*******************************************************************/
 static ADC_status_t _ADC_calibrate(ADC_registers_t* ADC) {
 	// Local variables.
 	ADC_status_t status = ADC_SUCCESS;
@@ -96,16 +91,12 @@ static ADC_status_t _ADC_calibrate(ADC_registers_t* ADC) {
 		}
 	}
 	lptim1_status = LPTIM1_delay_milliseconds(10, LPTIM_DELAY_MODE_ACTIVE);
-	LPTIM1_status_check(ADC_ERROR_BASE_LPTIM1);
+	LPTIM1_exit_error(ADC_ERROR_BASE_LPTIM1);
 errors:
 	return status;
 }
 
-/* INIT SINGLE ADC.
- * @param ADC:					ADC peripheral to init.
- * @param ADC_REGULAR_CHANNELS:	List of regulator channels to convert.
- * @return status:				Function execution status.
- */
+/*******************************************************************/
 static ADC_status_t _ADC_init(ADC_registers_t* ADC, ADC_channels_t* ADC_REGULAR_CHANNELS) {
 	// Local variables.
 	ADC_status_t status = ADC_SUCCESS;
@@ -171,10 +162,7 @@ errors:
 	return status;
 }
 
-/* START SINGLE ADC.
- * @param ADC:		ADC peripheral to start.
- * @return status:	Function execution status.
- */
+/*******************************************************************/
 static ADC_status_t _ADC_start(ADC_registers_t* ADC) {
 	// Local variables.
 	ADC_status_t status = ADC_SUCCESS;
@@ -186,7 +174,7 @@ static ADC_status_t _ADC_start(ADC_registers_t* ADC) {
 		// Wait for ADRDY='1' or timeout.
 		loop_count++;
 		if (loop_count > ADC_TIMEOUT_COUNT) {
-			status = ADC_ERROR_READY;
+			status = ADC_ERROR_READY_TIMEOUT;
 			goto errors;
 		}
 	}
@@ -196,10 +184,7 @@ errors:
 	return status;
 }
 
-/* STOP SINGLE ADC.
- * @param ADC:		ADC peripheral to start.
- * @return status:	Function execution status.
- */
+/*******************************************************************/
 static ADC_status_t _ADC_stop(ADC_registers_t* ADC) {
 	// Local variables.
 	ADC_status_t status = ADC_SUCCESS;
@@ -219,30 +204,45 @@ static ADC_status_t _ADC_stop(ADC_registers_t* ADC) {
 	return status;
 }
 
+/*******************************************************************/
+static ADC_status_t _ADC_disable(ADC_registers_t* ADC) {
+	// Local variables.
+	ADC_status_t status = ADC_SUCCESS;
+	uint32_t loop_count = 0;
+	// Check ADC state.
+	if (((ADC -> CR) & (0b1 << 0)) == 0) goto errors; // Not an error but to exit directly.
+	// Disable ADC.
+	ADC -> CR |= (0b1 << 1); // ADDIS='1'.
+	// Wait for ADC to be disabled.
+	while (((ADC -> CR) & (0b1 << 0)) != 0) {
+		// Exit if timeout.
+		loop_count++;
+		if (loop_count > ADC_TIMEOUT_COUNT) {
+			status = ADC_ERROR_DISABLE_TIMEOUT;
+			break;
+		}
+	}
+errors:
+	// Disable voltage regulator.
+	ADC -> CR &= ~(0b1 << 28);
+	return status;
+}
+
 /*** ADC functions ***/
 
-/* INIT ADC1 AND ADC2 IN DUAL MODE.
- * @param:			None.
- * @return status:	Function execution status.
- */
+/*******************************************************************/
 ADC_status_t ADC_init(void) {
 	// Local variables.
 	ADC_status_t status = ADC_SUCCESS;
-	LPTIM_status_t lptim1_status = LPTIM_SUCCESS;
 	// Enable peripheral clock (PLLP).
 	RCC -> CCIPR |= (0b01 << 28);
 	RCC -> AHB2ENR |= (0b1 << 13);
 	// Configure pins.
-	GPIO_configure(&GPIO_ANA_POWER_ENABLE, GPIO_MODE_OUTPUT, GPIO_TYPE_PUSH_PULL, GPIO_SPEED_LOW, GPIO_PULL_NONE);
 	GPIO_configure(&GPIO_ACV_SAMPLING, GPIO_MODE_ANALOG, GPIO_TYPE_OPEN_DRAIN, GPIO_SPEED_LOW, GPIO_PULL_NONE);
 	GPIO_configure(&GPIO_ACI1_SAMPLING, GPIO_MODE_ANALOG, GPIO_TYPE_OPEN_DRAIN, GPIO_SPEED_LOW, GPIO_PULL_NONE);
 	GPIO_configure(&GPIO_ACI2_SAMPLING, GPIO_MODE_ANALOG, GPIO_TYPE_OPEN_DRAIN, GPIO_SPEED_LOW, GPIO_PULL_NONE);
 	GPIO_configure(&GPIO_ACI3_SAMPLING, GPIO_MODE_ANALOG, GPIO_TYPE_OPEN_DRAIN, GPIO_SPEED_LOW, GPIO_PULL_NONE);
 	GPIO_configure(&GPIO_ACI4_SAMPLING, GPIO_MODE_ANALOG, GPIO_TYPE_OPEN_DRAIN, GPIO_SPEED_LOW, GPIO_PULL_NONE);
-	// Turn analog fonrt-end on to have VREF+ for calibration.
-	GPIO_write(&GPIO_ANA_POWER_ENABLE, 1);
-	lptim1_status = LPTIM1_delay_milliseconds(100, LPTIM_DELAY_MODE_ACTIVE);
-	LPTIM1_status_check(ADC_ERROR_BASE_LPTIM1);
 	// Use adc_ker_ck.
 	ADCCR12 -> CCR &= ~(0b11 << 16);
 	// ADC clocked on PLL with no prescaler -> Fadc = 8Mhz.
@@ -271,10 +271,22 @@ errors:
 	return status;
 }
 
-/* START ADC SAMPLING.
- * @param:	None.
- * @return:	None.
- */
+/*******************************************************************/
+ADC_status_t ADC_de_init(void) {
+	// Local variables.
+	ADC_status_t status = ADC_SUCCESS;
+	// Disable all ADCs.
+	status = _ADC_disable(ADC1);
+	if (status != ADC_SUCCESS) goto errors;
+	status = _ADC_disable(ADC2);
+	if (status != ADC_SUCCESS) goto errors;
+errors:
+	// Disable peripheral clock.
+	RCC -> AHB2ENR &= ~(0b1 << 13);
+	return status;
+}
+
+/*******************************************************************/
 ADC_status_t ADC_start(void) {
 	// Local variables.
 	ADC_status_t status = ADC_SUCCESS;
@@ -287,10 +299,7 @@ errors:
 	return status;
 }
 
-/* START ADC SAMPLING.
- * @param:	None.
- * @return:	None.
- */
+/*******************************************************************/
 ADC_status_t ADC_stop(void) {
 	// Local variables.
 	ADC_status_t status = ADC_SUCCESS;

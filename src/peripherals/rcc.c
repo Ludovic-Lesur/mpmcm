@@ -8,6 +8,7 @@
 #include "rcc.h"
 
 #include "error.h"
+#include "flash.h"
 #include "gpio.h"
 #include "mapping.h"
 #include "nvic.h"
@@ -15,37 +16,67 @@
 #include "rcc_reg.h"
 #include "types.h"
 
-/*** RCC macros ***/
+/*** RCC local macros ***/
 
 //#define RCC_MCO
 #define RCC_TIMEOUT_COUNT	1000000
 
-/*** RCC local global variables ***/
-
-#ifdef RCC_MCO
-static const GPIO_pin_t GPIO_MCO = (GPIO_pin_t) {GPIOA, 0, 8, 0}; // AF0 = MCO.
-#endif
-
 /*** RCC local functions ***/
 
-/* RCC INTERRUPT HANDLER.
- * @param:	None.
- * @return:	None.
- */
-void RCC_IRQHandler(void) {
+/*******************************************************************/
+void __attribute__((optimize("-O0"))) RCC_IRQHandler(void) {
 	// Clear all flags.
 	RCC -> CICR |= (0b11 << 0);
 }
 
+/*******************************************************************/
+void _RCC_enable_lsi(void) {
+	// Enable LSI.
+	RCC -> CSR |= (0b1 << 0); // LSION='1'.
+	// Enable interrupt.
+	RCC -> CIER |= (0b1 << 0);
+	NVIC_enable_interrupt(NVIC_INTERRUPT_RCC, NVIC_PRIORITY_RCC);
+	// Wait for LSI to be stable.
+	while (((RCC -> CSR) & (0b1 << 1)) == 0) {
+		PWR_enter_sleep_mode();
+	}
+	NVIC_disable_interrupt(NVIC_INTERRUPT_RCC);
+}
+
+/*******************************************************************/
+void _RCC_enable_lse(void) {
+	// Enable LSE (32.768kHz crystal).
+	RCC -> BDCR |= (0b1 << 0); // LSEON='1'.
+	// Enable interrupt.
+	RCC -> CIER |= (0b1 << 1);
+	NVIC_enable_interrupt(NVIC_INTERRUPT_RCC, NVIC_PRIORITY_RCC);
+	// Wait for LSE to be stable.
+	while (((RCC -> BDCR) & (0b1 << 1)) == 0) {
+		PWR_enter_sleep_mode();
+	}
+	NVIC_disable_interrupt(NVIC_INTERRUPT_RCC);
+}
+
 /*** RCC functions ***/
 
-/* INIT MCU CLOCK TREE.
- * @param:	None.
- * @return:	Function execution status.
- */
-RCC_status_t RCC_init(void) {
+/*******************************************************************/
+void __attribute__((optimize("-O0"))) RCC_init(void) {
+	// Local variables.
+	uint8_t i = 0;
+	// Reset backup domain.
+	RCC -> BDCR |= (0b1 << 16); // BDRST='1'.
+	for (i=0 ; i<100 ; i++);
+	RCC -> BDCR &= ~(0b1 << 16); // BDRST='0'.
+	// Enable low speed oscillators.
+	_RCC_enable_lsi();
+	_RCC_enable_lse();
+}
+
+/*******************************************************************/
+RCC_status_t RCC_switch_to_pll(void) {
 	// Local variables.
 	RCC_status_t status = RCC_SUCCESS;
+	FLASH_status_t flash_status = FLASH_SUCCESS;
 	uint32_t loop_count = 0;
 	uint8_t hse_ready = 1;
 	// Turn TCXO on.
@@ -80,7 +111,7 @@ RCC_status_t RCC_init(void) {
 		}
 	}
 	// Configure PLL.
-	// Clock entry = HSE 16MHz.
+	// Clock entry = HSE or HSI 16MHz.
 	// M=2 -> VCO input clock = 8MHz.
 	// N=30 -> VCO output clock = 240MHz.
 	// R=2 -> SYSCLK = 120MHz.
@@ -104,6 +135,9 @@ RCC_status_t RCC_init(void) {
 			goto errors;
 		}
 	}
+	// Update FLASH latency.
+	flash_status = FLASH_set_latency(4);
+	FLASH_exit_error(RCC_ERROR_BASE_FLASH);
 	// Switch SYSCLK.
 	RCC -> CFGR |= (0b11 << 0); // Use PLL as system clock (SW='11').
 	// Wait for clock switch.
@@ -126,38 +160,4 @@ RCC_status_t RCC_init(void) {
 	RCC -> CR &= ~(0b1 << 8); // HSION='0'.
 errors:
 	return status;
-}
-
-/* ENABLE INTERNAL LOW SPEED OSCILLATOR (38kHz INTERNAL RC).
- * @param:	None.
- * @return:	None.
- */
-void RCC_enable_lsi(void) {
-	// Enable LSI.
-	RCC -> CSR |= (0b1 << 0); // LSION='1'.
-	// Enable interrupt.
-	RCC -> CIER |= (0b1 << 0);
-	NVIC_enable_interrupt(NVIC_INTERRUPT_RCC);
-	// Wait for LSI to be stable.
-	while (((RCC -> CSR) & (0b1 << 1)) == 0) {
-		__asm volatile ("wfi"); // Wait For Interrupt core instruction.
-	}
-	NVIC_disable_interrupt(NVIC_INTERRUPT_RCC);
-}
-
-/* ENABLE EXTERNAL LOW SPEED OSCILLATOR (32.768kHz QUARTZ).
- * @param:	None.
- * @return:	None.
- */
-void RCC_enable_lse(void) {
-	// Enable LSE (32.768kHz crystal).
-	RCC -> BDCR |= (0b1 << 0); // LSEON='1'.
-	// Enable interrupt.
-	RCC -> CIER |= (0b1 << 1);
-	NVIC_enable_interrupt(NVIC_INTERRUPT_RCC);
-	// Wait for LSE to be stable.
-	while (((RCC -> BDCR) & (0b1 << 1)) == 0) {
-		__asm volatile ("wfi"); // Wait For Interrupt core instruction.
-	}
-	NVIC_disable_interrupt(NVIC_INTERRUPT_RCC);
 }

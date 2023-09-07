@@ -49,8 +49,9 @@ static const GPIO_pin_t GPIO_USART2_RX =			(GPIO_pin_t) {GPIOA, 0, 15, 7}; // AF
 static const GPIO_pin_t GPIO_LED_RED =				(GPIO_pin_t) {GPIOB, 1, 6, 2}; // AF2 = TIM4_CH1.
 static const GPIO_pin_t GPIO_LED_GREEN =			(GPIO_pin_t) {GPIOB, 1, 7, 2}; // AF2 = TIM4_CH2.
 static const GPIO_pin_t GPIO_LED_BLUE =				(GPIO_pin_t) {GPIOB, 1, 9, 2}; // AF2 = TIM4_CH4.
-// Test point.
+// Test points.
 static const GPIO_pin_t GPIO_TP1 =					(GPIO_pin_t) {GPIOB, 1, 5, 0};
+static const GPIO_pin_t GPIO_MCO = 					(GPIO_pin_t) {GPIOA, 0, 8, 0}; // AF0 = MCO.
 // Programming.
 static const GPIO_pin_t GPIO_SWDIO =				(GPIO_pin_t) {GPIOA, 0, 13, 0};
 static const GPIO_pin_t GPIO_SWCLK =				(GPIO_pin_t) {GPIOA, 0, 14, 0};

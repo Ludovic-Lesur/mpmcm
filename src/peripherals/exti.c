@@ -7,179 +7,115 @@
 
 #include "exti.h"
 
-#include "error.h"
 #include "exti_reg.h"
 #include "gpio.h"
 #include "mapping.h"
-#include "measure.h"
-#include "nvic.h"
 #include "rcc_reg.h"
 #include "syscfg_reg.h"
 #include "types.h"
 
-/*** EXTI local macros ***/
-
-#define EXTI_LINES_PER_REGISTER		32
-
 /*** EXTI local global variables ***/
 
-static volatile uint32_t* EXTI_IMR;
-static volatile uint32_t* EXTI_PR;
-static volatile uint32_t* EXTI_RTSR;
-static volatile uint32_t* EXTI_FTSR;
+static EXTI_gpio_irq_cb_t exti_gpio_irq_callbacks[GPIO_PINS_PER_PORT];
 
 /*** EXTI local functions ***/
 
-/* EXTI2 INTERRUPT HANDLER (ZERO CROSS PULSE INPUT).
- * @param:	None.
- * @return:	None.
- */
+/*******************************************************************/
+#define _EXTI_irq_handler(gpio) { \
+	/* Check flag */ \
+	if ((((EXTI -> EXTIx[0]).PR) & (0b1 << (gpio.pin))) != 0) { \
+		/* Check mask and callback */ \
+		if (((((EXTI -> EXTIx[0]).IMR) & (0b1 << (gpio.pin))) != 0) && (exti_gpio_irq_callbacks[gpio.pin] != NULL)) { \
+			/* Execute callback */ \
+			exti_gpio_irq_callbacks[gpio.pin](); \
+		} \
+		/* Clear flag */ \
+		(EXTI -> EXTIx[0]).PR |= (0b1 << (gpio.pin)); \
+	} \
+}
+
+/*******************************************************************/
 void __attribute__((optimize("-O0"))) EXTI2_IRQHandler(void) {
-	// Set flag in measure block.
-	MEASURE_increment_zero_cross_count();
-	// Clear flag.
-	EXTI -> PR1 |= (0b1 << GPIO_ZERO_CROSS_PULSE.pin);
+	// Zero-cross detector.
+	_EXTI_irq_handler(GPIO_ZERO_CROSS_PULSE);
 }
 
-/* SELECT PROPER IMR REGISTER.
- * @param:	None.
- * @return:	None.
- */
-#define _EXTI_SELECT_IMR(void){ \
-	EXTI_IMR = (line < EXTI_LINES_PER_REGISTER) ? &(EXTI -> IMR1) : &(EXTI -> IMR2); \
-}
-
-/* SELECT PROPER PR REGISTER.
- * @param:	None.
- * @return:	None.
- */
-#define _EXTI_SELECT_PR(void) { \
-	EXTI_PR = (line < EXTI_LINES_PER_REGISTER) ? &(EXTI -> PR1) : &(EXTI -> PR2); \
-}
-
-/* SELECT PROPER RTSR REGISTER.
- * @param:	None.
- * @return:	None.
- */
-#define _EXTI_SELECT_RTSR(void) { \
-	EXTI_RTSR = (line < EXTI_LINES_PER_REGISTER) ? &(EXTI -> RTSR1) : &(EXTI -> RTSR2); \
-}
-
-/* SELECT PROPER FTSR REGISTER.
- * @param:	None.
- * @return:	None.
- */
-#define _EXTI_SELECT_FTSR(void) { \
-	EXTI_FTSR = (line < EXTI_LINES_PER_REGISTER) ? &(EXTI -> FTSR1) : &(EXTI -> FTSR2); \
-}
-
-
-
-/* SET EXTI TRIGGER.
- * @param trigger:	Interrupt edge trigger (see EXTI_trigger_t enum).
- * @param line_idx:	Line index.
- * @return:			None.
- */
+/*******************************************************************/
 static void _EXTI_set_trigger(EXTI_trigger_t trigger, uint8_t line) {
-	// Compute registers and bit index.
-	uint8_t line_idx = (line % EXTI_LINES_PER_REGISTER);
-	_EXTI_SELECT_RTSR();
-	_EXTI_SELECT_FTSR();
-	_EXTI_SELECT_PR();
 	// Select triggers.
 	switch (trigger) {
 	// Rising edge only.
 	case EXTI_TRIGGER_RISING_EDGE:
-		(*EXTI_RTSR) |= (0b1 << line_idx); // Rising edge enabled.
-		(*EXTI_FTSR) &= ~(0b1 << line_idx); // Falling edge disabled.
+		(EXTI -> EXTIx[line >> 5]).RTSR |= (0b1 << (line % 32)); // Rising edge enabled.
+		(EXTI -> EXTIx[line >> 5]).FTSR &= ~(0b1 << (line % 32)); // Falling edge disabled.
 		break;
 	// Falling edge only.
 	case EXTI_TRIGGER_FALLING_EDGE:
-		(*EXTI_RTSR) &= ~(0b1 << line_idx); // Rising edge disabled.
-		(*EXTI_FTSR) |= (0b1 << line_idx); // Falling edge enabled.
+		(EXTI -> EXTIx[line >> 5]).RTSR &= ~(0b1 << (line % 32)); // Rising edge disabled.
+		(EXTI -> EXTIx[line >> 5]).FTSR |= (0b1 << (line % 32)); // Falling edge enabled.
 		break;
 	// Both edges.
 	case EXTI_TRIGGER_ANY_EDGE:
-		(*EXTI_RTSR) |= (0b1 << line_idx); // Rising edge enabled.
-		(*EXTI_FTSR) |= (0b1 << line_idx); // Falling edge enabled.
+		(EXTI -> EXTIx[line >> 5]).RTSR |= (0b1 << (line % 32)); // Rising edge enabled.
+		(EXTI -> EXTIx[line >> 5]).FTSR |= (0b1 << (line % 32)); // Falling edge enabled.
 		break;
 	// Unknown configuration.
 	default:
 		break;
 	}
 	// Clear flag.
-	(*EXTI_PR) |= (0b1 << line_idx);
+	(EXTI -> EXTIx[line >> 5]).PR |= (0b1 << (line % 32));
 }
 
 /*** EXTI functions ***/
 
-/* INIT EXTI PERIPHERAL.
- * @param:	None.
- * @return:	None.
- */
+/*******************************************************************/
 void EXTI_init(void) {
+	// Local variables.
+	uint8_t idx = 0;
 	// Enable peripheral clock.
 	RCC -> APB2ENR |= (0b1 << 0); // SYSCFEN='1'.
 	// Mask all sources by default.
-	EXTI -> IMR1 = 0;
-	EXTI -> IMR2 = 0;
+	(EXTI -> EXTIx[0]).IMR = 0;
+	(EXTI -> EXTIx[1]).IMR = 0;
 	// Clear all flags.
-	EXTI_clear_all_flags();
+	(EXTI -> EXTIx[0]).PR |= 0xE07BFFFF; // PIFx='1'.
+	(EXTI -> EXTIx[1]).PR |= 0x00000303; // PIFx='1'.
+	// Reset callbacks.
+	for (idx=0 ; idx<GPIO_PINS_PER_PORT ; idx++) {
+		exti_gpio_irq_callbacks[idx] = NULL;
+	}
 }
 
-/* CONFIGURE A GPIO AS EXTERNAL INTERRUPT SOURCE.
- * @param gpio:		GPIO to be attached to EXTI peripheral.
- * @param trigger:	Interrupt edge trigger (see EXTI_trigger_t enum).
- * @return:			None.
- */
-void EXTI_configure_gpio(const GPIO_pin_t* gpio, EXTI_trigger_t trigger) {
-	// Compute registers and bit index.
-	uint8_t line = (gpio -> pin);
-	uint8_t line_idx = (line % EXTI_LINES_PER_REGISTER);
-	_EXTI_SELECT_IMR();
+/*******************************************************************/
+void EXTI_configure_gpio(const GPIO_pin_t* gpio, EXTI_trigger_t trigger, EXTI_gpio_irq_cb_t irq_callback) {
 	// Select GPIO port.
 	SYSCFG -> EXTICR[((gpio -> pin) >> 2)] &= ~(0b1111 << (((gpio -> pin) % 4) << 2));
 	SYSCFG -> EXTICR[((gpio -> pin) >> 2)] |= ((gpio -> port_index) << (((gpio -> pin) % 4) << 2));
 	// Set mask.
-	(*EXTI_IMR) |= (0b1 << line_idx); // IMx='1'.
+	(EXTI -> EXTIx[0]).IMR |= (0b1 << (gpio -> pin));
 	// Select triggers.
-	_EXTI_set_trigger(trigger, line);
+	_EXTI_set_trigger(trigger, (gpio -> pin));
+	// Register callback.
+	exti_gpio_irq_callbacks[gpio -> pin] = irq_callback;
 }
 
-/* CONFIGURE A LINE AS INTERNAL INTERRUPT SOURCE.
- * @param line:		Line to configure (see EXTI_line_t enum).
- * @param trigger:	Interrupt edge trigger (see EXTI_trigger_t enum).
- * @return:			None.
- */
-void EXTI_configure_line(EXTI_line_t line, EXTI_trigger_t trigger) {
-	// Compute registers and bit index.
-	_EXTI_SELECT_IMR();
-	uint8_t line_idx = (line % EXTI_LINES_PER_REGISTER);
+/*******************************************************************/
+void EXTI_release_gpio(const GPIO_pin_t* gpio) {
 	// Set mask.
-	(*EXTI_IMR) |= (0b1 << line_idx); // IMx='1'.
+	(EXTI -> EXTIx[0]).IMR &= ~(0b1 << (gpio -> pin)); // IMx='0'.
+}
+
+/*******************************************************************/
+void EXTI_configure_line(EXTI_line_t line, EXTI_trigger_t trigger) {
+	// Set mask.
+	(EXTI -> EXTIx[line >> 5]).IMR |= (0b1 << (line % 32));
 	// Select triggers.
 	_EXTI_set_trigger(trigger, line);
 }
 
-/* CLEAR EXTI FLAG.
- * @param line:	Line to clear (see EXTI_line_t enum).
- * @return:		None.
- */
+/*******************************************************************/
 void EXTI_clear_flag(EXTI_line_t line) {
-	// Compute registers and bit index.
-	_EXTI_SELECT_PR();
-	uint8_t line_idx = (line % EXTI_LINES_PER_REGISTER);
 	// Clear flag.
-	(*EXTI_PR) |= (0b1 << line_idx); // PIFx='1'.
+	(EXTI -> EXTIx[line >> 5]).PR |= (0b1 << (line % 32));
 }
-
-/* CLEAR ALL EXTI FLAGS.
- * @param:	None.
- * @return:	None.
- */
-void EXTI_clear_all_flags(void) {
-	// Clear all flags.
-	EXTI -> PR1 |= 0xE07BFFFF; // PIFx='1'.
-	EXTI -> PR2 |= 0x00000303; // PIFx='1'.
-}
-

@@ -27,7 +27,7 @@
 		<link>
 			<name>dinfox</name>
 			<type>2</type>
-			<locationURI>PARENT-1-PROJECT_LOC/xm/inc/dinfox</locationURI>
+			<locationURI>PARENT-1-PROJECT_LOC/xm/src/dinfox</locationURI>
 		</link>
 	</linkedResources>
 </projectDescription>

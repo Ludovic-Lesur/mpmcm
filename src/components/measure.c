@@ -15,6 +15,7 @@
 #include "gpio.h"
 #include "mapping.h"
 #include "nvic.h"
+#include "power.h"
 #include "tim.h"
 #include "types.h"
 
@@ -54,6 +55,7 @@
 
 /*** MEASURE local structures ***/
 
+/*******************************************************************/
 typedef enum {
 	MEASURE_STATE_STOPPED = 0,
 	MEASURE_STATE_IDLE,
@@ -61,11 +63,13 @@ typedef enum {
 	MEASURE_STATE_LAST
 } MEASURE_state_t;
 
+/*******************************************************************/
 typedef struct {
 	int16_t data[MEASURE_PERIOD_DMA_BUFFER_SIZE];
 	uint16_t size;
 } MEASURE_buffer_t;
 
+/*******************************************************************/
 typedef struct {
 	// Raw buffers filled by ADC and DMA for 1 period.
 	MEASURE_buffer_t acv[MEASURE_PERIOD_DMA_BUFFER_DEPTH];
@@ -76,6 +80,7 @@ typedef struct {
 	uint8_t aci_write_idx;
 } MEASURE_sampling_t;
 
+/*******************************************************************/
 typedef struct {
 	// Temporary variables for individual channel processing on 1 period.
 	q31_t period_acvx_buffer_q31[MEASURE_PERIOD_BUFFER_SIZE];
@@ -91,6 +96,7 @@ typedef struct {
 	MEASURE_channel_result_t result[ADC_NUMBER_OF_ACI_CHANNELS];
 } MEASURE_data_t;
 
+/*******************************************************************/
 typedef struct {
 	MEASURE_state_t state;
 	uint8_t zero_cross_count;
@@ -108,10 +114,7 @@ static volatile MEASURE_context_t measure_ctx;
 
 /*** MEASURE local functions ***/
 
-/* RESET RESULT.
- * @param result:	Result structure to reset.
- * @return:			None.
- */
+/*******************************************************************/
 #define _MEASURE_reset_result(result) { \
 	result.min = 0x7FFFFFFF; \
 	result.max = 0; \
@@ -119,11 +122,7 @@ static volatile MEASURE_context_t measure_ctx;
 	result.number_of_samples = 0; \
 }
 
-/* COPY RESULT.
- * @param source:		Source result structure.
- * @param destination:	Destination result structure.
- * @return:				None.
- */
+/*******************************************************************/
 #define _MEASURE_copy_result(source, destination) { \
 	destination.min = source.min; \
 	destination.max = source.max; \
@@ -131,11 +130,7 @@ static volatile MEASURE_context_t measure_ctx;
 	destination.number_of_samples = source.number_of_samples; \
 }
 
-/* UPDATE RESULT WITH NEW SAMPLE.
- * @param result:		Result structure to update.
- * @param new_sample:	New value to take into account.
- * @return:				None.
- */
+/*******************************************************************/
 #define _MEASURE_result_add_sample(result, new_sample) { \
 	/* Min */ \
 	if (new_sample < result.min) { \
@@ -151,10 +146,19 @@ static volatile MEASURE_context_t measure_ctx;
 	result.number_of_samples++; \
 }
 
-/* RESET MEASURE CONTEXT.
- * @param:	None.
- * @return:	None.
- */
+/*******************************************************************/
+static void _MEASURE_increment_zero_cross_count(void) {
+	// Set local flag.
+	measure_ctx.zero_cross_count++;
+}
+
+/*******************************************************************/
+static void _MEASURE_set_dma_transfer_end_flag(void) {
+	// Set local flag.
+	measure_ctx.dma_transfer_end_flag = 1;
+}
+
+/*******************************************************************/
 static void _MEASURE_reset(void) {
 	// Reset indexes.
 	measure_sampling.acv_write_idx = 0;
@@ -168,53 +172,12 @@ static void _MEASURE_reset(void) {
 	DMA1_set_destination_address((uint32_t) &(measure_sampling.acv[measure_sampling.acv_write_idx].data), (uint32_t) &(measure_sampling.aci[measure_sampling.aci_write_idx].data), MEASURE_PERIOD_DMA_BUFFER_SIZE);
 }
 
-/* START MAINS MEASUREMENTS.
- * @param:			None.
- * @return status:	Function execution status.
- */
-static MEASURE_status_t _MEASURE_start(void) {
-	// Local variables.
-	MEASURE_status_t status = MEASURE_SUCCESS;
-	ADC_status_t adc_status = ADC_SUCCESS;
-	// Start DMA.
-	DMA1_start();
-	// Start ADC.
-	adc_status = ADC_start();
-	ADC_status_check(MEASURE_ERROR_BASE_ADC);
-	// Start trigger.
-	TIM6_start();
-errors:
-	return status;
-}
-
-/* STOP MAINS MEASUREMENTS.
- * @param:			None.
- * @return status:	Function execution status.
- */
-static MEASURE_status_t _MEASURE_stop(void) {
-	// Local variables.
-	MEASURE_status_t status = MEASURE_SUCCESS;
-	ADC_status_t adc_status = ADC_SUCCESS;
-	// Stop trigger.
-	TIM6_stop();
-	// Stop ADC.
-	adc_status = ADC_stop();
-	ADC_status_check(MEASURE_ERROR_BASE_ADC);
-	// Stop DMA.
-	DMA1_stop();
-errors:
-	return status;
-}
-
-/* SWITCH DMA BUFFER.
- * @param:	None.
- * @return:	None.
- */
+/*******************************************************************/
 static MEASURE_status_t _MEASURE_switch_dma_buffer(void) {
 	// Local variables.
 	MEASURE_status_t status = MEASURE_SUCCESS;
 	// Stop ADC and DMA.
-	status = _MEASURE_stop();
+	status = MEASURE_stop();
 	if (status != MEASURE_SUCCESS) goto errors;
 	// Retrieve number of transfered data.
 	DMA1_get_number_of_transfered_data((uint16_t*) &(measure_sampling.acv[measure_sampling.acv_write_idx].size), (uint16_t*) &(measure_sampling.aci[measure_sampling.acv_write_idx].size));
@@ -224,15 +187,12 @@ static MEASURE_status_t _MEASURE_switch_dma_buffer(void) {
 	// Set new address.
 	DMA1_set_destination_address((uint32_t) &(measure_sampling.acv[measure_sampling.acv_write_idx].data), (uint32_t) &(measure_sampling.aci[measure_sampling.aci_write_idx].data), MEASURE_PERIOD_DMA_BUFFER_SIZE);
 	// Restart DMA.
-	status = _MEASURE_start();
+	status = MEASURE_start();
 errors:
 	return status;
 }
 
-/* RESET ALL CHANNELS RESULTS.
- * @param:	None.
- * @return:	None.
- */
+/*******************************************************************/
 static inline void _MEASURE_reset_channel_results(uint8_t ac_channel_index) {
 	// Local variables.
 	uint8_t ac_channel_idx = 0;
@@ -244,10 +204,7 @@ static inline void _MEASURE_reset_channel_results(uint8_t ac_channel_index) {
 	_MEASURE_reset_result(measure_data.result[ac_channel_idx].power_factor);
 }
 
-/* RESET ALL CHANNELS RESULTS.
- * @param:	None.
- * @return:	None.
- */
+/*******************************************************************/
 static inline void _MEASURE_reset_all_channels_results(void) {
 	// Local variables.
 	uint8_t ac_channel_idx = 0;
@@ -258,10 +215,7 @@ static inline void _MEASURE_reset_all_channels_results(void) {
 	}
 }
 
-/* MAINS MEASUREMENTS INTERNAL STATE MACHINE.
- * @param:			None.
- * @return status:	Function execution status.
- */
+/*******************************************************************/
 static MEASURE_status_t _MEASURE_internal_process(void) {
 	// Local variables.
 	MEASURE_status_t status = MEASURE_SUCCESS;
@@ -294,7 +248,7 @@ static MEASURE_status_t _MEASURE_internal_process(void) {
 			// Reset context.
 			_MEASURE_reset();
 			// Start measure.
-			status = _MEASURE_start();
+			status = MEASURE_start();
 			if (status != MEASURE_SUCCESS) goto errors;
 			// Update state.
 			measure_ctx.state = MEASURE_STATE_IDLE;
@@ -390,13 +344,11 @@ errors:
 
 /*** MEASURE functions ***/
 
-/* INIT MAINS MEASUREMENT PERIPHERALS
- * @param:			None.
- * @return status:	Function execution status.
- */
+/*******************************************************************/
 MEASURE_status_t MEASURE_init(void) {
 	// Local variables.
 	MEASURE_status_t status = MEASURE_SUCCESS;
+	POWER_status_t power_status = POWER_SUCCESS;
 	ADC_status_t adc_status = ADC_SUCCESS;
 	uint8_t idx = 0;
 	// Init context.
@@ -408,42 +360,57 @@ MEASURE_status_t MEASURE_init(void) {
 	}
 	// Init zero cross pulse GPIO.
 	GPIO_configure(&GPIO_ZERO_CROSS_PULSE, GPIO_MODE_INPUT, GPIO_TYPE_PUSH_PULL, GPIO_SPEED_LOW, GPIO_PULL_NONE);
-	EXTI_configure_gpio(&GPIO_ZERO_CROSS_PULSE, EXTI_TRIGGER_RISING_EDGE);
-	NVIC_set_priority(NVIC_INTERRUPT_EXTI2, NVIC_PRIORITY_EXTI2);
-	NVIC_enable_interrupt(NVIC_INTERRUPT_EXTI2);
+	EXTI_configure_gpio(&GPIO_ZERO_CROSS_PULSE, EXTI_TRIGGER_RISING_EDGE, &_MEASURE_increment_zero_cross_count);
+	NVIC_enable_interrupt(NVIC_INTERRUPT_EXTI2, NVIC_PRIORITY_EXTI2);
 	// Init DMA.
-	DMA1_init();
+	DMA1_init(&_MEASURE_set_dma_transfer_end_flag);
+	// Turn analog front-end on to have VREF+ for ADC calibration.
+	power_status = POWER_enable(POWER_DOMAIN_ANALOG, LPTIM_DELAY_MODE_ACTIVE);
+	POWER_exit_error(MEASURE_ERROR_BASE_POWER);
 	// Init ADC.
 	adc_status = ADC_init();
-	ADC_status_check(MEASURE_ERROR_BASE_ADC);
+	ADC_exit_error(MEASURE_ERROR_BASE_ADC);
 	// Init timer.
 	TIM6_init();
 errors:
 	return status;
 }
 
-/* INCREMENT ZERO CROSS COUNTER (CALLED BY EXTI INTERRUPT).
- * @param:	None.
- * @return:	None.
- */
-void MEASURE_increment_zero_cross_count(void) {
-	// Set local flag.
-	measure_ctx.zero_cross_count++;
+/*******************************************************************/
+MEASURE_status_t MEASURE_start(void) {
+	// Local variables.
+	MEASURE_status_t status = MEASURE_SUCCESS;
+	ADC_status_t adc_status = ADC_SUCCESS;
+	// Start DMA.
+	DMA1_start();
+	// Start ADC.
+	adc_status = ADC_start();
+	ADC_exit_error(MEASURE_ERROR_BASE_ADC);
+	// Start trigger.
+	TIM6_start();
+errors:
+	return status;
 }
 
-/* SET DMA TIMEOUT FLAG (CALLED BY DMA INTERRUPT).
- * @param:	None.
- * @return:	None.
- */
-void MEASURE_set_dma_transfer_end_flag(void) {
-	// Set local flag.
-	measure_ctx.dma_transfer_end_flag = 1;
+/*******************************************************************/
+MEASURE_status_t MEASURE_stop(void) {
+	// Local variables.
+	MEASURE_status_t status = MEASURE_SUCCESS;
+	ADC_status_t adc_status = ADC_SUCCESS;
+	// Stop trigger.
+	TIM6_stop();
+	// Stop ADC.
+	adc_status = ADC_stop();
+	ADC_exit_error(MEASURE_ERROR_BASE_ADC);
+	// Stop DMA.
+	DMA1_stop();
+errors:
+	// Update state.
+	measure_ctx.state = MEASURE_STATE_STOPPED;
+	return status;
 }
 
-/* PROCESS FUNCTION OF MAINS MEASUREMENTS).
- * @param:			None.
- * @return status:	Function execution status.
- */
+/*******************************************************************/
 MEASURE_status_t MEASURE_process(void) {
 	// Local variables.
 	MEASURE_status_t status = MEASURE_SUCCESS;
@@ -457,11 +424,21 @@ errors:
 	return status;
 }
 
-/* READ MAINS MEASUREMENTS.
- * @param ac_channel_index:	AC channel index to read.
- * @param data:				Pointer to the result structure.
- * @return status:			Function execution status.
- */
+/*******************************************************************/
+MEASURE_status_t MEASURE_get_ac_channel_detect_flag(uint8_t ac_channel_index, uint8_t* current_sensor_connected) {
+	// Local variables.
+	MEASURE_status_t status = MEASURE_SUCCESS;
+	// Check parameters.
+	if (ac_channel_index >= ADC_NUMBER_OF_ACI_CHANNELS) {
+		status = MEASURE_ERROR_AC_LINE_INDEX;
+		goto errors;
+	}
+	(*current_sensor_connected) = GPIO_read(MEASURE_GPIO_ACI_DETECT[ac_channel_index]);
+errors:
+	return status;
+}
+
+/*******************************************************************/
 MEASURE_status_t MEASURE_get_ac_channel_data(uint8_t ac_channel_index, MEASURE_channel_result_t* ac_channel_data) {
 	// Local variables.
 	MEASURE_status_t status = MEASURE_SUCCESS;

@@ -10,7 +10,9 @@
 
 /*** Debug mode ***/
 
-//#define DEBUG				// Disable watchdog for debug purpose if defined.
+//#define ATM
 //#define HIGH_SPEED_LOG	// Use 115200 raw transmission on RS485 bus.
+
+//#define DEBUG				// Disable watchdog for debug purpose if defined.
 
 #endif /* __MODE_H__ */

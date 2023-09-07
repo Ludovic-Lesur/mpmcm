@@ -9,7 +9,6 @@
 
 #include "exti.h"
 #include "gpio.h"
-#include "lbus.h"
 #include "lpuart_reg.h"
 #include "mapping.h"
 #include "mode.h"
@@ -29,12 +28,13 @@
 #define LPUART_TIMEOUT_COUNT	100000
 //#define LPUART_USE_NRE
 
+/*** LPUART local global variables ***/
+
+static LPUART_rx_irq_cb_t lpuart1_rx_irq_callback = NULL;
+
 /*** LPUART local functions ***/
 
-/* LPUART1 INTERRUPT HANDLER.
- * @param:	None.
- * @return:	None.
- */
+/*******************************************************************/
 void LPUART1_IRQHandler(void) {
 	// Local variables.
 	uint8_t rx_byte = 0;
@@ -42,7 +42,10 @@ void LPUART1_IRQHandler(void) {
 	if (((LPUART1 -> ISR) & (0b1 << 5)) != 0) {
 		// Read incoming byte.
 		rx_byte = (LPUART1 -> RDR);
-		LBUS_fill_rx_buffer(rx_byte);
+		// Transmit byte to upper layer.
+		if (lpuart1_rx_irq_callback != NULL) {
+			lpuart1_rx_irq_callback(rx_byte);
+		}
 		// Clear RXNE flag.
 		LPUART1 -> RQR |= (0b1 << 3);
 	}
@@ -54,10 +57,7 @@ void LPUART1_IRQHandler(void) {
 	EXTI_clear_flag(EXTI_LINE_LPUART1);
 }
 
-/* FILL LPUART1 TX BUFFER WITH A NEW BYTE.
- * @param tx_byte:	Byte to append.
- * @return status:	Function execution status.
- */
+/*******************************************************************/
 static LPUART_status_t _LPUART1_fill_tx_buffer(uint8_t tx_byte) {
 	// Local variables.
 	LPUART_status_t status = LPUART_SUCCESS;
@@ -79,29 +79,40 @@ errors:
 
 /*** LPUART functions ***/
 
-/* CONFIGURE LPUART1.
- * @param self_address:	Self bus address.
- * @return status:		Function execution status.
- */
-LPUART_status_t LPUART1_init(NODE_address_t self_address) {
+/*******************************************************************/
+void LPUART1_init(NODE_address_t self_address, LPUART_rx_irq_cb_t irq_callback) {
 	// Local variables.
-	LPUART_status_t status = LPUART_SUCCESS;
 	uint32_t brr = 0;
-	// Check address.
-	if (self_address > LBUS_ADDRESS_LAST) {
-		// Do not exit, just store error and apply mask.
-		status = LPUART_ERROR_LBUS_ADDRESS;
-	}
 #ifdef HIGH_SPEED_LOG
-	// Select SYSCLK as clock source.
-	RCC -> CCIPR |= (0b01 << 10); // LPUART1SEL='01'.
+	// Select HSI as clock source.
+	RCC -> CCIPR |= (0b10 << 10); // LPUART1SEL='10'.
 #else
 	// Select LSE as clock source.
 	RCC -> CCIPR |= (0b11 << 10); // LPUART1SEL='11'.
 #endif
 	// Enable peripheral clock.
 	RCC -> APB1ENR2 |= (0b1 << 0); // LPUARTEN='1'.
-	// Configure TX and RX GPIOs.
+	// Configure peripheral.
+	LPUART1 -> CR1 |= 0x00002822;
+	LPUART1 -> CR2 |= (self_address << 24) | (0b1 << 4);
+	LPUART1 -> CR3 |= 0x00805000;
+	// Baud rate.
+#ifdef HIGH_SPEED_LOG
+	LPUART1 -> PRESC |= 0b0110;
+	brr = ((RCC_HSI_FREQUENCY_KHZ * 1000) / (12));
+	brr *= 256;
+#else
+	brr = (RCC_LSE_FREQUENCY_HZ * 256);
+#endif
+	brr /= LPUART_BAUD_RATE;
+	LPUART1 -> BRR = (brr & 0x000FFFFF); // BRR = (256*fCK)/(baud rate). See p.730 of RM0377 datasheet.
+	// Configure interrupt.
+	EXTI_configure_line(EXTI_LINE_LPUART1, EXTI_TRIGGER_RISING_EDGE);
+	// Enable transmitter.
+	LPUART1 -> CR1 |= (0b1 << 3); // TE='1'.
+	// Enable peripheral.
+	LPUART1 -> CR1 |= (0b1 << 0); // UE='1'.
+	// Configure GPIOs.
 	GPIO_configure(&GPIO_LPUART1_TX, GPIO_MODE_ALTERNATE_FUNCTION, GPIO_TYPE_PUSH_PULL, GPIO_SPEED_LOW, GPIO_PULL_NONE);
 	GPIO_configure(&GPIO_LPUART1_RX, GPIO_MODE_ALTERNATE_FUNCTION, GPIO_TYPE_PUSH_PULL, GPIO_SPEED_LOW, GPIO_PULL_NONE);
 	GPIO_configure(&GPIO_LPUART1_DE, GPIO_MODE_ALTERNATE_FUNCTION, GPIO_TYPE_PUSH_PULL, GPIO_SPEED_LOW, GPIO_PULL_NONE); // External pull-down resistor present.
@@ -113,40 +124,17 @@ LPUART_status_t LPUART1_init(NODE_address_t self_address) {
 	// Put NRE pin in high impedance since it is directly connected to the DE pin.
 	GPIO_configure(&GPIO_LPUART1_NRE, GPIO_MODE_ANALOG, GPIO_TYPE_OPEN_DRAIN, GPIO_SPEED_LOW, GPIO_PULL_NONE);
 #endif
-	// Configure peripheral.
-	LPUART1 -> CR1 |= 0x00002822;
-	LPUART1 -> CR2 |= (self_address << 24) | (0b1 << 4);
-	LPUART1 -> CR3 |= 0x00805000;
-	// Baud rate.
-#ifdef HIGH_SPEED_LOG
-	LPUART1 -> PRESC |= 0b0110;
-	brr = ((RCC_SYSCLK_KHZ * 1000) / (12));
-	brr *= 256;
-#else
-	brr = (RCC_LSE_FREQUENCY_HZ * 256);
-#endif
-	brr /= LPUART_BAUD_RATE;
-	LPUART1 -> BRR = (brr & 0x000FFFFF); // BRR = (256*fCK)/(baud rate). See p.730 of RM0377 datasheet.
-	// Configure interrupt.
-	NVIC_set_priority(NVIC_INTERRUPT_LPUART1, 0);
-	EXTI_configure_line(EXTI_LINE_LPUART1, EXTI_TRIGGER_RISING_EDGE);
-	// Enable transmitter.
-	LPUART1 -> CR1 |= (0b1 << 3); // TE='1'.
-	// Enable peripheral.
-	LPUART1 -> CR1 |= (0b1 << 0); // UE='1'.
-	return status;
+	// Register callback.
+	lpuart1_rx_irq_callback = irq_callback;
 }
 
-/* EANABLE LPUART RX OPERATION.
- * @param:	None.
- * @return:	None.
- */
+/*******************************************************************/
 void LPUART1_enable_rx(void) {
 	// Mute mode request.
 	LPUART1 -> RQR |= (0b1 << 2); // MMRQ='1'.
 	// Clear flag and enable interrupt.
 	LPUART1 -> RQR |= (0b1 << 3);
-	NVIC_enable_interrupt(NVIC_INTERRUPT_LPUART1);
+	NVIC_enable_interrupt(NVIC_INTERRUPT_LPUART1, NVIC_PRIORITY_LPUART1);
 	// Enable receiver.
 	LPUART1 -> CR1 |= (0b1 << 2); // RE='1'.
 #ifdef LPUART_USE_NRE
@@ -154,10 +142,7 @@ void LPUART1_enable_rx(void) {
 #endif
 }
 
-/* DISABLE LPUART RX OPERATION.
- * @param:	None.
- * @return:	None.
- */
+/*******************************************************************/
 void LPUART1_disable_rx(void) {
 	// Disable receiver.
 #ifdef LPUART_USE_NRE
@@ -168,12 +153,8 @@ void LPUART1_disable_rx(void) {
 	NVIC_disable_interrupt(NVIC_INTERRUPT_LPUART1);
 }
 
-/* SEND A BYTE ARRAY THROUGH LPUART1.
- * @param data:				Byte array to send.
- * @param data_size_bytes:	Number of bytes to send.
- * @return status:			Function execution status.
- */
-LPUART_status_t LPUART1_send(uint8_t* data, uint32_t data_size_bytes) {
+/*******************************************************************/
+LPUART_status_t LPUART1_write(uint8_t* data, uint32_t data_size_bytes) {
 	// Local variables.
 	LPUART_status_t status = LPUART_SUCCESS;
 	uint32_t idx = 0;

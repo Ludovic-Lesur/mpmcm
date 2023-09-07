@@ -8,26 +8,33 @@
 #ifndef __EXTI_REG_H__
 #define __EXTI_REG_H__
 
-/*** EXTI registers ***/
+/*** EXTI REG macros ***/
 
-typedef struct {
-	volatile uint32_t IMR1;    	// EXTI interrupt mask register 1.
-	volatile uint32_t EMR1;    	// EXTI event mask register 1.
-	volatile uint32_t RTSR1;    // EXTI rising edge trigger selection register 1.
-	volatile uint32_t FTSR1;    // EXTI falling edge trigger selection register 1.
-	volatile uint32_t SWIER1;	// EXTI software interrupt event register 1.
-	volatile uint32_t PR1;    	// EXTI pending register 1.
-	uint32_t RESERVED[2];		// Reserved 0x18-0x1C.
-	volatile uint32_t IMR2;    	// EXTI interrupt mask register 2.
-	volatile uint32_t EMR2;    	// EXTI event mask register 2.
-	volatile uint32_t RTSR2;    // EXTI rising edge trigger selection register 2.
-	volatile uint32_t FTSR2;    // EXTI falling edge trigger selection register 2.
-	volatile uint32_t SWIER2;	// EXTI software interrupt event register 2.
-	volatile uint32_t PR2;    	// EXTI pending register 2.
-} EXTI_registers_t;
-
-/*** EXTI base address ***/
-
+// Peripheral base address.
 #define EXTI	((EXTI_registers_t*) ((uint32_t) 0x40010400))
+
+/*** EXTI REG structures ***/
+
+/*!******************************************************************
+ * \enum EXTI_register_pattern_t
+ * \brief EXTI registers map pattern.
+ *******************************************************************/
+typedef struct {
+	volatile uint32_t IMR;    		// EXTI interrupt mask register.
+	volatile uint32_t EMR;    		// EXTI event mask register.
+	volatile uint32_t RTSR;    		// EXTI rising edge trigger selection register.
+	volatile uint32_t FTSR;    		// EXTI falling edge trigger selection register.
+	volatile uint32_t SWIER;		// EXTI software interrupt event register.
+	volatile uint32_t PR;    		// EXTI pending register.
+	volatile uint32_t RESERVED[2];	// Reserved.
+} EXTI_register_pattern_t;
+
+/*!******************************************************************
+ * \enum EXTI_registers_t
+ * \brief EXTI registers map.
+ *******************************************************************/
+typedef struct {
+	volatile EXTI_register_pattern_t EXTIx[2];
+} EXTI_registers_t;
 
 #endif /* __EXTI_REG_H__ */
