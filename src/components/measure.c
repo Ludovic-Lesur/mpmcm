@@ -14,6 +14,7 @@
 #include "exti.h"
 #include "gpio.h"
 #include "mapping.h"
+#include "mode.h"
 #include "nvic.h"
 #include "power.h"
 #include "tim.h"
@@ -29,9 +30,8 @@
 #define MEASURE_ACV_FACTOR_NUM				((int64_t) MEASURE_TRANSFORMER_GAIN * (int64_t) MEASURE_TRANSFORMER_ATTEN * (int64_t) ADC_VREF_MV)
 #define MEASURE_ACV_FACTOR_DEN				((int64_t) ADC_FULL_SCALE)
 
-#define MEASURE_SCT013_GAIN					20 // Unit mA/mV.
 #define MEASURE_SCT013_ATTEN				1 // Unit mV/mV
-#define MEASURE_ACI_FACTOR_NUM				((int64_t) MEASURE_SCT013_GAIN * (int64_t) MEASURE_SCT013_ATTEN * (int64_t) ADC_VREF_MV)
+#define MEASURE_ACI_FACTOR_NUM				((int64_t) SCT013_GAIN[ac_channel_idx] * (int64_t) MEASURE_SCT013_ATTEN * (int64_t) ADC_VREF_MV)
 #define MEASURE_ACI_FACTOR_DEN				((int64_t) ADC_FULL_SCALE)
 
 #define MEASURE_ACP_FACTOR_NUM				(MEASURE_ACV_FACTOR_NUM * MEASURE_ACI_FACTOR_NUM)
