@@ -84,8 +84,8 @@ void LPUART1_init(NODE_address_t self_address, LPUART_rx_irq_cb_t irq_callback) 
 	// Local variables.
 	uint32_t brr = 0;
 #ifdef HIGH_SPEED_LOG
-	// Select HSI as clock source.
-	RCC -> CCIPR |= (0b10 << 10); // LPUART1SEL='10'.
+	// Select SYSCLK as clock source.
+	RCC -> CCIPR |= (0b01 << 10); // LPUART1SEL='01'.
 #else
 	// Select LSE as clock source.
 	RCC -> CCIPR |= (0b11 << 10); // LPUART1SEL='11'.
@@ -95,11 +95,11 @@ void LPUART1_init(NODE_address_t self_address, LPUART_rx_irq_cb_t irq_callback) 
 	// Configure peripheral.
 	LPUART1 -> CR1 |= 0x00002822;
 	LPUART1 -> CR2 |= (self_address << 24) | (0b1 << 4);
-	LPUART1 -> CR3 |= 0x00805000;
+	LPUART1 -> CR3 |= 0x00005000;
 	// Baud rate.
 #ifdef HIGH_SPEED_LOG
 	LPUART1 -> PRESC |= 0b0110;
-	brr = ((RCC_HSI_FREQUENCY_KHZ * 1000) / (12));
+	brr = ((RCC_SYSCLK_FREQUENCY_KHZ * 1000) / (12));
 	brr *= 256;
 #else
 	brr = (RCC_LSE_FREQUENCY_HZ * 256);

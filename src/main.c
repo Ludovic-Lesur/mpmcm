@@ -39,8 +39,8 @@ static void _MPMCM_init_hw(void) {
 	// Init memory.
 	NVIC_init();
 	// Init power module and clock tree.
-	RCC_init();
 	PWR_init();
+	RCC_init();
 	// Init GPIOs.
 	GPIO_init();
 	EXTI_init();

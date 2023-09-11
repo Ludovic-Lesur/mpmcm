@@ -395,6 +395,8 @@ void AT_BUS_high_speed_log(void) {
 	MEASURE_channel_result_t channel_result;
 	// Get measurements.
 	MEASURE_get_ac_channel_data(0, &channel_result);
+	// Disable receiver.
+	LBUS_disable_rx();
 	// Print data.
 	_AT_BUS_reply_add_string("Pact = ");
 	_AT_BUS_reply_add_value(channel_result.active_power_mw.rolling_mean, STRING_FORMAT_DECIMAL, 0);
@@ -417,5 +419,7 @@ void AT_BUS_high_speed_log(void) {
 	_AT_BUS_reply_send();
 	_AT_BUS_reply_add_string(" ");
 	_AT_BUS_reply_send();
+	// Enable receiver.
+	LBUS_enable_rx();
 }
 #endif
