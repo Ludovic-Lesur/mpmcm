@@ -21,6 +21,17 @@
 /*** COMMON local functions ***/
 
 /*******************************************************************/
+static void _COMMON_reset_analog_data(void) {
+	// Local variables.
+	uint32_t analog_data_0 = 0;
+	uint32_t analog_data_0_mask = 0;
+	// VMCU and TMCU.
+	DINFOX_write_field(&analog_data_0, &analog_data_0_mask, DINFOX_VOLTAGE_ERROR_VALUE, COMMON_REG_ANALOG_DATA_0_MASK_VMCU);
+	DINFOX_write_field(&analog_data_0, &analog_data_0_mask, DINFOX_TEMPERATURE_ERROR_VALUE, COMMON_REG_ANALOG_DATA_0_MASK_TMCU);
+	NODE_write_register(NODE_REQUEST_SOURCE_INTERNAL, COMMON_REG_ADDR_ANALOG_DATA_0, analog_data_0_mask, analog_data_0);
+}
+
+/*******************************************************************/
 NODE_status_t _COMMON_mtrg_callback(void) {
 	// Local variables.
 	NODE_status_t status = NODE_SUCCESS;
@@ -66,6 +77,8 @@ void COMMON_init_registers(NODE_address_t self_address) {
 	NODE_write_register(NODE_REQUEST_SOURCE_INTERNAL, COMMON_REG_ADDR_SW_VERSION_0, sw_version_0_mask, sw_version_0);
 	NODE_write_register(NODE_REQUEST_SOURCE_INTERNAL, COMMON_REG_ADDR_SW_VERSION_1, sw_version_1_mask, sw_version_1);
 	NODE_write_register(NODE_REQUEST_SOURCE_INTERNAL, COMMON_REG_ADDR_RESET_FLAGS, reset_flags_mask, reset_flags);
+	// Load default values.
+	_COMMON_reset_analog_data();
 }
 
 /*******************************************************************/
