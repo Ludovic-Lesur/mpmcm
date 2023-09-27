@@ -124,7 +124,7 @@ static ADC_status_t _ADC_init(ADC_registers_t* ADC, ADC_channels_t* ADC_REGULAR_
 	// Event 0b01101 = TIM6_TRGO.
 	ADC -> CFGR |= (0b01 << 10);
 	ADC -> CFGR |= (0b01101 << 5);
-	// Overwritte register in case of overrun.
+	// Overwrite register in case of overrun.
 	ADC -> CFGR |= (0b1 << 12);
 	// Enable circular DMA.
 	ADC -> CFGR |= (0b11 << 0);
@@ -247,7 +247,7 @@ ADC_status_t ADC_init(void) {
 	ADCCR12 -> CCR &= ~(0b11 << 16);
 	// ADC clocked on PLL with no prescaler -> Fadc = 8Mhz.
 	ADCCR12 -> CCR &= ~(0b1111 << 18);
-	// Use independant circular DMA channel for each ADC.
+	// Use independent circular DMA channel for each ADC.
 	ADCCR12 -> CCR &= ~(0b11 << 14);
 	ADCCR12 -> CCR |= (0b1 << 13);
 	// Dual mode (regular simultaneous only).

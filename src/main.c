@@ -26,6 +26,7 @@
 
 /*** MAIN local functions ***/
 
+/*******************************************************************/
 static void _MPMCM_init_hw(void) {
 	// Local variables.
 	MEASURE_status_t measure_status = MEASURE_SUCCESS;
@@ -68,10 +69,7 @@ static void _MPMCM_init_hw(void) {
 
 /*** MAIN function ***/
 
-/* MAIN FUNCTION.
- * @param:	None.
- * @return:	None.
- */
+/*******************************************************************/
 int main(void) {
 	// Init board.
 	_MPMCM_init_hw();

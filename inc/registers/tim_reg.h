@@ -39,7 +39,7 @@
 typedef struct {
 	volatile uint32_t CR1;    			// TIM control register 1.
 	volatile uint32_t CR2;    			// TIM control register 2.
-	volatile uint32_t SMCR;    			// TIM slave mode controler register.
+	volatile uint32_t SMCR;    			// TIM slave mode controller register.
 	volatile uint32_t DIER;    			// TIM DMA interrupt enable register.
 	volatile uint32_t SR;    			// TIM status register.
 	volatile uint32_t EGR;    			// TIM event generation register.

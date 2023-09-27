@@ -1,7 +1,7 @@
 /*
  * rtc_reg.h
  *
- *  Created on: 2 jul. 2023
+ *  Created on: 02 jul. 2023
  *      Author: Ludo
  */
 

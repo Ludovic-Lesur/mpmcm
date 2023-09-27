@@ -1,7 +1,7 @@
 /*
  * iwdg.h
  *
- *  Created on: 17 jun 2023
+ *  Created on: 17 jun. 2023
  *      Author: Ludo
  */
 

@@ -1,8 +1,8 @@
 /*
  * dma.c
  *
- *  Created on: Jun 18, 2023
- *      Author: ludo
+ *  Created on: 18 jun. 2023
+ *      Author: Ludo
  */
 
 #include "dma.h"
@@ -49,7 +49,7 @@ void __attribute__((optimize("-O0"))) DMA1_CH1_IRQHandler(void) {
 
 /*******************************************************************/
 void __attribute__((optimize("-O0"))) DMA1_CH2_IRQHandler(void) {
-	// Exectue callback.
+	// Execute callback.
 	if (dma_ctx.tc_irq_callback != NULL) {
 		dma_ctx.tc_irq_callback();
 	}
