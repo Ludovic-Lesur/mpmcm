@@ -66,6 +66,7 @@ NODE_status_t MPMCM_check_register(uint8_t reg_addr) {
 	uint8_t channel_idx = 0;
 	uint8_t reg_offset = 0;
 	uint32_t reg_value = 0;
+	uint32_t field_value = 0;
 	uint32_t new_reg_value = 0;
 	uint32_t new_reg_mask = 0;
 	uint32_t data_reg_value = 0;
@@ -91,54 +92,68 @@ NODE_status_t MPMCM_check_register(uint8_t reg_addr) {
 				// Active power.
 				data_reg_value = 0;
 				data_reg_mask = 0;
-				DINFOX_write_field(&data_reg_value, &data_reg_mask, DINFOX_convert_mw(channel_data.active_power_mw.rolling_mean), MPMCM_REG_X_0_MEAN_MASK);
+				field_value = (channel_data.active_power_mw.number_of_samples > 0) ? DINFOX_convert_mw(channel_data.active_power_mw.rolling_mean) : DINFOX_ELECTRICAL_POWER_ERROR_VALUE;
+				DINFOX_write_field(&data_reg_value, &data_reg_mask, field_value, MPMCM_REG_X_0_MEAN_MASK);
 				NODE_write_register(NODE_REQUEST_SOURCE_INTERNAL, (MPMCM_REG_ADDR_CH1_ACTIVE_POWER_0 + reg_offset), data_reg_mask, data_reg_value);
 				data_reg_value = 0;
 				data_reg_mask = 0;
-				DINFOX_write_field(&data_reg_value, &data_reg_mask, DINFOX_convert_mw(channel_data.active_power_mw.min), MPMCM_REG_X_1_MIN_MASK);
-				DINFOX_write_field(&data_reg_value, &data_reg_mask, DINFOX_convert_mw(channel_data.active_power_mw.max), MPMCM_REG_X_1_MAX_MASK);
+				field_value = (channel_data.active_power_mw.number_of_samples > 0) ? DINFOX_convert_mw(channel_data.active_power_mw.min) : DINFOX_ELECTRICAL_POWER_ERROR_VALUE;
+				DINFOX_write_field(&data_reg_value, &data_reg_mask, field_value, MPMCM_REG_X_1_MIN_MASK);
+				field_value = (channel_data.active_power_mw.number_of_samples > 0) ? DINFOX_convert_mw(channel_data.active_power_mw.max) : DINFOX_ELECTRICAL_POWER_ERROR_VALUE;
+				DINFOX_write_field(&data_reg_value, &data_reg_mask, field_value, MPMCM_REG_X_1_MAX_MASK);
 				NODE_write_register(NODE_REQUEST_SOURCE_INTERNAL, (MPMCM_REG_ADDR_CH1_ACTIVE_POWER_1 + reg_offset), data_reg_mask, data_reg_value);
 				// RMS voltage.
 				data_reg_value = 0;
 				data_reg_mask = 0;
-				DINFOX_write_field(&data_reg_value, &data_reg_mask, DINFOX_convert_mv(channel_data.rms_voltage_mv.rolling_mean), MPMCM_REG_X_0_MEAN_MASK);
+				field_value = (channel_data.rms_voltage_mv.number_of_samples > 0) ? DINFOX_convert_mv(channel_data.rms_voltage_mv.rolling_mean) : DINFOX_VOLTAGE_ERROR_VALUE;
+				DINFOX_write_field(&data_reg_value, &data_reg_mask, field_value, MPMCM_REG_X_0_MEAN_MASK);
 				NODE_write_register(NODE_REQUEST_SOURCE_INTERNAL, (MPMCM_REG_ADDR_CH1_RMS_VOLTAGE_0 + reg_offset), data_reg_mask, data_reg_value);
 				data_reg_value = 0;
 				data_reg_mask = 0;
-				DINFOX_write_field(&data_reg_value, &data_reg_mask, DINFOX_convert_mv(channel_data.rms_voltage_mv.min), MPMCM_REG_X_1_MIN_MASK);
-				DINFOX_write_field(&data_reg_value, &data_reg_mask, DINFOX_convert_mv(channel_data.rms_voltage_mv.max), MPMCM_REG_X_1_MAX_MASK);
+				field_value = (channel_data.rms_voltage_mv.number_of_samples > 0) ? DINFOX_convert_mv(channel_data.rms_voltage_mv.min) : DINFOX_VOLTAGE_ERROR_VALUE;
+				DINFOX_write_field(&data_reg_value, &data_reg_mask, field_value, MPMCM_REG_X_1_MIN_MASK);
+				field_value = (channel_data.rms_voltage_mv.number_of_samples > 0) ? DINFOX_convert_mv(channel_data.rms_voltage_mv.max) : DINFOX_VOLTAGE_ERROR_VALUE;
+				DINFOX_write_field(&data_reg_value, &data_reg_mask, field_value, MPMCM_REG_X_1_MAX_MASK);
 				NODE_write_register(NODE_REQUEST_SOURCE_INTERNAL, (MPMCM_REG_ADDR_CH1_RMS_VOLTAGE_1 + reg_offset), data_reg_mask, data_reg_value);
 				// RMS current.
 				data_reg_value = 0;
 				data_reg_mask = 0;
-				DINFOX_write_field(&data_reg_value, &data_reg_mask, DINFOX_convert_ua(channel_data.rms_current_ma.rolling_mean * 1000), MPMCM_REG_X_0_MEAN_MASK);
+				field_value = (channel_data.rms_current_ma.number_of_samples > 0) ? DINFOX_convert_ua(channel_data.rms_current_ma.rolling_mean * 1000) : DINFOX_CURRENT_ERROR_VALUE;
+				DINFOX_write_field(&data_reg_value, &data_reg_mask, field_value, MPMCM_REG_X_0_MEAN_MASK);
 				NODE_write_register(NODE_REQUEST_SOURCE_INTERNAL, (MPMCM_REG_ADDR_CH1_RMS_CURRENT_0 + reg_offset), data_reg_mask, data_reg_value);
 				data_reg_value = 0;
 				data_reg_mask = 0;
-				DINFOX_write_field(&data_reg_value, &data_reg_mask, DINFOX_convert_ua(channel_data.rms_current_ma.min * 1000), MPMCM_REG_X_1_MIN_MASK);
-				DINFOX_write_field(&data_reg_value, &data_reg_mask, DINFOX_convert_ua(channel_data.rms_current_ma.max * 1000), MPMCM_REG_X_1_MAX_MASK);
+				field_value = (channel_data.rms_current_ma.number_of_samples > 0) ? DINFOX_convert_ua(channel_data.rms_current_ma.min * 1000) : DINFOX_CURRENT_ERROR_VALUE;
+				DINFOX_write_field(&data_reg_value, &data_reg_mask, field_value, MPMCM_REG_X_1_MIN_MASK);
+				field_value = (channel_data.rms_current_ma.number_of_samples > 0) ? DINFOX_convert_ua(channel_data.rms_current_ma.max * 1000) : DINFOX_CURRENT_ERROR_VALUE;
+				DINFOX_write_field(&data_reg_value, &data_reg_mask, field_value, MPMCM_REG_X_1_MAX_MASK);
 				NODE_write_register(NODE_REQUEST_SOURCE_INTERNAL, (MPMCM_REG_ADDR_CH1_RMS_CURRENT_1 + reg_offset), data_reg_mask, data_reg_value);
 				// Apparent power.
 				data_reg_value = 0;
 				data_reg_mask = 0;
-				DINFOX_write_field(&data_reg_value, &data_reg_mask, DINFOX_convert_mw(channel_data.apparent_power_mva.rolling_mean), MPMCM_REG_X_0_MEAN_MASK);
+				field_value = (channel_data.apparent_power_mva.number_of_samples > 0) ? DINFOX_convert_mw(channel_data.apparent_power_mva.rolling_mean) : DINFOX_ELECTRICAL_POWER_ERROR_VALUE;
+				DINFOX_write_field(&data_reg_value, &data_reg_mask, field_value, MPMCM_REG_X_0_MEAN_MASK);
 				NODE_write_register(NODE_REQUEST_SOURCE_INTERNAL, (MPMCM_REG_ADDR_CH1_APPARENT_POWER_0 + reg_offset), data_reg_mask, data_reg_value);
 				data_reg_value = 0;
 				data_reg_mask = 0;
-				DINFOX_write_field(&data_reg_value, &data_reg_mask, DINFOX_convert_mw(channel_data.apparent_power_mva.min), MPMCM_REG_X_1_MIN_MASK);
-				DINFOX_write_field(&data_reg_value, &data_reg_mask, DINFOX_convert_mw(channel_data.apparent_power_mva.max), MPMCM_REG_X_1_MAX_MASK);
+				field_value = (channel_data.apparent_power_mva.number_of_samples > 0) ? DINFOX_convert_mw(channel_data.apparent_power_mva.min) : DINFOX_ELECTRICAL_POWER_ERROR_VALUE;
+				DINFOX_write_field(&data_reg_value, &data_reg_mask, field_value, MPMCM_REG_X_1_MIN_MASK);
+				field_value = (channel_data.apparent_power_mva.number_of_samples > 0) ? DINFOX_convert_mw(channel_data.apparent_power_mva.max) : DINFOX_ELECTRICAL_POWER_ERROR_VALUE;
+				DINFOX_write_field(&data_reg_value, &data_reg_mask, field_value, MPMCM_REG_X_1_MAX_MASK);
 				NODE_write_register(NODE_REQUEST_SOURCE_INTERNAL, (MPMCM_REG_ADDR_CH1_APPARENT_POWER_1 + reg_offset), data_reg_mask, data_reg_value);
 				// Power factor.
 				data_reg_value = 0;
 				data_reg_mask = 0;
-				DINFOX_write_field(&data_reg_value, &data_reg_mask, DINFOX_convert_power_factor(channel_data.power_factor.rolling_mean), MPMCM_REG_X_0_MEAN_MASK);
+				field_value = (channel_data.power_factor.number_of_samples > 0) ? DINFOX_convert_power_factor(channel_data.power_factor.rolling_mean) : DINFOX_POWER_FACTOR_ERROR_VALUE;
+				DINFOX_write_field(&data_reg_value, &data_reg_mask, field_value, MPMCM_REG_X_0_MEAN_MASK);
 				NODE_write_register(NODE_REQUEST_SOURCE_INTERNAL, (MPMCM_REG_ADDR_CH1_POWER_FACTOR_0 + reg_offset), data_reg_mask, data_reg_value);
 				data_reg_value = 0;
 				data_reg_mask = 0;
-				DINFOX_write_field(&data_reg_value, &data_reg_mask, DINFOX_convert_power_factor(channel_data.power_factor.min), MPMCM_REG_X_1_MIN_MASK);
-				DINFOX_write_field(&data_reg_value, &data_reg_mask, DINFOX_convert_power_factor(channel_data.power_factor.max), MPMCM_REG_X_1_MAX_MASK);
+				field_value = (channel_data.power_factor.number_of_samples > 0) ? DINFOX_convert_power_factor(channel_data.power_factor.min) : DINFOX_POWER_FACTOR_ERROR_VALUE;
+				DINFOX_write_field(&data_reg_value, &data_reg_mask, field_value, MPMCM_REG_X_1_MIN_MASK);
+				field_value = (channel_data.power_factor.number_of_samples > 0) ? DINFOX_convert_power_factor(channel_data.power_factor.max) : DINFOX_POWER_FACTOR_ERROR_VALUE;
+				DINFOX_write_field(&data_reg_value, &data_reg_mask, field_value, MPMCM_REG_X_1_MAX_MASK);
 				NODE_write_register(NODE_REQUEST_SOURCE_INTERNAL, (MPMCM_REG_ADDR_CH1_POWER_FACTOR_1 + reg_offset), data_reg_mask, data_reg_value);
-
 			}
 		}
 		break;
