@@ -13,6 +13,7 @@
 #include "dsp/statistics_functions.h"
 #include "exti.h"
 #include "gpio.h"
+#include "led.h"
 #include "mapping.h"
 #include "mode.h"
 #include "nvic.h"
@@ -48,6 +49,9 @@
 
 #define MEASURE_Q31_SHIFT_ADC				16
 #define MEASURE_Q31_SHIFT_MULT				1
+
+#define MEASURE_LED_PULSE_DURATION_MS		50
+#define MEASURE_LED_PULSE_PERIOD_SECONDS	5
 
 #define MEASURE_TIMEOUT_COUNT				10000000
 
@@ -102,6 +106,8 @@ typedef struct {
 	MEASURE_state_t state;
 	uint8_t zero_cross_count;
 	uint8_t dma_transfer_end_flag;
+	uint32_t period_process_count;
+	uint32_t tick_led_count;
 } MEASURE_context_t;
 
 /*** MEASURE local global variables ***/
@@ -149,7 +155,7 @@ static volatile MEASURE_context_t measure_ctx;
 
 /*******************************************************************/
 static void _MEASURE_increment_zero_cross_count(void) {
-	// Set local flag.
+	// Increment counts.
 	measure_ctx.zero_cross_count++;
 }
 
@@ -174,11 +180,47 @@ static void _MEASURE_reset(void) {
 }
 
 /*******************************************************************/
+MEASURE_status_t _MEASURE_start(void) {
+	// Local variables.
+	MEASURE_status_t status = MEASURE_SUCCESS;
+	ADC_status_t adc_status = ADC_SUCCESS;
+	// Start DMA.
+	DMA1_start();
+	// Start ADC.
+	adc_status = ADC_start();
+	ADC_exit_error(MEASURE_ERROR_BASE_ADC);
+	// Start trigger.
+	TIM6_start();
+errors:
+	return status;
+}
+
+/*******************************************************************/
+MEASURE_status_t _MEASURE_stop(void) {
+	// Local variables.
+	MEASURE_status_t status = MEASURE_SUCCESS;
+	ADC_status_t adc_status = ADC_SUCCESS;
+	// Clear count.
+	measure_ctx.zero_cross_count = 0;
+	// Stop trigger.
+	TIM6_stop();
+	// Stop ADC.
+	adc_status = ADC_stop();
+	ADC_exit_error(MEASURE_ERROR_BASE_ADC);
+	// Stop DMA.
+	DMA1_stop();
+errors:
+	// Update state.
+	measure_ctx.state = MEASURE_STATE_STOPPED;
+	return status;
+}
+
+/*******************************************************************/
 static MEASURE_status_t _MEASURE_switch_dma_buffer(void) {
 	// Local variables.
 	MEASURE_status_t status = MEASURE_SUCCESS;
 	// Stop ADC and DMA.
-	status = MEASURE_stop();
+	status = _MEASURE_stop();
 	if (status != MEASURE_SUCCESS) goto errors;
 	// Retrieve number of transfered data.
 	DMA1_get_number_of_transfered_data((uint16_t*) &(measure_sampling.acv[measure_sampling.acv_write_idx].size), (uint16_t*) &(measure_sampling.aci[measure_sampling.acv_write_idx].size));
@@ -188,7 +230,7 @@ static MEASURE_status_t _MEASURE_switch_dma_buffer(void) {
 	// Set new address.
 	DMA1_set_destination_address((uint32_t) &(measure_sampling.acv[measure_sampling.acv_write_idx].data), (uint32_t) &(measure_sampling.aci[measure_sampling.aci_write_idx].data), MEASURE_PERIOD_DMA_BUFFER_SIZE);
 	// Restart DMA.
-	status = MEASURE_start();
+	status = _MEASURE_start();
 errors:
 	return status;
 }
@@ -219,19 +261,19 @@ static MEASURE_status_t _MEASURE_internal_process(void) {
 	case MEASURE_STATE_STOPPED:
 #ifdef MEASURE_CONTINUOUS
 		// Start measure.
-		status = _MEASURE_start();
+		status = __MEASURE_start();
 		if (status != MEASURE_SUCCESS) goto errors;
 		// Update state.
 		measure_ctx.state = MEASURE_STATE_IDLE;
 #else
 		// Synchronize on zero cross.
 		if (measure_ctx.zero_cross_count > MEASURE_ZERO_CROSS_PER_PERIOD) {
-			// Clear flag.
+			// Clear count.
 			measure_ctx.zero_cross_count = 0;
 			// Reset context.
 			_MEASURE_reset();
 			// Start measure.
-			status = MEASURE_start();
+			status = _MEASURE_start();
 			if (status != MEASURE_SUCCESS) goto errors;
 			// Update state.
 			measure_ctx.state = MEASURE_STATE_IDLE;
@@ -314,6 +356,8 @@ static MEASURE_status_t _MEASURE_internal_process(void) {
 		// Update read indexes.
 		measure_sampling.acv_read_idx = ((measure_sampling.acv_read_idx + 1) % MEASURE_PERIOD_DMA_BUFFER_DEPTH);
 		measure_sampling.aci_read_idx = ((measure_sampling.aci_read_idx + 1) % MEASURE_PERIOD_DMA_BUFFER_DEPTH);
+		// Increment period process count.
+		measure_ctx.period_process_count++;
 		// Go back to idle.
 		measure_ctx.state = MEASURE_STATE_IDLE;
 		break;
@@ -336,6 +380,9 @@ MEASURE_status_t MEASURE_init(void) {
 	uint8_t idx = 0;
 	// Init context.
 	measure_ctx.state = MEASURE_STATE_STOPPED;
+	measure_ctx.period_process_count = 0;
+	measure_ctx.tick_led_count = 0;
+	_MEASURE_reset();
 	// Clear all results.
 	for (idx=0 ; idx<ADC_NUMBER_OF_ACI_CHANNELS ; idx++) {
 		_MEASURE_reset_all_accumulated_data(idx);
@@ -344,6 +391,8 @@ MEASURE_status_t MEASURE_init(void) {
 	for (idx=0 ; idx<ADC_NUMBER_OF_ACI_CHANNELS ; idx++) {
 		GPIO_configure(MEASURE_GPIO_ACI_DETECT[idx], GPIO_MODE_INPUT, GPIO_TYPE_PUSH_PULL, GPIO_SPEED_LOW, GPIO_PULL_NONE);
 	}
+	// Init RGB LED.
+	LED_init();
 	// Init zero cross pulse GPIO.
 	GPIO_configure(&GPIO_ZERO_CROSS_PULSE, GPIO_MODE_INPUT, GPIO_TYPE_PUSH_PULL, GPIO_SPEED_LOW, GPIO_PULL_NONE);
 	EXTI_configure_gpio(&GPIO_ZERO_CROSS_PULSE, EXTI_TRIGGER_RISING_EDGE, &_MEASURE_increment_zero_cross_count);
@@ -363,40 +412,6 @@ errors:
 }
 
 /*******************************************************************/
-MEASURE_status_t MEASURE_start(void) {
-	// Local variables.
-	MEASURE_status_t status = MEASURE_SUCCESS;
-	ADC_status_t adc_status = ADC_SUCCESS;
-	// Start DMA.
-	DMA1_start();
-	// Start ADC.
-	adc_status = ADC_start();
-	ADC_exit_error(MEASURE_ERROR_BASE_ADC);
-	// Start trigger.
-	TIM6_start();
-errors:
-	return status;
-}
-
-/*******************************************************************/
-MEASURE_status_t MEASURE_stop(void) {
-	// Local variables.
-	MEASURE_status_t status = MEASURE_SUCCESS;
-	ADC_status_t adc_status = ADC_SUCCESS;
-	// Stop trigger.
-	TIM6_stop();
-	// Stop ADC.
-	adc_status = ADC_stop();
-	ADC_exit_error(MEASURE_ERROR_BASE_ADC);
-	// Stop DMA.
-	DMA1_stop();
-errors:
-	// Update state.
-	measure_ctx.state = MEASURE_STATE_STOPPED;
-	return status;
-}
-
-/*******************************************************************/
 MEASURE_status_t MEASURE_process(void) {
 	// Local variables.
 	MEASURE_status_t status = MEASURE_SUCCESS;
@@ -407,6 +422,43 @@ MEASURE_status_t MEASURE_process(void) {
 	}
 	while (measure_ctx.state == MEASURE_STATE_PERIOD_PROCESS);
 errors:
+	return status;
+}
+
+/*******************************************************************/
+MEASURE_status_t MEASURE_tick(void) {
+	// Local variables.
+	MEASURE_status_t status = MEASURE_SUCCESS;
+	LED_color_t led_color = LED_COLOR_OFF;
+	// Check number processed periods during last second.
+	if ((measure_ctx.state != MEASURE_STATE_STOPPED) && (measure_ctx.period_process_count == 0)) {
+		// Stop measure.
+		_MEASURE_stop();
+	}
+	// Increment tick count.
+	measure_ctx.tick_led_count++;
+	// Check LED period.
+	if (measure_ctx.tick_led_count >= MEASURE_LED_PULSE_PERIOD_SECONDS) {
+		// Compute LED color according to state.
+		if (measure_ctx.state == MEASURE_STATE_STOPPED) {
+			// Check current number of samples.
+			if (measure_data.accumulated_data[0].rms_voltage_mv.number_of_samples == 0) {
+				led_color = LED_COLOR_RED;
+			}
+			else {
+				led_color = LED_COLOR_YELLOW;
+			}
+		}
+		else {
+			led_color = LED_COLOR_GREEN;
+		}
+		// Perform LED pulse.
+		LED_single_pulse(MEASURE_LED_PULSE_DURATION_MS, led_color);
+		// Reset count.
+		measure_ctx.tick_led_count = 0;
+	}
+	// Reset count.
+	measure_ctx.period_process_count = 0;
 	return status;
 }
 

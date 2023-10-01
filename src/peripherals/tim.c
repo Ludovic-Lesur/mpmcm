@@ -11,8 +11,66 @@
 #include "rcc.h"
 #include "rcc_reg.h"
 #include "tim_reg.h"
+#include "types.h"
+
+/*** TIM local macros ***/
+
+#define TIM4_CLOCK_KHZ					10
+#define TIM4_NUMBER_OF_CHANNELS			4
+#define TIM4_NUMBER_OF_USED_CHANNELS	3
+
+/*** TIM local global variables ***/
+
+static const uint8_t TIM4_LED_CHANNELS[TIM4_NUMBER_OF_USED_CHANNELS] = {
+	TIM4_CHANNEL_LED_RED,
+	TIM4_CHANNEL_LED_GREEN,
+	TIM4_CHANNEL_LED_BLUE
+};
 
 /*** TIM functions ***/
+
+/*******************************************************************/
+void TIM4_init(void) {
+	// Local variables.
+	uint8_t idx = 0;
+	// Enable peripheral clock.
+	RCC -> APB1ENR1 |= (0b1 << 2); // TIM4EN='1'.
+	// Set prescaler.
+	TIM4 -> PSC = ((RCC_SYSCLK_FREQUENCY_KHZ / TIM4_CLOCK_KHZ) - 1);
+	// One pulse mode.
+	TIM4 -> ARR = 0xFFFF;
+	TIM4 -> CR1 |= (0b1 << 3) | (0b1 << 7);
+	// Configure channels 1-4 in PWM mode 2 (OCxM='0111', OCxFE='1' and OCxPE='1').
+	TIM4 -> CCMR1 |= (0b111 << 12) | (0b11 << 10) | (0b111 << 4) | (0b11 << 2);
+	TIM4 -> CCMR2 |= (0b111 << 12) | (0b11 << 10) | (0b111 << 4) | (0b11 << 2);
+	// Enable required channels.
+	for (idx=0 ; idx<TIM4_NUMBER_OF_USED_CHANNELS ; idx++) {
+		TIM4 -> CCER |= (0b1 << (TIM4_LED_CHANNELS[idx] << 2));
+	}
+	// Generate event to update registers.
+	TIM4 -> EGR |= (0b1 << 0); // UG='1'.
+}
+
+/*******************************************************************/
+void TIM4_single_pulse(uint32_t pulse_duration_ms, TIM4_channel_mask_t led_color) {
+	// Local variables.
+	uint8_t idx = 0;
+	// Stop counter.
+	TIM4 -> CR1 &= ~(0b1 << 0);
+	// Reset counter.
+	TIM4 -> CNT = 0;
+	// Check parameter.
+	if (pulse_duration_ms == 0) return;
+	// Configure channels.
+	for (idx=0 ; idx<TIM4_NUMBER_OF_CHANNELS ; idx++) {
+		// Set pulse length.
+		TIM4 -> CCRx[idx] = ((led_color & (0b1 << idx)) != 0) ? (pulse_duration_ms * TIM4_CLOCK_KHZ) : 0;
+	}
+	// Generate event to update registers.
+	TIM4 -> EGR |= (0b1 << 0); // UG='1'.
+	// Start counter.
+	TIM4 -> CR1 |= (0b1 << 0); // CEN='1'.
+}
 
 /*******************************************************************/
 void TIM6_init(void) {

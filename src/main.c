@@ -5,6 +5,7 @@
  *      Author: Ludo
  */
 
+// Peripherals.
 #include "adc.h"
 #include "error.h"
 #include "exti.h"
@@ -13,16 +14,17 @@
 #include "lptim.h"
 #include "lpuart.h"
 #include "mapping.h"
-#include "mode.h"
 #include "nvic.h"
 #include "pwr.h"
 #include "rcc.h"
 #include "rtc.h"
 #include "tim.h"
 #include "types.h"
+// Components.
+#include "measure.h"
 // Applicative.
 #include "at_bus.h"
-#include "measure.h"
+#include "mode.h"
 
 /*** MAIN local functions ***/
 
@@ -88,6 +90,9 @@ int main(void) {
 		if (RTC_get_wakeup_timer_flag() != 0) {
 			// Clear flag.
 			RTC_clear_wakeup_timer_flag();
+			// Call measure tick.
+			measure_status = MEASURE_tick();
+			MEASURE_stack_error();
 #ifdef HIGH_SPEED_LOG
 			AT_BUS_high_speed_log();
 #endif

@@ -50,10 +50,15 @@ typedef struct {
 	volatile uint32_t PSC;    			// TIM prescaler register.
 	volatile uint32_t ARR;    			// TIM auto-reload register.
 	volatile uint32_t RCR;    			// TIM repetition counter register.
-	volatile uint32_t CCR1;    			// TIM capture/compare register 1.
-	volatile uint32_t CCR2;    			// TIM capture/compare register 2.
-	volatile uint32_t CCR3;    			// TIM capture/compare register 3.
-	volatile uint32_t CCR4;    			// TIM capture/compare register 4.
+	union {
+		struct {
+			volatile uint32_t CCR1;    	// TIM capture/compare register 1.
+			volatile uint32_t CCR2;    	// TIM capture/compare register 2.
+			volatile uint32_t CCR3;    	// TIM capture/compare register 3.
+			volatile uint32_t CCR4;    	// TIM capture/compare register 4.
+		};
+		volatile uint32_t CCRx[4];		// TIM Capture/compare registers.
+	};
 	volatile uint32_t BDTR;    			// TIM break and dead-time register.
 	volatile uint32_t CCR5;    			// TIM capture/compare register 5.
 	volatile uint32_t CCR6;    			// TIM capture/compare register 6.
