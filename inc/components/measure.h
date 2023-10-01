@@ -34,7 +34,7 @@ typedef enum {
 } MEASURE_status_t;
 
 /*!******************************************************************
- * \enum MEASURE_instantaneous_channel_result_t
+ * \enum MEASURE_channel_run_data_t
  * \brief Single channel instantaneous results structure.
  *******************************************************************/
 typedef struct {
@@ -43,10 +43,11 @@ typedef struct {
 	int32_t rms_current_ma;
 	int32_t apparent_power_mva;
 	int32_t power_factor;
-} MEASURE_instantaneous_channel_result_t;
+	uint32_t number_of_samples;
+} MEASURE_channel_run_data_t;
 
 /*!******************************************************************
- * \enum MEASURE_accumulated_result_t
+ * \enum MEASURE_accumulated_data_t
  * \brief Single data result structure.
  *******************************************************************/
 typedef struct {
@@ -54,19 +55,19 @@ typedef struct {
 	int32_t max;
 	int32_t rolling_mean;
 	uint32_t number_of_samples;
-} MEASURE_accumulated_result_t;
+} MEASURE_accumulated_data_t;
 
 /*!******************************************************************
- * \enum MEASURE_accumulated_channel_result_t
+ * \enum MEASURE_channel_accumulated_data_t
  * \brief Single channel accumulated results structure.
  *******************************************************************/
 typedef struct {
-	MEASURE_accumulated_result_t active_power_mw;
-	MEASURE_accumulated_result_t rms_voltage_mv;
-	MEASURE_accumulated_result_t rms_current_ma;
-	MEASURE_accumulated_result_t apparent_power_mva;
-	MEASURE_accumulated_result_t power_factor;
-} MEASURE_accumulated_channel_result_t;
+	MEASURE_accumulated_data_t active_power_mw;
+	MEASURE_accumulated_data_t rms_voltage_mv;
+	MEASURE_accumulated_data_t rms_current_ma;
+	MEASURE_accumulated_data_t apparent_power_mva;
+	MEASURE_accumulated_data_t power_factor;
+} MEASURE_channel_accumulated_data_t;
 
 /*** MEASURE functions ***/
 
@@ -107,22 +108,22 @@ MEASURE_status_t MEASURE_tick(void);
 MEASURE_status_t MEASURE_get_detect_flag(uint8_t ac_channel_index, uint8_t* current_sensor_connected);
 
 /*!******************************************************************
- * \fn MEASURE_status_t MEASURE_get_instantaneous_data(uint8_t ac_channel_index, MEASURE_instantaneous_channel_result_t* ac_channel_data)
+ * \fn MEASURE_status_t MEASURE_get_run_data(uint8_t ac_channel_index, MEASURE_channel_run_data_t* ac_channel_data)
  * \brief Get AC channel instantaneous data.
  * \param[in]  	ac_channel_index: AC channel index to read.
  * \param[out] 	ac_channel_data: Pointer to the channel results.
  * \retval		Function execution status.
  *******************************************************************/
-MEASURE_status_t MEASURE_get_instantaneous_data(uint8_t ac_channel_index, MEASURE_instantaneous_channel_result_t* ac_channel_data);
+MEASURE_status_t MEASURE_get_run_data(uint8_t ac_channel_index, MEASURE_channel_run_data_t* ac_channel_data);
 
 /*!******************************************************************
- * \fn MEASURE_status_t MEASURE_get_accumulated_data(uint8_t ac_channel_index, MEASURE_accumulated_channel_result_t* ac_channel_data)
+ * \fn MEASURE_status_t MEASURE_get_accumulated_data(uint8_t ac_channel_index, MEASURE_channel_accumulated_data_t* ac_channel_data)
  * \brief Get AC channel accumulated data.
  * \param[in]  	ac_channel_index: AC channel index to read.
  * \param[out] 	ac_channel_data: Pointer to the channel results.
  * \retval		Function execution status.
  *******************************************************************/
-MEASURE_status_t MEASURE_get_accumulated_data(uint8_t ac_channel_index, MEASURE_accumulated_channel_result_t* ac_channel_data);
+MEASURE_status_t MEASURE_get_accumulated_data(uint8_t ac_channel_index, MEASURE_channel_accumulated_data_t* ac_channel_data);
 
 /*******************************************************************/
 #define MEASURE_exit_error(error_base) { if (measure_status != MEASURE_SUCCESS) { status = error_base + measure_status; goto errors; } }

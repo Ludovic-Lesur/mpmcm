@@ -392,30 +392,30 @@ void AT_BUS_task(void) {
 /*******************************************************************/
 void AT_BUS_high_speed_log(void) {
 	// Local variables.
-	MEASURE_channel_result_t channel_result;
+	MEASURE_channel_run_data_t channel_result;
 	// Get measurements.
-	MEASURE_get_ac_channel_data(0, &channel_result);
+	MEASURE_get_run_data(0, &channel_result);
 	// Disable receiver.
 	LBUS_disable_rx();
 	// Print data.
 	_AT_BUS_reply_add_string("Pact = ");
-	_AT_BUS_reply_add_value(channel_result.active_power_mw.rolling_mean, STRING_FORMAT_DECIMAL, 0);
+	_AT_BUS_reply_add_value(channel_result.active_power_mw, STRING_FORMAT_DECIMAL, 0);
 	_AT_BUS_reply_add_string(" mW");
 	_AT_BUS_reply_send();
 	_AT_BUS_reply_add_string("Urms = ");
-	_AT_BUS_reply_add_value(channel_result.rms_voltage_mv.rolling_mean, STRING_FORMAT_DECIMAL, 0);
+	_AT_BUS_reply_add_value(channel_result.rms_voltage_mv, STRING_FORMAT_DECIMAL, 0);
 	_AT_BUS_reply_add_string(" mV");
 	_AT_BUS_reply_send();
 	_AT_BUS_reply_add_string("Irms = ");
-	_AT_BUS_reply_add_value(channel_result.rms_current_ma.rolling_mean, STRING_FORMAT_DECIMAL, 0);
+	_AT_BUS_reply_add_value(channel_result.rms_current_ma, STRING_FORMAT_DECIMAL, 0);
 	_AT_BUS_reply_add_string(" mA");
 	_AT_BUS_reply_send();
 	_AT_BUS_reply_add_string("Papp = ");
-	_AT_BUS_reply_add_value(channel_result.apparent_power_mva.rolling_mean, STRING_FORMAT_DECIMAL, 0);
+	_AT_BUS_reply_add_value(channel_result.apparent_power_mva, STRING_FORMAT_DECIMAL, 0);
 	_AT_BUS_reply_add_string(" mVA");
 	_AT_BUS_reply_send();
 	_AT_BUS_reply_add_string("PF = ");
-	_AT_BUS_reply_add_value(channel_result.power_factor.rolling_mean, STRING_FORMAT_DECIMAL, 0);
+	_AT_BUS_reply_add_value(channel_result.power_factor, STRING_FORMAT_DECIMAL, 0);
 	_AT_BUS_reply_send();
 	_AT_BUS_reply_add_string(" ");
 	_AT_BUS_reply_send();

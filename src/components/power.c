@@ -15,7 +15,7 @@
 
 /*** POWER local macros ***/
 
-#define POWER_ON_DELAY_MS_ANALOG	100
+#define POWER_ON_DELAY_MS_ANALOG	2000
 
 /*** POWER local global variables ***/
 

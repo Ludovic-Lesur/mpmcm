@@ -32,7 +32,7 @@
 #define MEASURE_ACV_FACTOR_DEN				((int64_t) ADC_FULL_SCALE)
 
 #define MEASURE_SCT013_ATTEN				1 // Unit mV/mV
-#define MEASURE_ACI_FACTOR_NUM				((int64_t) SCT013_GAIN[ac_channel_idx] * (int64_t) MEASURE_SCT013_ATTEN * (int64_t) ADC_VREF_MV)
+#define MEASURE_ACI_FACTOR_NUM				((int64_t) MPMCM_SCT013_GAIN[ac_channel_idx] * (int64_t) MEASURE_SCT013_ATTEN * (int64_t) ADC_VREF_MV)
 #define MEASURE_ACI_FACTOR_DEN				((int64_t) ADC_FULL_SCALE)
 
 #define MEASURE_ACP_FACTOR_NUM				(MEASURE_ACV_FACTOR_NUM * MEASURE_ACI_FACTOR_NUM)
@@ -97,8 +97,9 @@ typedef struct {
 	q31_t period_apparent_power_q31;
 	q31_t period_power_factor_q31;
 	// Results.
-	MEASURE_instantaneous_channel_result_t instantaneous_result[ADC_NUMBER_OF_ACI_CHANNELS];
-	MEASURE_accumulated_channel_result_t accumulated_data[ADC_NUMBER_OF_ACI_CHANNELS];
+	MEASURE_channel_run_data_t run_data[ADC_NUMBER_OF_ACI_CHANNELS];
+	MEASURE_channel_accumulated_data_t accumulated_data_run[ADC_NUMBER_OF_ACI_CHANNELS];
+	MEASURE_channel_accumulated_data_t accumulated_data[ADC_NUMBER_OF_ACI_CHANNELS];
 } MEASURE_data_t;
 
 /*******************************************************************/
@@ -130,6 +131,15 @@ static volatile MEASURE_context_t measure_ctx;
 }
 
 /*******************************************************************/
+#define _MEASURE_reset_all_accumulated_data(source, channel_index) { \
+	_MEASURE_reset_accumulated_data(source[channel_index].active_power_mw); \
+	_MEASURE_reset_accumulated_data(source[channel_index].rms_voltage_mv); \
+	_MEASURE_reset_accumulated_data(source[channel_index].rms_current_ma); \
+	_MEASURE_reset_accumulated_data(source[channel_index].apparent_power_mva); \
+	_MEASURE_reset_accumulated_data(source[channel_index].power_factor); \
+}
+
+/*******************************************************************/
 #define _MEASURE_copy_accumulated_data(source, destination) { \
 	destination.min = source.min; \
 	destination.max = source.max; \
@@ -138,7 +148,7 @@ static volatile MEASURE_context_t measure_ctx;
 }
 
 /*******************************************************************/
-#define _MEASURE_result_add_sample(result, new_sample) { \
+#define _MEASURE_add_sample(result, new_sample) { \
 	/* Min */ \
 	if (new_sample < result.min) { \
 		result.min = new_sample; \
@@ -236,24 +246,19 @@ errors:
 }
 
 /*******************************************************************/
-static inline void _MEASURE_reset_all_accumulated_data(uint8_t ac_channel_index) {
-	// Clear all data.
-	_MEASURE_reset_accumulated_data(measure_data.accumulated_data[ac_channel_index].active_power_mw);
-	_MEASURE_reset_accumulated_data(measure_data.accumulated_data[ac_channel_index].rms_voltage_mv);
-	_MEASURE_reset_accumulated_data(measure_data.accumulated_data[ac_channel_index].rms_current_ma);
-	_MEASURE_reset_accumulated_data(measure_data.accumulated_data[ac_channel_index].apparent_power_mva);
-	_MEASURE_reset_accumulated_data(measure_data.accumulated_data[ac_channel_index].power_factor);
-}
-
-/*******************************************************************/
 static MEASURE_status_t _MEASURE_internal_process(void) {
 	// Local variables.
 	MEASURE_status_t status = MEASURE_SUCCESS;
 	uint32_t acv_buffer_size = 0;
 	uint32_t aci_buffer_size = 0;
 	uint8_t ac_channel_idx = 0;
+	int32_t active_power_mw = 0;
 	q31_t mean_voltage_q31 = 0;
+	int32_t rms_voltage_mv = 0;
 	q31_t mean_current_q31 = 0;
+	int32_t rms_current_ma = 0;
+	int32_t apparent_power_mva = 0;
+	int32_t power_factor = 0;
 	int64_t temp_s64 = 0;
 	uint32_t idx = 0;
 	// Perform state machine.
@@ -268,8 +273,6 @@ static MEASURE_status_t _MEASURE_internal_process(void) {
 #else
 		// Synchronize on zero cross.
 		if (measure_ctx.zero_cross_count > MEASURE_ZERO_CROSS_PER_PERIOD) {
-			// Clear count.
-			measure_ctx.zero_cross_count = 0;
 			// Reset context.
 			_MEASURE_reset();
 			// Start measure.
@@ -331,27 +334,33 @@ static MEASURE_status_t _MEASURE_internal_process(void) {
 			arm_mean_q31(measure_data.period_acpx_buffer_q31, measure_data.period_acxx_buffer_size, &(measure_data.period_active_power_q31));
 			temp_s64 = (int64_t) (measure_data.period_active_power_q31 >> MEASURE_Q31_SHIFT_MULT);
 			temp_s64 *= MEASURE_ACP_FACTOR_NUM;
-			measure_data.instantaneous_result[ac_channel_idx].active_power_mw = (int32_t) (temp_s64 / MEASURE_ACP_FACTOR_DEN);
+			active_power_mw = (int32_t) (temp_s64 / MEASURE_ACP_FACTOR_DEN);
 			// RMS voltage.
 			arm_rms_q31(measure_data.period_acvx_buffer_q31, measure_data.period_acxx_buffer_size, &(measure_data.period_rms_voltage_q31));
 			temp_s64 = MEASURE_ACV_FACTOR_NUM * (int64_t) (measure_data.period_rms_voltage_q31 >> MEASURE_Q31_SHIFT_ADC);
-			measure_data.instantaneous_result[ac_channel_idx].rms_voltage_mv = (int32_t) (temp_s64 / MEASURE_ACV_FACTOR_DEN);
+			rms_voltage_mv = (int32_t) (temp_s64 / MEASURE_ACV_FACTOR_DEN);
 			// RMS current.
 			arm_rms_q31(measure_data.period_acix_buffer_q31, measure_data.period_acxx_buffer_size, &(measure_data.period_rms_current_q31));
 			temp_s64 = MEASURE_ACI_FACTOR_NUM * (int64_t) (measure_data.period_rms_current_q31 >> MEASURE_Q31_SHIFT_ADC);
-			measure_data.instantaneous_result[ac_channel_idx].rms_current_ma = (int32_t) (temp_s64 / MEASURE_ACI_FACTOR_DEN);
+			rms_current_ma = (int32_t) (temp_s64 / MEASURE_ACI_FACTOR_DEN);
 			// Apparent power.
-			temp_s64 = ((int64_t) measure_data.instantaneous_result[ac_channel_idx].rms_voltage_mv) * ((int64_t) measure_data.instantaneous_result[ac_channel_idx].rms_current_ma);
-			measure_data.instantaneous_result[ac_channel_idx].apparent_power_mva = (int32_t) ((temp_s64) / ((int64_t) 1000));
+			temp_s64 = ((int64_t) rms_voltage_mv) * ((int64_t) rms_current_ma);
+			apparent_power_mva = (int32_t) ((temp_s64) / ((int64_t) 1000));
 			// Power factor.
-			temp_s64 = (int64_t) MEASURE_POWER_FACTOR_MULTIPLIER * ((int64_t) measure_data.instantaneous_result[ac_channel_idx].active_power_mw);
-			measure_data.instantaneous_result[ac_channel_idx].power_factor = (measure_data.instantaneous_result[ac_channel_idx].apparent_power_mva != 0) ? (int32_t) ((temp_s64) / ((int64_t) measure_data.instantaneous_result[ac_channel_idx].apparent_power_mva)) : 0;
-			// Update results.
-			_MEASURE_result_add_sample(measure_data.accumulated_data[ac_channel_idx].active_power_mw, measure_data.instantaneous_result[ac_channel_idx].active_power_mw);
-			_MEASURE_result_add_sample(measure_data.accumulated_data[ac_channel_idx].rms_voltage_mv, measure_data.instantaneous_result[ac_channel_idx].rms_voltage_mv);
-			_MEASURE_result_add_sample(measure_data.accumulated_data[ac_channel_idx].rms_current_ma, measure_data.instantaneous_result[ac_channel_idx].rms_current_ma);
-			_MEASURE_result_add_sample(measure_data.accumulated_data[ac_channel_idx].apparent_power_mva, measure_data.instantaneous_result[ac_channel_idx].apparent_power_mva);
-			_MEASURE_result_add_sample(measure_data.accumulated_data[ac_channel_idx].power_factor, measure_data.instantaneous_result[ac_channel_idx].power_factor);
+			temp_s64 = (int64_t) MEASURE_POWER_FACTOR_MULTIPLIER * ((int64_t) active_power_mw);
+			power_factor = (apparent_power_mva != 0) ? (int32_t) ((temp_s64) / ((int64_t) apparent_power_mva)) : 0;
+			// Update accumulated data for run.
+			_MEASURE_add_sample(measure_data.accumulated_data_run[ac_channel_idx].active_power_mw, active_power_mw);
+			_MEASURE_add_sample(measure_data.accumulated_data_run[ac_channel_idx].rms_voltage_mv, rms_voltage_mv);
+			_MEASURE_add_sample(measure_data.accumulated_data_run[ac_channel_idx].rms_current_ma, rms_current_ma);
+			_MEASURE_add_sample(measure_data.accumulated_data_run[ac_channel_idx].apparent_power_mva, apparent_power_mva);
+			_MEASURE_add_sample(measure_data.accumulated_data_run[ac_channel_idx].power_factor, power_factor);
+			// Update accumulated data.
+			_MEASURE_add_sample(measure_data.accumulated_data[ac_channel_idx].active_power_mw, active_power_mw);
+			_MEASURE_add_sample(measure_data.accumulated_data[ac_channel_idx].rms_voltage_mv, rms_voltage_mv);
+			_MEASURE_add_sample(measure_data.accumulated_data[ac_channel_idx].rms_current_ma, rms_current_ma);
+			_MEASURE_add_sample(measure_data.accumulated_data[ac_channel_idx].apparent_power_mva, apparent_power_mva);
+			_MEASURE_add_sample(measure_data.accumulated_data[ac_channel_idx].power_factor, power_factor);
 		}
 		// Update read indexes.
 		measure_sampling.acv_read_idx = ((measure_sampling.acv_read_idx + 1) % MEASURE_PERIOD_DMA_BUFFER_DEPTH);
@@ -382,13 +391,15 @@ MEASURE_status_t MEASURE_init(void) {
 	measure_ctx.state = MEASURE_STATE_STOPPED;
 	measure_ctx.period_process_count = 0;
 	measure_ctx.tick_led_count = 0;
-	_MEASURE_reset();
-	// Clear all results.
+	// Turn analog front-end on to have VREF+ for ADC calibration.
+	power_status = POWER_enable(POWER_DOMAIN_ANALOG, LPTIM_DELAY_MODE_ACTIVE);
+	POWER_exit_error(MEASURE_ERROR_BASE_POWER);
+	// Init channels.
 	for (idx=0 ; idx<ADC_NUMBER_OF_ACI_CHANNELS ; idx++) {
-		_MEASURE_reset_all_accumulated_data(idx);
-	}
-	// Init current sensors detector.
-	for (idx=0 ; idx<ADC_NUMBER_OF_ACI_CHANNELS ; idx++) {
+		// Clear all data.
+		_MEASURE_reset_all_accumulated_data(measure_data.accumulated_data, idx);
+		_MEASURE_reset_all_accumulated_data(measure_data.accumulated_data_run, idx);
+		// Init detect pins.
 		GPIO_configure(MEASURE_GPIO_ACI_DETECT[idx], GPIO_MODE_INPUT, GPIO_TYPE_PUSH_PULL, GPIO_SPEED_LOW, GPIO_PULL_NONE);
 	}
 	// Init RGB LED.
@@ -397,17 +408,15 @@ MEASURE_status_t MEASURE_init(void) {
 	GPIO_configure(&GPIO_ZERO_CROSS_PULSE, GPIO_MODE_INPUT, GPIO_TYPE_PUSH_PULL, GPIO_SPEED_LOW, GPIO_PULL_NONE);
 	EXTI_configure_gpio(&GPIO_ZERO_CROSS_PULSE, EXTI_TRIGGER_RISING_EDGE, &_MEASURE_increment_zero_cross_count);
 	NVIC_enable_interrupt(NVIC_INTERRUPT_EXTI2, NVIC_PRIORITY_EXTI2);
+	// Init timer.
+	TIM6_init();
 	// Init DMA.
 	DMA1_init(&_MEASURE_set_dma_transfer_end_flag);
-	// Turn analog front-end on to have VREF+ for ADC calibration.
-	power_status = POWER_enable(POWER_DOMAIN_ANALOG, LPTIM_DELAY_MODE_ACTIVE);
-	POWER_exit_error(MEASURE_ERROR_BASE_POWER);
 	// Init ADC.
 	adc_status = ADC_init();
 	ADC_exit_error(MEASURE_ERROR_BASE_ADC);
-	// Init timer.
-	TIM6_init();
 errors:
+	_MEASURE_reset();
 	return status;
 }
 
@@ -430,6 +439,20 @@ MEASURE_status_t MEASURE_tick(void) {
 	// Local variables.
 	MEASURE_status_t status = MEASURE_SUCCESS;
 	LED_color_t led_color = LED_COLOR_OFF;
+	uint8_t ac_channel_idx = 0;
+	// Compute run data.
+	for (ac_channel_idx=0 ; ac_channel_idx<ADC_NUMBER_OF_ACI_CHANNELS ; ac_channel_idx++) {
+		// Copy all rolling means.
+		measure_data.run_data[ac_channel_idx].active_power_mw = measure_data.accumulated_data_run[ac_channel_idx].active_power_mw.rolling_mean;
+		measure_data.run_data[ac_channel_idx].rms_voltage_mv = measure_data.accumulated_data_run[ac_channel_idx].rms_voltage_mv.rolling_mean;
+		measure_data.run_data[ac_channel_idx].rms_current_ma = measure_data.accumulated_data_run[ac_channel_idx].rms_current_ma.rolling_mean;
+		measure_data.run_data[ac_channel_idx].apparent_power_mva = measure_data.accumulated_data_run[ac_channel_idx].apparent_power_mva.rolling_mean;
+		measure_data.run_data[ac_channel_idx].power_factor = measure_data.accumulated_data_run[ac_channel_idx].power_factor.rolling_mean;
+		// Use RMS voltage as reference for number of samples.
+		measure_data.run_data[ac_channel_idx].number_of_samples = measure_data.accumulated_data_run[ac_channel_idx].rms_voltage_mv.number_of_samples;
+		// Reset results.
+		_MEASURE_reset_all_accumulated_data(measure_data.accumulated_data_run, ac_channel_idx);
+	}
 	// Check number processed periods during last second.
 	if ((measure_ctx.state != MEASURE_STATE_STOPPED) && (measure_ctx.period_process_count == 0)) {
 		// Stop measure.
@@ -441,13 +464,8 @@ MEASURE_status_t MEASURE_tick(void) {
 	if (measure_ctx.tick_led_count >= MEASURE_LED_PULSE_PERIOD_SECONDS) {
 		// Compute LED color according to state.
 		if (measure_ctx.state == MEASURE_STATE_STOPPED) {
-			// Check current number of samples.
-			if (measure_data.accumulated_data[0].rms_voltage_mv.number_of_samples == 0) {
-				led_color = LED_COLOR_RED;
-			}
-			else {
-				led_color = LED_COLOR_YELLOW;
-			}
+			// Check current number of samples (CH1 RMS voltage as reference).
+			led_color = (measure_data.accumulated_data[0].rms_voltage_mv.number_of_samples == 0) ? LED_COLOR_RED : LED_COLOR_YELLOW;
 		}
 		else {
 			led_color = LED_COLOR_GREEN;
@@ -477,7 +495,7 @@ errors:
 }
 
 /*******************************************************************/
-MEASURE_status_t MEASURE_get_instantaneous_data(uint8_t ac_channel_index, MEASURE_instantaneous_channel_result_t* ac_channel_data) {
+MEASURE_status_t MEASURE_get_run_data(uint8_t ac_channel_index, MEASURE_channel_run_data_t* ac_channel_data) {
 	// Local variables.
 	MEASURE_status_t status = MEASURE_SUCCESS;
 	// Check parameters.
@@ -490,17 +508,18 @@ MEASURE_status_t MEASURE_get_instantaneous_data(uint8_t ac_channel_index, MEASUR
 		goto errors;
 	}
 	// Copy data.
-	(ac_channel_data -> active_power_mw) = measure_data.instantaneous_result[ac_channel_index].active_power_mw;
-	(ac_channel_data -> rms_voltage_mv) = measure_data.instantaneous_result[ac_channel_index].rms_voltage_mv;
-	(ac_channel_data -> rms_current_ma) = measure_data.instantaneous_result[ac_channel_index].rms_current_ma;
-	(ac_channel_data -> apparent_power_mva) = measure_data.instantaneous_result[ac_channel_index].apparent_power_mva;
-	(ac_channel_data -> power_factor) = measure_data.instantaneous_result[ac_channel_index].power_factor;
+	(ac_channel_data -> active_power_mw) = measure_data.run_data[ac_channel_index].active_power_mw;
+	(ac_channel_data -> rms_voltage_mv) = measure_data.run_data[ac_channel_index].rms_voltage_mv;
+	(ac_channel_data -> rms_current_ma) = measure_data.run_data[ac_channel_index].rms_current_ma;
+	(ac_channel_data -> apparent_power_mva) = measure_data.run_data[ac_channel_index].apparent_power_mva;
+	(ac_channel_data -> power_factor) = measure_data.run_data[ac_channel_index].power_factor;
+	(ac_channel_data -> number_of_samples) = measure_data.run_data[ac_channel_index].number_of_samples;
 errors:
 	return status;
 }
 
 /*******************************************************************/
-MEASURE_status_t MEASURE_get_accumulated_data(uint8_t ac_channel_index, MEASURE_accumulated_channel_result_t* ac_channel_data) {
+MEASURE_status_t MEASURE_get_accumulated_data(uint8_t ac_channel_index, MEASURE_channel_accumulated_data_t* ac_channel_data) {
 	// Local variables.
 	MEASURE_status_t status = MEASURE_SUCCESS;
 	// Check parameters.
@@ -519,7 +538,7 @@ MEASURE_status_t MEASURE_get_accumulated_data(uint8_t ac_channel_index, MEASURE_
 	_MEASURE_copy_accumulated_data(measure_data.accumulated_data[ac_channel_index].apparent_power_mva, (ac_channel_data -> apparent_power_mva));
 	_MEASURE_copy_accumulated_data(measure_data.accumulated_data[ac_channel_index].power_factor, (ac_channel_data -> power_factor));
 	// Reset data.
-	_MEASURE_reset_all_accumulated_data(ac_channel_index);
+	_MEASURE_reset_all_accumulated_data(measure_data.accumulated_data, ac_channel_index);
 errors:
 	return status;
 }
