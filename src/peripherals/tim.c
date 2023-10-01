@@ -8,6 +8,8 @@
 #include "tim.h"
 
 #include "adc.h"
+#include "gpio.h"
+#include "mapping.h"
 #include "rcc.h"
 #include "rcc_reg.h"
 #include "tim_reg.h"
@@ -28,6 +30,39 @@ static const uint8_t TIM4_LED_CHANNELS[TIM4_NUMBER_OF_USED_CHANNELS] = {
 };
 
 /*** TIM functions ***/
+
+/*******************************************************************/
+void TIM2_init(uint32_t sampling_frequency_hz) {
+	// Enable peripheral clock.
+	RCC -> APB1ENR1 |= (0b1 << 0); // TIM2EN='1'.
+	// Set prescaler.
+	TIM2 -> PSC = (((RCC_SYSCLK_FREQUENCY_KHZ * 1000) / (sampling_frequency_hz)) - 1);
+	TIM2 -> ARR = 0xFFFFFFFF;
+	// Configure CH1 in input capture mode with prescaler (2 zero cross edges per period).
+	TIM2 -> CCMR1 |= (0b01 << 2) | (0b01 << 0);
+	// Enable DMA request.
+	TIM2 -> DIER |= (0b1 << 9);
+	// Generate event to update registers.
+	TIM2 -> EGR |= (0b1 << 0); // UG='1'.
+	// Configure GPIO.
+	GPIO_configure(&GPIO_ACV_FREQUENCY, GPIO_MODE_ALTERNATE_FUNCTION, GPIO_TYPE_PUSH_PULL, GPIO_SPEED_LOW, GPIO_PULL_NONE);
+}
+
+/*******************************************************************/
+void TIM2_start(void) {
+	// Reset counter.
+	TIM2 -> CNT = 0;
+	// Enable channel and counter.
+	TIM2 -> CCER |= (0b1 << 0);
+	TIM2 -> CR1 |= (0b1 << 0);
+}
+
+/*******************************************************************/
+void TIM2_stop(void) {
+	// Disable counter and channel.
+	TIM2 -> CR1 &= ~(0b1 << 0);
+	TIM2 -> CCER &= ~(0b1 << 0);
+}
 
 /*******************************************************************/
 void TIM4_init(void) {

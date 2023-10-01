@@ -29,7 +29,7 @@ static const GPIO_pin_t GPIO_ACI4_DETECT =			(GPIO_pin_t) {GPIOB, 1, 14, 0};
 static const GPIO_pin_t GPIO_ZERO_CROSS_RAW =		(GPIO_pin_t) {GPIOA, 0, 3, 0};
 static const GPIO_pin_t GPIO_ZERO_CROSS_PULSE =		(GPIO_pin_t) {GPIOA, 0, 2, 0};
 // Frequency measure.
-static const GPIO_pin_t GPIO_ACV_FREQUENCY =		(GPIO_pin_t) {GPIOA, 0, 5, 2}; // AF2 = TIM2_ETR.
+static const GPIO_pin_t GPIO_ACV_FREQUENCY =		(GPIO_pin_t) {GPIOA, 0, 5, 1}; // AF1 = TIM2_CH1.
 // Loads command.
 static const GPIO_pin_t GPIO_LOAD_TRIGGER =			(GPIO_pin_t) {GPIOA, 0, 12, 11}; // AF11 = TIM1_ETR.
 static const GPIO_pin_t GPIO_LOAD1_COMMAND =		(GPIO_pin_t) {GPIOA, 0, 8, 6}; // AF6 = TIM1_CH1.

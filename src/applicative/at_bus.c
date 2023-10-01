@@ -394,7 +394,7 @@ void AT_BUS_high_speed_log(void) {
 	// Local variables.
 	MEASURE_channel_run_data_t channel_result;
 	// Get measurements.
-	MEASURE_get_run_data(0, &channel_result);
+	MEASURE_get_channel_run_data(0, &channel_result);
 	// Disable receiver.
 	LBUS_disable_rx();
 	// Print data.

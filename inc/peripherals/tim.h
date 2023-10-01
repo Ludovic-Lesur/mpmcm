@@ -40,6 +40,33 @@ typedef enum {
 /*** TIM functions ***/
 
 /*!******************************************************************
+ * \fn void TIM2_init(void)
+ * \brief Init TIM2 peripheral for mains voltage frequency measurement.
+ * \param[in]  	sampling_frequency_hz: Input capture sampling frequency in Hz.
+ * \param[out] 	none
+ * \retval		none
+ *******************************************************************/
+void TIM2_init(uint32_t sampling_frequency_hz);
+
+/*!******************************************************************
+ * \fn void TIM2_start(void)
+ * \brief Start TIM2 operation.
+ * \param[in]  	none
+ * \param[out] 	none
+ * \retval		none
+ *******************************************************************/
+void TIM2_start(void);
+
+/*!******************************************************************
+ * \fn void TIM2_stop(void)
+ * \brief Stop TIM2 operation.
+ * \param[in]  	none
+ * \param[out] 	none
+ * \retval		none
+ *******************************************************************/
+void TIM2_stop(void);
+
+/*!******************************************************************
  * \fn void TIM4_init(void)
  * \brief Init TIM4 peripheral for RGB LED blinking operation.
  * \param[in]  	none
@@ -69,7 +96,7 @@ void TIM6_init(void);
 
 /*!******************************************************************
  * \fn void TIM6_start(void)
- * \brief Start TIM6.
+ * \brief Start TIM6 operation.
  * \param[in]  	none
  * \param[out] 	none
  * \retval		none
@@ -78,7 +105,7 @@ void TIM6_start(void);
 
 /*!******************************************************************
  * \fn void TIM6_stop(void)
- * \brief Stop TIM6.
+ * \brief Stop TIM6 operation.
  * \param[in]  	none
  * \param[out] 	none
  * \retval		none
