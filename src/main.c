@@ -75,24 +75,18 @@ static void _MPMCM_init_hw(void) {
 int main(void) {
 	// Init board.
 	_MPMCM_init_hw();
-	// Local variables.
-	MEASURE_status_t measure_status = MEASURE_SUCCESS;
 	// Main loop.
 	while (1) {
 		// Enter sleep mode.
 		IWDG_reload();
 		PWR_enter_sleep_mode();
 		IWDG_reload();
-		// Process measure.
-		measure_status = MEASURE_process();
-		MEASURE_stack_error();
 		// Check RTC flag.
 		if (RTC_get_wakeup_timer_flag() != 0) {
 			// Clear flag.
 			RTC_clear_wakeup_timer_flag();
 			// Call measure tick.
-			measure_status = MEASURE_tick();
-			MEASURE_stack_error();
+			MEASURE_tick();
 #ifdef HIGH_SPEED_LOG
 			AT_BUS_high_speed_log();
 #endif

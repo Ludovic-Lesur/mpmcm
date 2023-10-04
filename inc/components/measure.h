@@ -100,22 +100,13 @@ typedef struct {
 MEASURE_status_t MEASURE_init(void);
 
 /*!******************************************************************
- * \fn MEASURE_status_t MEASURE_process(void)
- * \brief Process MEASURE driver.
- * \param[in]  	none
- * \param[out] 	none
- * \retval		Function execution status.
- *******************************************************************/
-MEASURE_status_t MEASURE_process(void);
-
-/*!******************************************************************
  * \fn MEASURE_status_t MEASURE_tick(void)
  * \brief Function to call every second.
  * \param[in]  	none
  * \param[out] 	none
- * \retval		Function execution status.
+ * \retval		none
  *******************************************************************/
-MEASURE_status_t MEASURE_tick(void);
+void MEASURE_tick(void);
 
 /*!******************************************************************
  * \fn MEASURE_status_t MEASURE_get_detect_flag(uint8_t ac_channel_index, uint8_t* current_sensor_connected)
