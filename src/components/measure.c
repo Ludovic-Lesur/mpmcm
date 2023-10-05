@@ -56,7 +56,7 @@
 #define MEASURE_STOP_THRESHOLD_PERIODS					50
 #define MEASURE_DMA_TRANSFER_END_LIMIT					(MEASURE_STOP_THRESHOLD_PERIODS / MEASURE_PERIOD_PER_BUFFER)
 
-#define MEASURE_POWER_FACTOR_MULTIPLIER					1000
+#define MEASURE_POWER_FACTOR_MULTIPLIER					100
 
 #define MEASURE_Q31_SHIFT_ADC							16
 #define MEASURE_Q31_SHIFT_MULT							1
@@ -110,18 +110,19 @@ typedef struct {
 	q31_t period_apparent_power_q31;
 	q31_t period_power_factor_q31;
 	// AC channels results.
-	MEASURE_channel_run_data_t chx_run_data[ADC_NUMBER_OF_ACI_CHANNELS];
-	MEASURE_channel_accumulated_data_t chx_accumulated_data_run[ADC_NUMBER_OF_ACI_CHANNELS];
+	MEASURE_channel_data_t chx_rolling_mean[ADC_NUMBER_OF_ACI_CHANNELS];
+	MEASURE_channel_data_t chx_run_data[ADC_NUMBER_OF_ACI_CHANNELS];
 	MEASURE_channel_accumulated_data_t chx_accumulated_data[ADC_NUMBER_OF_ACI_CHANNELS];
 	// Mains frequency.
-	MEASURE_run_data_t acv_frequency_run_data;
-	MEASURE_accumulated_data_t acv_frequency_accumulated_data_run;
+	MEASURE_data_t acv_frequency_rolling_mean;
+	MEASURE_data_t acv_frequency_run_data;
 	MEASURE_accumulated_data_t acv_frequency_accumulated_data;
-} MEASURE_data_t;
+} MEASURE_internal_data_t;
 
 /*******************************************************************/
 typedef struct {
 	MEASURE_state_t state;
+	uint8_t processing_enable;
 	uint8_t zero_cross_count;
 	uint8_t dma_transfer_end_count;
 	uint32_t tick_led_count;
@@ -132,11 +133,17 @@ typedef struct {
 static const GPIO_pin_t* MEASURE_GPIO_ACI_DETECT[ADC_NUMBER_OF_ACI_CHANNELS] = {&GPIO_ACI1_DETECT, &GPIO_ACI2_DETECT, &GPIO_ACI3_DETECT, &GPIO_ACI4_DETECT};
 
 static volatile MEASURE_sampling_t measure_sampling;
-static volatile MEASURE_data_t measure_data __attribute__((section(".bss_ccmsram")));
+static volatile MEASURE_internal_data_t measure_data __attribute__((section(".bss_ccmsram")));
 
 static volatile MEASURE_context_t measure_ctx;
 
 /*** MEASURE local functions ***/
+
+/*******************************************************************/
+#define _MEASURE_reset_data(source) { \
+	source.value = 0; \
+	source.number_of_samples = 0; \
+}
 
 /*******************************************************************/
 #define _MEASURE_reset_accumulated_data(result) { \
@@ -144,6 +151,29 @@ static volatile MEASURE_context_t measure_ctx;
 	result.max = -2147483648; \
 	result.rolling_mean = 0; \
 	result.number_of_samples = 0; \
+}
+
+/*******************************************************************/
+#define _MEASURE_copy_data(source, destination) { \
+	destination.value = source.value; \
+	destination.number_of_samples = source.number_of_samples; \
+}
+
+/*******************************************************************/
+#define _MEASURE_copy_accumulated_data(source, destination) { \
+	destination.min = source.min; \
+	destination.max = source.max; \
+	destination.rolling_mean = source.rolling_mean; \
+	destination.number_of_samples = source.number_of_samples; \
+}
+
+/*******************************************************************/
+#define _MEASURE_reset_chx_data(source, channel_index) { \
+	_MEASURE_reset_data(source[channel_index].active_power_mw); \
+	_MEASURE_reset_data(source[channel_index].rms_voltage_mv); \
+	_MEASURE_reset_data(source[channel_index].rms_current_ma); \
+	_MEASURE_reset_data(source[channel_index].apparent_power_mva); \
+	_MEASURE_reset_data(source[channel_index].power_factor); \
 }
 
 /*******************************************************************/
@@ -156,27 +186,51 @@ static volatile MEASURE_context_t measure_ctx;
 }
 
 /*******************************************************************/
-#define _MEASURE_copy_accumulated_data(source, destination) { \
-	destination.min = source.min; \
-	destination.max = source.max; \
-	destination.rolling_mean = source.rolling_mean; \
-	destination.number_of_samples = source.number_of_samples; \
+#define _MEASURE_add_sample(source, new_sample) { \
+	/* Compute rolling mean */ \
+	temp_s64 = ((int64_t) source.value * (int64_t) source.number_of_samples) + (int64_t) new_sample; \
+	source.value = (int32_t) ((temp_s64) / ((int64_t) (source.number_of_samples + 1))); \
+	source.number_of_samples++; \
 }
 
 /*******************************************************************/
-#define _MEASURE_add_sample(result, new_sample) { \
+#define _MEASURE_add_chx_sample(source, result, new_sample) { \
+	/* Compute rolling mean */ \
+	temp_s64 = ((int64_t) source.result.value * (int64_t) source.result.number_of_samples) + (int64_t) new_sample; \
+	source.result.value = (int32_t) ((temp_s64) / ((int64_t) (source.result.number_of_samples + 1))); \
+	source.result.number_of_samples++; \
+}
+
+/*******************************************************************/
+#define _MEASURE_add_accumulated_sample(source, new_sample) { \
 	/* Min */ \
-	if (new_sample < result.min) { \
-		result.min = new_sample; \
+	if (new_sample < source.min) { \
+		source.min = new_sample; \
 	} \
 	/* Max */ \
-	if (new_sample > result.max) { \
-		result.max = new_sample; \
+	if (new_sample > source.max) { \
+		source.max = new_sample; \
 	} \
-	/* Rolling mean */ \
-	temp_s64 = ((int64_t) result.rolling_mean * (int64_t) result.number_of_samples) + (int64_t) new_sample; \
-	result.rolling_mean = (int32_t) ((temp_s64) / ((int64_t) (result.number_of_samples + 1))); \
-	result.number_of_samples++; \
+	/* Compute rolling mean */ \
+	temp_s64 = ((int64_t) source.rolling_mean * (int64_t) source.number_of_samples) + (int64_t) new_sample; \
+	source.rolling_mean = (int32_t) ((temp_s64) / ((int64_t) (source.number_of_samples + 1))); \
+	source.number_of_samples++; \
+}
+
+/*******************************************************************/
+#define _MEASURE_add_chx_accumulated_sample(source, result, new_sample) { \
+	/* Min */ \
+	if (new_sample < source.result.min) { \
+		source.result.min = new_sample; \
+	} \
+	/* Max */ \
+	if (new_sample > source.result.max) { \
+		source.result.max = new_sample; \
+	} \
+	/* Compute rolling mean */ \
+	temp_s64 = ((int64_t) source.result.rolling_mean * (int64_t) source.result.number_of_samples) + (int64_t) new_sample; \
+	source.result.rolling_mean = (int32_t) ((temp_s64) / ((int64_t) (source.result.number_of_samples + 1))); \
+	source.result.number_of_samples++; \
 }
 
 /*******************************************************************/
@@ -193,22 +247,24 @@ static void _MEASURE_reset(void) {
 	// Reset flags.
 	measure_ctx.zero_cross_count = 0;
 	measure_ctx.dma_transfer_end_count = 0;
+	// Reset sampling buffers.
+	for (idx0=0 ; idx0<MEASURE_PERIOD_ADCX_DMA_BUFFER_DEPTH ; idx0++) {
+		for (idx1=0 ; idx1<MEASURE_PERIOD_ADCX_DMA_BUFFER_SIZE ; idx1++) {
+			measure_sampling.acv[idx0].data[idx1] = 0;
+			measure_sampling.aci[idx0].data[idx1] = 0;
+		}
+	}
 	// Reset channels data.
 	for (chx_idx=0 ; chx_idx<ADC_NUMBER_OF_ACI_CHANNELS ; chx_idx++) {
 		// Clear all data.
+		_MEASURE_reset_chx_data(measure_data.chx_rolling_mean, chx_idx);
+		_MEASURE_reset_chx_data(measure_data.chx_run_data, chx_idx);
 		_MEASURE_reset_chx_accumulated_data(measure_data.chx_accumulated_data, chx_idx);
-		_MEASURE_reset_chx_accumulated_data(measure_data.chx_accumulated_data_run, chx_idx);
-		// Reset sampling buffers.
-		for (idx0=0 ; idx0<MEASURE_PERIOD_ADCX_DMA_BUFFER_DEPTH ; idx0++) {
-			for (idx1=0 ; idx1<MEASURE_PERIOD_ADCX_DMA_BUFFER_SIZE ; idx1++) {
-				measure_sampling.acv[idx0].data[idx1] = 0;
-				measure_sampling.aci[idx0].data[idx1] = 0;
-			}
-		}
 	}
 	// Reset frequency data.
+	_MEASURE_reset_data(measure_data.acv_frequency_rolling_mean);
+	_MEASURE_reset_data(measure_data.acv_frequency_run_data);
 	_MEASURE_reset_accumulated_data(measure_data.acv_frequency_accumulated_data);
-	_MEASURE_reset_accumulated_data(measure_data.acv_frequency_accumulated_data_run);
 	// Reset sampling buffers.
 	for (idx1=0 ; idx1<MEASURE_PERIOD_TIM2_DMA_BUFFER_SIZE ; idx1++) {
 		measure_sampling.tim2_ccr1[idx1] = 0;
@@ -260,6 +316,8 @@ MEASURE_status_t _MEASURE_start(void) {
 	DMA1_tim2_start();
 	// Start analog measurements.
 	status = _MEASURE_start_analog_transfer();
+	// Update flag.
+	measure_ctx.processing_enable = 1;
 	return status;
 }
 
@@ -267,6 +325,8 @@ MEASURE_status_t _MEASURE_start(void) {
 MEASURE_status_t _MEASURE_stop(void) {
 	// Local variables.
 	MEASURE_status_t status = MEASURE_SUCCESS;
+	// Update flag.
+	measure_ctx.processing_enable = 0;
 	// Stop frequency measurement timer.
 	DMA1_tim2_stop();
 	TIM2_stop();
@@ -311,13 +371,15 @@ static void _MEASURE_compute_period_data(void) {
 	int32_t frequency_mhz = 0;
 	int64_t temp_s64 = 0;
 	uint32_t idx = 0;
+	// Check enable flag.
+	if (measure_ctx.processing_enable == 0) return;
 	// Get size.
 	acv_buffer_size = (uint32_t) ((measure_sampling.acv[measure_sampling.acv_read_idx].size) / (ADC_NUMBER_OF_ACI_CHANNELS));
 	aci_buffer_size = (uint32_t) ((measure_sampling.aci[measure_sampling.acv_read_idx].size) / (ADC_NUMBER_OF_ACI_CHANNELS));
 	// Take the minimum size between voltage and current.
 	measure_data.period_acxx_buffer_size = (acv_buffer_size < aci_buffer_size) ? acv_buffer_size : aci_buffer_size;
 	// Check size.
-	if ((measure_data.period_acxx_buffer_size < MEASURE_PERIOD_ADCX_BUFFER_SIZE_LOW_LIMIT) || (measure_data.period_acxx_buffer_size > MEASURE_PERIOD_ADCX_BUFFER_SIZE_HIGH_LIMIT)) goto errors;
+	if ((measure_data.period_acxx_buffer_size < MEASURE_PERIOD_ADCX_BUFFER_SIZE_LOW_LIMIT) || (measure_data.period_acxx_buffer_size > MEASURE_PERIOD_ADCX_BUFFER_SIZE_HIGH_LIMIT)) return;
 	// Processing each channel.
 	for (chx_idx=0 ; chx_idx<ADC_NUMBER_OF_ACI_CHANNELS ; chx_idx++) {
 		// Compute channel buffer.
@@ -359,18 +421,12 @@ static void _MEASURE_compute_period_data(void) {
 		// Power factor.
 		temp_s64 = (int64_t) MEASURE_POWER_FACTOR_MULTIPLIER * ((int64_t) active_power_mw);
 		power_factor = (apparent_power_mva != 0) ? (int32_t) ((temp_s64) / ((int64_t) apparent_power_mva)) : 0;
-		// Update accumulated data for run.
-		_MEASURE_add_sample(measure_data.chx_accumulated_data_run[chx_idx].active_power_mw, active_power_mw);
-		_MEASURE_add_sample(measure_data.chx_accumulated_data_run[chx_idx].rms_voltage_mv, rms_voltage_mv);
-		_MEASURE_add_sample(measure_data.chx_accumulated_data_run[chx_idx].rms_current_ma, rms_current_ma);
-		_MEASURE_add_sample(measure_data.chx_accumulated_data_run[chx_idx].apparent_power_mva, apparent_power_mva);
-		_MEASURE_add_sample(measure_data.chx_accumulated_data_run[chx_idx].power_factor, power_factor);
 		// Update accumulated data.
-		_MEASURE_add_sample(measure_data.chx_accumulated_data[chx_idx].active_power_mw, active_power_mw);
-		_MEASURE_add_sample(measure_data.chx_accumulated_data[chx_idx].rms_voltage_mv, rms_voltage_mv);
-		_MEASURE_add_sample(measure_data.chx_accumulated_data[chx_idx].rms_current_ma, rms_current_ma);
-		_MEASURE_add_sample(measure_data.chx_accumulated_data[chx_idx].apparent_power_mva, apparent_power_mva);
-		_MEASURE_add_sample(measure_data.chx_accumulated_data[chx_idx].power_factor, power_factor);
+		_MEASURE_add_chx_sample(measure_data.chx_rolling_mean[chx_idx], active_power_mw, active_power_mw);
+		_MEASURE_add_chx_sample(measure_data.chx_rolling_mean[chx_idx], rms_voltage_mv, rms_voltage_mv);
+		_MEASURE_add_chx_sample(measure_data.chx_rolling_mean[chx_idx], rms_current_ma, rms_current_ma);
+		_MEASURE_add_chx_sample(measure_data.chx_rolling_mean[chx_idx], apparent_power_mva, apparent_power_mva);
+		_MEASURE_add_chx_sample(measure_data.chx_rolling_mean[chx_idx], power_factor, power_factor);
 	}
 	// Update read indexes.
 	measure_sampling.acv_read_idx = ((measure_sampling.acv_read_idx + 1) % MEASURE_PERIOD_ADCX_DMA_BUFFER_DEPTH);
@@ -388,11 +444,8 @@ static void _MEASURE_compute_period_data(void) {
 		temp_s64 = (((int64_t) MEASURE_ACV_FREQUENCY_SAMPLING_HZ * 1000) / ((int64_t) measure_sampling.tim2_ccr1[(idx + 1) % MEASURE_PERIOD_TIM2_DMA_BUFFER_SIZE] - (int64_t) measure_sampling.tim2_ccr1[idx]));
 		frequency_mhz = (int32_t) temp_s64;
 		// Update accumulated data.
-		_MEASURE_add_sample(measure_data.acv_frequency_accumulated_data_run, frequency_mhz);
-		_MEASURE_add_sample(measure_data.acv_frequency_accumulated_data, frequency_mhz);
+		_MEASURE_add_sample(measure_data.acv_frequency_rolling_mean, frequency_mhz);
 	}
-errors:
-	return;
 }
 
 /*******************************************************************/
@@ -402,20 +455,39 @@ static void _MEASURE_compute_run_data(void) {
 	// Compute AC channels run data.
 	for (chx_idx=0 ; chx_idx<ADC_NUMBER_OF_ACI_CHANNELS ; chx_idx++) {
 		// Copy all rolling means.
-		measure_data.chx_run_data[chx_idx].active_power_mw = measure_data.chx_accumulated_data_run[chx_idx].active_power_mw.rolling_mean;
-		measure_data.chx_run_data[chx_idx].rms_voltage_mv = measure_data.chx_accumulated_data_run[chx_idx].rms_voltage_mv.rolling_mean;
-		measure_data.chx_run_data[chx_idx].rms_current_ma = measure_data.chx_accumulated_data_run[chx_idx].rms_current_ma.rolling_mean;
-		measure_data.chx_run_data[chx_idx].apparent_power_mva = measure_data.chx_accumulated_data_run[chx_idx].apparent_power_mva.rolling_mean;
-		measure_data.chx_run_data[chx_idx].power_factor = measure_data.chx_accumulated_data_run[chx_idx].power_factor.rolling_mean;
-		// Use RMS voltage as reference for number of samples.
-		measure_data.chx_run_data[chx_idx].number_of_samples = measure_data.chx_accumulated_data_run[chx_idx].rms_voltage_mv.number_of_samples;
+		_MEASURE_copy_data(measure_data.chx_rolling_mean[chx_idx].active_power_mw, measure_data.chx_run_data[chx_idx].active_power_mw);
+		_MEASURE_copy_data(measure_data.chx_rolling_mean[chx_idx].rms_voltage_mv, measure_data.chx_run_data[chx_idx].rms_voltage_mv);
+		_MEASURE_copy_data(measure_data.chx_rolling_mean[chx_idx].rms_current_ma, measure_data.chx_run_data[chx_idx].rms_current_ma);
+		_MEASURE_copy_data(measure_data.chx_rolling_mean[chx_idx].apparent_power_mva, measure_data.chx_run_data[chx_idx].apparent_power_mva);
+		_MEASURE_copy_data(measure_data.chx_rolling_mean[chx_idx].power_factor, measure_data.chx_run_data[chx_idx].power_factor);
 		// Reset results.
-		_MEASURE_reset_chx_accumulated_data(measure_data.chx_accumulated_data_run, chx_idx);
+		_MEASURE_reset_chx_data(measure_data.chx_rolling_mean, chx_idx);
 	}
 	// Compute frequency run data.
-	measure_data.acv_frequency_run_data.value = measure_data.acv_frequency_accumulated_data_run.rolling_mean;
-	measure_data.acv_frequency_run_data.number_of_samples = measure_data.acv_frequency_accumulated_data_run.number_of_samples;
-	_MEASURE_reset_accumulated_data(measure_data.acv_frequency_accumulated_data_run);
+	measure_data.acv_frequency_run_data.value = measure_data.acv_frequency_rolling_mean.value;
+	measure_data.acv_frequency_run_data.number_of_samples = measure_data.acv_frequency_rolling_mean.number_of_samples;
+	// Reset results.
+	_MEASURE_reset_data(measure_data.acv_frequency_rolling_mean);
+}
+
+/*******************************************************************/
+static void _MEASURE_compute_accumulated_data(void) {
+	// Local variables.
+	uint8_t chx_idx = 0;
+	int64_t temp_s64 = 0;
+	// Compute AC channels accumulated data.
+	for (chx_idx=0 ; chx_idx<ADC_NUMBER_OF_ACI_CHANNELS ; chx_idx++) {
+		// Copy all rolling means.s
+		_MEASURE_add_chx_accumulated_sample(measure_data.chx_accumulated_data[chx_idx], active_power_mw, measure_data.chx_run_data[chx_idx].active_power_mw.value);
+		_MEASURE_add_chx_accumulated_sample(measure_data.chx_accumulated_data[chx_idx], rms_voltage_mv, measure_data.chx_run_data[chx_idx].rms_voltage_mv.value);
+		_MEASURE_add_chx_accumulated_sample(measure_data.chx_accumulated_data[chx_idx], rms_current_ma, measure_data.chx_run_data[chx_idx].rms_current_ma.value);
+		_MEASURE_add_chx_accumulated_sample(measure_data.chx_accumulated_data[chx_idx], apparent_power_mva, measure_data.chx_run_data[chx_idx].apparent_power_mva.value);
+		_MEASURE_add_chx_accumulated_sample(measure_data.chx_accumulated_data[chx_idx], power_factor, measure_data.chx_run_data[chx_idx].power_factor.value);
+		// Reset results.
+		_MEASURE_reset_chx_data(measure_data.chx_rolling_mean, chx_idx);
+	}
+	// Compute frequency accumulated data.
+	_MEASURE_add_accumulated_sample(measure_data.acv_frequency_accumulated_data, measure_data.acv_frequency_run_data.value);
 }
 
 /*******************************************************************/
@@ -501,7 +573,7 @@ static void _MEASURE_increment_zero_cross_count(void) {
 }
 
 /*******************************************************************/
-static void _MEASURE_set_dma_adcx_transfer_end_flag(void) {
+static void _MEASURE_increment_dma_transfer_end_count(void) {
 	// Local variables.
 	MEASURE_status_t measure_status = MEASURE_SUCCESS;
 	// Set local flag.
@@ -539,7 +611,7 @@ MEASURE_status_t MEASURE_init(void) {
 	TIM2_init(MEASURE_ACV_FREQUENCY_SAMPLING_HZ);
 	TIM6_init();
 	// Init ADC DMA.
-	DMA1_adcx_init(&_MEASURE_set_dma_adcx_transfer_end_flag);
+	DMA1_adcx_init(&_MEASURE_increment_dma_transfer_end_count);
 	DMA1_adcx_set_destination_address((uint32_t) &(measure_sampling.acv[measure_sampling.acv_write_idx].data), (uint32_t) &(measure_sampling.aci[measure_sampling.aci_write_idx].data), MEASURE_PERIOD_ADCX_DMA_BUFFER_SIZE);
 	// Init timer DMA.
 	DMA1_tim2_init();
@@ -551,8 +623,13 @@ errors:
 
 /*******************************************************************/
 void MEASURE_tick(void) {
-	// Compute run data.
+	// Disable processing during data copy.
+	measure_ctx.processing_enable = 0;
+	// Compute run data from last second and accumulated data.
 	_MEASURE_compute_run_data();
+	_MEASURE_compute_accumulated_data();
+	// Enable processing.
+	measure_ctx.processing_enable = 1;
 	// Manage LED.
 	_MEASURE_led_single_pulse();
 }
@@ -572,7 +649,7 @@ errors:
 }
 
 /*******************************************************************/
-MEASURE_status_t MEASURE_get_run_data(MEASURE_data_type_t data_type, MEASURE_run_data_t* run_data) {
+MEASURE_status_t MEASURE_get_run_data(MEASURE_data_type_t data_type, MEASURE_data_t* run_data) {
 	// Local variables.
 	MEASURE_status_t status = MEASURE_SUCCESS;
 	// Check parameters.
@@ -621,7 +698,7 @@ errors:
 }
 
 /*******************************************************************/
-MEASURE_status_t MEASURE_get_channel_run_data(uint8_t ac_channel, MEASURE_channel_run_data_t* ac_channel_run_data) {
+MEASURE_status_t MEASURE_get_channel_run_data(uint8_t ac_channel, MEASURE_channel_data_t* ac_channel_run_data) {
 	// Local variables.
 	MEASURE_status_t status = MEASURE_SUCCESS;
 	// Check parameters.
@@ -634,12 +711,11 @@ MEASURE_status_t MEASURE_get_channel_run_data(uint8_t ac_channel, MEASURE_channe
 		goto errors;
 	}
 	// Copy data.
-	(ac_channel_run_data -> active_power_mw) = measure_data.chx_run_data[ac_channel].active_power_mw;
-	(ac_channel_run_data -> rms_voltage_mv) = measure_data.chx_run_data[ac_channel].rms_voltage_mv;
-	(ac_channel_run_data -> rms_current_ma) = measure_data.chx_run_data[ac_channel].rms_current_ma;
-	(ac_channel_run_data -> apparent_power_mva) = measure_data.chx_run_data[ac_channel].apparent_power_mva;
-	(ac_channel_run_data -> power_factor) = measure_data.chx_run_data[ac_channel].power_factor;
-	(ac_channel_run_data -> number_of_samples) = measure_data.chx_run_data[ac_channel].number_of_samples;
+	_MEASURE_copy_data(measure_data.chx_run_data[ac_channel].active_power_mw, (ac_channel_run_data -> active_power_mw));
+	_MEASURE_copy_data(measure_data.chx_run_data[ac_channel].rms_voltage_mv, (ac_channel_run_data -> rms_voltage_mv));
+	_MEASURE_copy_data(measure_data.chx_run_data[ac_channel].rms_current_ma, (ac_channel_run_data -> rms_current_ma));
+	_MEASURE_copy_data(measure_data.chx_run_data[ac_channel].apparent_power_mva, (ac_channel_run_data -> apparent_power_mva));
+	_MEASURE_copy_data(measure_data.chx_run_data[ac_channel].power_factor, (ac_channel_run_data -> power_factor));
 errors:
 	return status;
 }

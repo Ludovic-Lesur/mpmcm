@@ -44,26 +44,25 @@ typedef enum {
 } MEASURE_data_type_t;
 
 /*!******************************************************************
- * \struct MEASURE_channel_run_data_t
+ * \struct MEASURE_channel_data_t
  * \brief Single channel run data structure.
  *******************************************************************/
 typedef struct {
 	int32_t value;
 	uint32_t number_of_samples;
-} MEASURE_run_data_t;
+} MEASURE_data_t;
 
 /*!******************************************************************
- * \struct MEASURE_channel_run_data_t
+ * \struct MEASURE_channel_data_t
  * \brief Single channel run data structure.
  *******************************************************************/
 typedef struct {
-	int32_t active_power_mw;
-	int32_t rms_voltage_mv;
-	int32_t rms_current_ma;
-	int32_t apparent_power_mva;
-	int32_t power_factor;
-	uint32_t number_of_samples;
-} MEASURE_channel_run_data_t;
+	MEASURE_data_t active_power_mw;
+	MEASURE_data_t rms_voltage_mv;
+	MEASURE_data_t rms_current_ma;
+	MEASURE_data_t apparent_power_mva;
+	MEASURE_data_t power_factor;
+} MEASURE_channel_data_t;
 
 /*!******************************************************************
  * \struct MEASURE_accumulated_data_t
@@ -118,13 +117,13 @@ void MEASURE_tick(void);
 MEASURE_status_t MEASURE_get_detect_flag(uint8_t ac_channel_index, uint8_t* current_sensor_connected);
 
 /*!******************************************************************
- * \fn MEASURE_status_t MEASURE_get_run_data(MEASURE_data_type_t data_type, MEASURE_run_data_t* run_data)
+ * \fn MEASURE_status_t MEASURE_get_run_data(MEASURE_data_type_t data_type, MEASURE_data_t* run_data)
  * \brief Get run data.
  * \param[in]  	data_type: Data to read.
  * \param[out] 	data: Pointer to the run data.
  * \retval		Function execution status.
  *******************************************************************/
-MEASURE_status_t MEASURE_get_run_data(MEASURE_data_type_t data_type, MEASURE_run_data_t* run_data);
+MEASURE_status_t MEASURE_get_run_data(MEASURE_data_type_t data_type, MEASURE_data_t* run_data);
 
 /*!******************************************************************
  * \fn MEASURE_status_t MEASURE_get_accumulated_data(MEASURE_data_type_t data_type, MEASURE_accumulated_data_t* accumulated_data)
@@ -136,13 +135,13 @@ MEASURE_status_t MEASURE_get_run_data(MEASURE_data_type_t data_type, MEASURE_run
 MEASURE_status_t MEASURE_get_accumulated_data(MEASURE_data_type_t data_type, MEASURE_accumulated_data_t* accumulated_data);
 
 /*!******************************************************************
- * \fn MEASURE_status_t MEASURE_get_channel_run_data(uint8_t ac_channel, MEASURE_channel_run_data_t* ac_channel_run_data)
+ * \fn MEASURE_status_t MEASURE_get_channel_run_data(uint8_t ac_channel, MEASURE_channel_data_t* ac_channel_run_data)
  * \brief Get AC channel run data.
  * \param[in]  	ac_channel_index: AC channel index to read.
  * \param[out] 	ac_channel_data: Pointer to the channel results.
  * \retval		Function execution status.
  *******************************************************************/
-MEASURE_status_t MEASURE_get_channel_run_data(uint8_t ac_channel, MEASURE_channel_run_data_t* ac_channel_run_data);
+MEASURE_status_t MEASURE_get_channel_run_data(uint8_t ac_channel, MEASURE_channel_data_t* ac_channel_run_data);
 
 /*!******************************************************************
  * \fn MEASURE_status_t MEASURE_get_channel_accumulated_data(uint8_t ac_channel, MEASURE_channel_accumulated_data_t* ac_channel_accumulated_data)

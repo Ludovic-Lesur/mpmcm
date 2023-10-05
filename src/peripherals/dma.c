@@ -99,8 +99,8 @@ void DMA1_adcx_start(void) {
 	// Clear all flags.
 	DMA1 -> IFCR |= 0x000000FF;
 	// Enable interrupts.
-	NVIC_enable_interrupt(NVIC_INTERRUPT_DMA1_CH1, NVIC_PRIORITY_DMA1);
-	NVIC_enable_interrupt(NVIC_INTERRUPT_DMA1_CH2, NVIC_PRIORITY_DMA1);
+	NVIC_enable_interrupt(NVIC_INTERRUPT_DMA1_CH1, NVIC_PRIORITY_DMA1_CH1);
+	NVIC_enable_interrupt(NVIC_INTERRUPT_DMA1_CH2, NVIC_PRIORITY_DMA1_CH2);
 	// Start transfer.
 	(DMA1 -> CHx[DMA_CHANNEL_INDEX_ADC1]).CCR |= (0b1 << 0); // EN='1'.
 	(DMA1 -> CHx[DMA_CHANNEL_INDEX_ADC2]).CCR |= (0b1 << 0); // EN='1'.

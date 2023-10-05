@@ -392,7 +392,7 @@ void AT_BUS_task(void) {
 /*******************************************************************/
 void AT_BUS_high_speed_log(void) {
 	// Local variables.
-	MEASURE_channel_run_data_t channel_result;
+	MEASURE_channel_data_t channel_result;
 	// Get measurements.
 	MEASURE_get_channel_run_data(0, &channel_result);
 	// Disable receiver.
