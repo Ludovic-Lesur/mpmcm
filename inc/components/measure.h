@@ -108,13 +108,22 @@ MEASURE_status_t MEASURE_init(void);
 void MEASURE_tick(void);
 
 /*!******************************************************************
- * \fn MEASURE_status_t MEASURE_get_detect_flag(uint8_t ac_channel_index, uint8_t* current_sensor_connected)
+ * \fn MEASURE_status_t MEASURE_get_probe_detect_flag(uint8_t ac_channel_index, uint8_t* current_probe_connected)
  * \brief Get AC channel detect flag.
  * \param[in]  	ac_channel_index: AC channel index to read.
- * \param[out] 	current_sensor_connected: Pointer to the current sensor detection flag.
+ * \param[out] 	current_probe_connected: Pointer to the current probe detection flag.
  * \retval		Function execution status.
  *******************************************************************/
-MEASURE_status_t MEASURE_get_detect_flag(uint8_t ac_channel_index, uint8_t* current_sensor_connected);
+MEASURE_status_t MEASURE_get_probe_detect_flag(uint8_t ac_channel_index, uint8_t* current_probe_connected);
+
+/*!******************************************************************
+ * \fn MEASURE_status_t MEASURE_get_mains_detect_flag(uint8_t mains_voltage_detected)
+ * \brief Get mains voltage detect flag.
+ * \param[in]  	none
+ * \param[out] 	mains_voltage_detected: Pointer to the mains voltage detection flag.
+ * \retval		Function execution status.
+ *******************************************************************/
+MEASURE_status_t MEASURE_get_mains_detect_flag(uint8_t* mains_voltage_detected);
 
 /*!******************************************************************
  * \fn MEASURE_status_t MEASURE_get_run_data(MEASURE_data_type_t data_type, MEASURE_data_t* run_data)

@@ -34,18 +34,23 @@ NODE_status_t MPMCM_update_register(uint8_t reg_addr) {
 	uint32_t reg_value = 0;
 	uint32_t reg_mask = 0;
 	uint8_t channel_idx = 0;
-	uint8_t chxd = 0;
+	uint8_t generic_u8 = 0;
 	// Check address.
 	switch (reg_addr) {
 	case MPMCM_REG_ADDR_STATUS_CONTROL_1:
-		// Update detect flags.
+		// Update probe detect flags.
 		for (channel_idx=0 ; channel_idx<ADC_NUMBER_OF_ACI_CHANNELS ; channel_idx++) {
 			// Read flag.
-			measure_status = MEASURE_get_detect_flag(channel_idx, &chxd);
+			measure_status = MEASURE_get_probe_detect_flag(channel_idx, &generic_u8);
 			MEASURE_exit_error(NODE_ERROR_BASE_MEASURE);
 			// Update field.
-			DINFOX_write_field(&reg_value, &reg_mask, (uint32_t) chxd, (0b1 << ((channel_idx << 1) + 1)));
+			DINFOX_write_field(&reg_value, &reg_mask, (uint32_t) generic_u8, (0b1 << ((channel_idx << 1) + 1)));
 		}
+		// Update mains detect flag.
+		measure_status = MEASURE_get_mains_detect_flag(&generic_u8);
+		MEASURE_exit_error(NODE_ERROR_BASE_MEASURE);
+		// Update field.
+		DINFOX_write_field(&reg_value, &reg_mask, (uint32_t) generic_u8, MPMCM_REG_STATUS_CONTROL_1_MASK_MVD);
 		break;
 	default:
 		// Nothing to do for other registers.

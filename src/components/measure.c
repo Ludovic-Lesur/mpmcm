@@ -53,9 +53,6 @@
 #define MEASURE_PERIOD_ADCX_BUFFER_SIZE_LOW_LIMIT		((100 - MEASURE_PERIOD_ADCX_BUFFER_SIZE_ERROR_PERCENT) * MEASURE_PERIOD_BUFFER_SIZE) / (100)
 #define MEASURE_PERIOD_ADCX_BUFFER_SIZE_HIGH_LIMIT		((100 + MEASURE_PERIOD_ADCX_BUFFER_SIZE_ERROR_PERCENT) * MEASURE_PERIOD_BUFFER_SIZE) / (100)
 
-#define MEASURE_STOP_THRESHOLD_PERIODS					50
-#define MEASURE_DMA_TRANSFER_END_LIMIT					(MEASURE_STOP_THRESHOLD_PERIODS / MEASURE_PERIOD_PER_BUFFER)
-
 #define MEASURE_POWER_FACTOR_MULTIPLIER					100
 
 #define MEASURE_Q31_SHIFT_ADC							16
@@ -124,7 +121,7 @@ typedef struct {
 	MEASURE_state_t state;
 	uint8_t processing_enable;
 	uint8_t zero_cross_count;
-	uint8_t dma_transfer_end_count;
+	uint8_t dma_transfer_end_flag;
 	uint32_t tick_led_count;
 } MEASURE_context_t;
 
@@ -246,7 +243,7 @@ static void _MEASURE_reset(void) {
 	measure_sampling.aci_read_idx = 0;
 	// Reset flags.
 	measure_ctx.zero_cross_count = 0;
-	measure_ctx.dma_transfer_end_count = 0;
+	measure_ctx.dma_transfer_end_flag = 0;
 	// Reset sampling buffers.
 	for (idx0=0 ; idx0<MEASURE_PERIOD_ADCX_DMA_BUFFER_DEPTH ; idx0++) {
 		for (idx1=0 ; idx1<MEASURE_PERIOD_ADCX_DMA_BUFFER_SIZE ; idx1++) {
@@ -536,17 +533,17 @@ static MEASURE_status_t _MEASURE_internal_process(void) {
 		if (measure_ctx.zero_cross_count >= MEASURE_ZERO_CROSS_PER_PERIOD) {
 			// Clear counters.
 			measure_ctx.zero_cross_count = 0;
-			measure_ctx.dma_transfer_end_count = 0;
+			measure_ctx.dma_transfer_end_flag = 0;
 			// Switch to next buffer.
 			status = _MEASURE_switch_dma_buffer();
 			if (status != MEASURE_SUCCESS) goto errors;
 			// Compute data.
 			_MEASURE_compute_period_data();
 		}
-		// Check DMA transfer end count.
-		if (measure_ctx.dma_transfer_end_count > MEASURE_DMA_TRANSFER_END_LIMIT) {
-			// Clear counter.
-			measure_ctx.dma_transfer_end_count = 0;
+		// Check DMA transfer end flag.
+		if (measure_ctx.dma_transfer_end_flag != 0) {
+			// Clear flag.
+			measure_ctx.dma_transfer_end_flag = 0;
 			// Stop measure.
 			_MEASURE_stop();
 			// Update state.
@@ -573,11 +570,11 @@ static void _MEASURE_increment_zero_cross_count(void) {
 }
 
 /*******************************************************************/
-static void _MEASURE_increment_dma_transfer_end_count(void) {
+static void _MEASURE_set_dma_transfer_end_flag(void) {
 	// Local variables.
 	MEASURE_status_t measure_status = MEASURE_SUCCESS;
 	// Set local flag.
-	measure_ctx.dma_transfer_end_count++;
+	measure_ctx.dma_transfer_end_flag = 1;
 	// Process measure.
 	measure_status = _MEASURE_internal_process();
 	MEASURE_stack_error();
@@ -611,7 +608,7 @@ MEASURE_status_t MEASURE_init(void) {
 	TIM2_init(MEASURE_ACV_FREQUENCY_SAMPLING_HZ);
 	TIM6_init();
 	// Init ADC DMA.
-	DMA1_adcx_init(&_MEASURE_increment_dma_transfer_end_count);
+	DMA1_adcx_init(&_MEASURE_set_dma_transfer_end_flag);
 	DMA1_adcx_set_destination_address((uint32_t) &(measure_sampling.acv[measure_sampling.acv_write_idx].data), (uint32_t) &(measure_sampling.aci[measure_sampling.aci_write_idx].data), MEASURE_PERIOD_ADCX_DMA_BUFFER_SIZE);
 	// Init timer DMA.
 	DMA1_tim2_init();
@@ -623,19 +620,22 @@ errors:
 
 /*******************************************************************/
 void MEASURE_tick(void) {
-	// Disable processing during data copy.
-	measure_ctx.processing_enable = 0;
-	// Compute run data from last second and accumulated data.
-	_MEASURE_compute_run_data();
-	_MEASURE_compute_accumulated_data();
-	// Enable processing.
-	measure_ctx.processing_enable = 1;
+	// Check state.
+	if (measure_ctx.state != MEASURE_STATE_STOPPED) {
+		// Disable processing during data copy.
+		measure_ctx.processing_enable = 0;
+		// Compute run data from last second and accumulated data.
+		_MEASURE_compute_run_data();
+		_MEASURE_compute_accumulated_data();
+		// Enable processing.
+		measure_ctx.processing_enable = 1;
+	}
 	// Manage LED.
 	_MEASURE_led_single_pulse();
 }
 
 /*******************************************************************/
-MEASURE_status_t MEASURE_get_detect_flag(uint8_t ac_channel_index, uint8_t* current_sensor_connected) {
+MEASURE_status_t MEASURE_get_probe_detect_flag(uint8_t ac_channel_index, uint8_t* current_sensor_connected) {
 	// Local variables.
 	MEASURE_status_t status = MEASURE_SUCCESS;
 	// Check parameters.
@@ -643,7 +643,27 @@ MEASURE_status_t MEASURE_get_detect_flag(uint8_t ac_channel_index, uint8_t* curr
 		status = MEASURE_ERROR_AC_CHANNEL;
 		goto errors;
 	}
+	if (current_sensor_connected == NULL) {
+		status = MEASURE_ERROR_NULL_PARAMETER;
+		goto errors;
+	}
+	// Update flag.
 	(*current_sensor_connected) = GPIO_read(MEASURE_GPIO_ACI_DETECT[ac_channel_index]);
+errors:
+	return status;
+}
+
+/*******************************************************************/
+MEASURE_status_t MEASURE_get_mains_detect_flag(uint8_t* mains_voltage_detected) {
+	// Local variables.
+	MEASURE_status_t status = MEASURE_SUCCESS;
+	// Check parameters.
+	if (mains_voltage_detected == NULL) {
+		status = MEASURE_ERROR_NULL_PARAMETER;
+		goto errors;
+	}
+	// Update flag.
+	(*mains_voltage_detected) = (measure_ctx.state == MEASURE_STATE_STOPPED) ? 0 : 1;
 errors:
 	return status;
 }
