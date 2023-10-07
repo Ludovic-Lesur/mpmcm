@@ -10,6 +10,8 @@
 
 #include "adc.h"
 #include "dma.h"
+#include "led.h"
+#include "math_custom.h"
 #include "power.h"
 #include "types.h"
 
@@ -29,9 +31,11 @@ typedef enum {
 	MEASURE_ERROR_AC_CHANNEL,
 	// Low level drivers errors.
 	MEASURE_ERROR_BASE_ADC = 0x0100,
-	MEASURE_ERROR_BASE_POWER = (MEASURE_ERROR_BASE_ADC + ADC_ERROR_BASE_LAST),
+	MEASURE_ERROR_BASE_MATH = (MEASURE_ERROR_BASE_ADC + ADC_ERROR_BASE_LAST),
+	MEASURE_ERROR_BASE_POWER = (MEASURE_ERROR_BASE_MATH + MATH_ERROR_BASE_LAST),
+	MEASURE_ERROR_BASE_LED = (MEASURE_ERROR_BASE_POWER + POWER_ERROR_BASE_LAST),
 	// Last base value.
-	MEASURE_ERROR_BASE_LAST = (MEASURE_ERROR_BASE_POWER + POWER_ERROR_BASE_LAST)
+	MEASURE_ERROR_BASE_LAST = (MEASURE_ERROR_BASE_LED + LED_ERROR_BASE_LAST)
 } MEASURE_status_t;
 
 /*!******************************************************************
@@ -103,9 +107,9 @@ MEASURE_status_t MEASURE_init(void);
  * \brief Function to call every second.
  * \param[in]  	none
  * \param[out] 	none
- * \retval		none
+ * \retval		Function execution status.
  *******************************************************************/
-void MEASURE_tick(void);
+MEASURE_status_t MEASURE_tick(void);
 
 /*!******************************************************************
  * \fn MEASURE_status_t MEASURE_get_probe_detect_flag(uint8_t ac_channel_index, uint8_t* current_probe_connected)

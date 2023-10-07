@@ -16,6 +16,7 @@
 #include "gpio.h"
 #include "led.h"
 #include "mapping.h"
+#include "math_custom.h"
 #include "mode.h"
 #include "nvic.h"
 #include "power.h"
@@ -145,7 +146,7 @@ static volatile MEASURE_context_t measure_ctx;
 /*******************************************************************/
 #define _MEASURE_reset_accumulated_data(result) { \
 	result.min = 2147483647; \
-	result.max = -2147483648; \
+	result.max = 0; \
 	result.rolling_mean = 0; \
 	result.number_of_samples = 0; \
 }
@@ -200,12 +201,19 @@ static volatile MEASURE_context_t measure_ctx;
 
 /*******************************************************************/
 #define _MEASURE_add_accumulated_sample(source, new_sample) { \
+	/* Compute absolute value of new sample */ \
+	math_status = MATH_abs(new_sample, &new_sample_abs); \
+	MATH_exit_error(MEASURE_ERROR_BASE_MATH); \
 	/* Min */ \
-	if (new_sample < source.min) { \
+	math_status = MATH_abs(source.min, &ref_abs); \
+	MATH_exit_error(MEASURE_ERROR_BASE_MATH); \
+	if (new_sample_abs < ref_abs) { \
 		source.min = new_sample; \
 	} \
 	/* Max */ \
-	if (new_sample > source.max) { \
+	math_status = MATH_abs(source.max, &ref_abs); \
+	MATH_exit_error(MEASURE_ERROR_BASE_MATH); \
+	if (new_sample_abs > ref_abs) { \
 		source.max = new_sample; \
 	} \
 	/* Compute rolling mean */ \
@@ -216,12 +224,19 @@ static volatile MEASURE_context_t measure_ctx;
 
 /*******************************************************************/
 #define _MEASURE_add_chx_accumulated_sample(source, result, new_sample) { \
+	/* Compute absolute value of new sample */ \
+	math_status = MATH_abs(new_sample, &new_sample_abs); \
+	MATH_exit_error(MEASURE_ERROR_BASE_MATH); \
 	/* Min */ \
-	if (new_sample < source.result.min) { \
+	math_status = MATH_abs(source.result.min, &ref_abs); \
+	MATH_exit_error(MEASURE_ERROR_BASE_MATH); \
+	if (new_sample_abs < ref_abs) { \
 		source.result.min = new_sample; \
 	} \
 	/* Max */ \
-	if (new_sample > source.result.max) { \
+	math_status = MATH_abs(source.result.max, &ref_abs); \
+	MATH_exit_error(MEASURE_ERROR_BASE_MATH); \
+	if (new_sample_abs > ref_abs) { \
 		source.result.max = new_sample; \
 	} \
 	/* Compute rolling mean */ \
@@ -468,8 +483,12 @@ static void _MEASURE_compute_run_data(void) {
 }
 
 /*******************************************************************/
-static void _MEASURE_compute_accumulated_data(void) {
+static MEASURE_status_t _MEASURE_compute_accumulated_data(void) {
 	// Local variables.
+	MEASURE_status_t status = MEASURE_SUCCESS;
+	MATH_status_t math_status = MATH_SUCCESS;
+	uint32_t new_sample_abs = 0;
+	uint32_t ref_abs = 0;
 	uint8_t chx_idx = 0;
 	int64_t temp_s64 = 0;
 	// Compute AC channels accumulated data.
@@ -485,16 +504,22 @@ static void _MEASURE_compute_accumulated_data(void) {
 	}
 	// Compute frequency accumulated data.
 	_MEASURE_add_accumulated_sample(measure_data.acv_frequency_accumulated_data, measure_data.acv_frequency_run_data.value);
+errors:
+	return status;
 }
 
 /*******************************************************************/
-static void _MEASURE_led_single_pulse(void) {
+static MEASURE_status_t _MEASURE_led_single_pulse(void) {
 	// Local variables.
+	MEASURE_status_t status = MEASURE_SUCCESS;
+	LED_status_t led_status = LED_SUCCESS;
 	LED_color_t led_color = LED_COLOR_OFF;
 	// Increment tick count.
 	measure_ctx.tick_led_count++;
 	// Check LED period.
 	if (measure_ctx.tick_led_count >= MEASURE_LED_PULSE_PERIOD_SECONDS) {
+		// Reset count.
+		measure_ctx.tick_led_count = 0;
 		// Compute LED color according to state.
 		if (measure_ctx.state == MEASURE_STATE_STOPPED) {
 			// Check current number of samples (CH1 RMS voltage as reference).
@@ -504,10 +529,11 @@ static void _MEASURE_led_single_pulse(void) {
 			led_color = LED_COLOR_GREEN;
 		}
 		// Perform LED pulse.
-		LED_single_pulse(MEASURE_LED_PULSE_DURATION_MS, led_color);
-		// Reset count.
-		measure_ctx.tick_led_count = 0;
+		led_status = LED_single_pulse(MEASURE_LED_PULSE_DURATION_MS, led_color);
+		LED_exit_error(MEASURE_ERROR_BASE_LED);
 	}
+errors:
+	return status;
 }
 
 /*******************************************************************/
@@ -619,19 +645,26 @@ errors:
 }
 
 /*******************************************************************/
-void MEASURE_tick(void) {
+MEASURE_status_t MEASURE_tick(void) {
+	// Local variables.
+	MEASURE_status_t status = MEASURE_SUCCESS;
 	// Check state.
 	if (measure_ctx.state != MEASURE_STATE_STOPPED) {
 		// Disable processing during data copy.
 		measure_ctx.processing_enable = 0;
-		// Compute run data from last second and accumulated data.
+		// Compute run data from last second.
 		_MEASURE_compute_run_data();
-		_MEASURE_compute_accumulated_data();
-		// Enable processing.
-		measure_ctx.processing_enable = 1;
+		// Compute accumulated data.
+		status = _MEASURE_compute_accumulated_data();
+		if (status != MEASURE_SUCCESS) goto errors;
 	}
 	// Manage LED.
-	_MEASURE_led_single_pulse();
+	status = _MEASURE_led_single_pulse();
+	if (status != MEASURE_SUCCESS) goto errors;
+errors:
+	// Enable processing.
+	measure_ctx.processing_enable = 1;
+	return status;
 }
 
 /*******************************************************************/
