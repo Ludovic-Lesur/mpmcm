@@ -380,6 +380,7 @@ static void _MEASURE_compute_period_data(void) {
 	int32_t rms_current_ma = 0;
 	int32_t apparent_power_mva = 0;
 	int32_t power_factor = 0;
+	uint32_t tim2_ccr1_delta = 0;
 	int32_t frequency_mhz = 0;
 	int64_t temp_s64 = 0;
 	uint32_t idx = 0;
@@ -446,14 +447,19 @@ static void _MEASURE_compute_period_data(void) {
 	// Compute mains frequency.
 	idx = 0;
 	while (idx < MEASURE_PERIOD_TIM2_DMA_BUFFER_SIZE) {
-		// Manage init state and rollover case.
-		if (measure_sampling.tim2_ccr1[idx] < measure_sampling.tim2_ccr1[(idx + 1) % MEASURE_PERIOD_TIM2_DMA_BUFFER_SIZE]) break;
+		// Search two valid consecutive samples.
+		if (measure_sampling.tim2_ccr1[idx] < measure_sampling.tim2_ccr1[(idx + 1) % MEASURE_PERIOD_TIM2_DMA_BUFFER_SIZE]) {
+			// Compute delta.
+			tim2_ccr1_delta	= measure_sampling.tim2_ccr1[(idx + 1) % MEASURE_PERIOD_TIM2_DMA_BUFFER_SIZE] - measure_sampling.tim2_ccr1[idx];
+			// Avoid rollover case (clamp to 1Hz).
+			if (tim2_ccr1_delta < MEASURE_ACV_FREQUENCY_SAMPLING_HZ) break;
+		}
 		idx++;
 	}
 	// Check index.
 	if (idx < MEASURE_PERIOD_TIM2_DMA_BUFFER_SIZE) {
 		// Compute mains frequency.
-		temp_s64 = (((int64_t) MEASURE_ACV_FREQUENCY_SAMPLING_HZ * 1000) / ((int64_t) measure_sampling.tim2_ccr1[(idx + 1) % MEASURE_PERIOD_TIM2_DMA_BUFFER_SIZE] - (int64_t) measure_sampling.tim2_ccr1[idx]));
+		temp_s64 = (((int64_t) MEASURE_ACV_FREQUENCY_SAMPLING_HZ * 1000) / ((int64_t) tim2_ccr1_delta));
 		frequency_mhz = (int32_t) temp_s64;
 		// Update accumulated data.
 		_MEASURE_add_sample(measure_data.acv_frequency_rolling_mean, frequency_mhz);
