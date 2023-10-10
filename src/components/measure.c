@@ -50,7 +50,8 @@
 #define MEASURE_PERIOD_ADCX_DMA_BUFFER_DEPTH			2
 
 // ADC buffers with size out of this range are not computed.
-#define MEASURE_PERIOD_ADCX_BUFFER_SIZE_ERROR_PERCENT	5
+// Warning: it limits the acceptable input frequency range around 50Hz.
+#define MEASURE_PERIOD_ADCX_BUFFER_SIZE_ERROR_PERCENT	20
 #define MEASURE_PERIOD_ADCX_BUFFER_SIZE_LOW_LIMIT		((100 - MEASURE_PERIOD_ADCX_BUFFER_SIZE_ERROR_PERCENT) * MEASURE_PERIOD_BUFFER_SIZE) / (100)
 #define MEASURE_PERIOD_ADCX_BUFFER_SIZE_HIGH_LIMIT		((100 + MEASURE_PERIOD_ADCX_BUFFER_SIZE_ERROR_PERCENT) * MEASURE_PERIOD_BUFFER_SIZE) / (100)
 
@@ -392,7 +393,7 @@ static void _MEASURE_compute_period_data(void) {
 	// Take the minimum size between voltage and current.
 	measure_data.period_acxx_buffer_size = (acv_buffer_size < aci_buffer_size) ? acv_buffer_size : aci_buffer_size;
 	// Check size.
-	if ((measure_data.period_acxx_buffer_size < MEASURE_PERIOD_ADCX_BUFFER_SIZE_LOW_LIMIT) || (measure_data.period_acxx_buffer_size > MEASURE_PERIOD_ADCX_BUFFER_SIZE_HIGH_LIMIT)) return;
+	if ((measure_data.period_acxx_buffer_size < MEASURE_PERIOD_ADCX_BUFFER_SIZE_LOW_LIMIT) || (measure_data.period_acxx_buffer_size > MEASURE_PERIOD_ADCX_BUFFER_SIZE_HIGH_LIMIT)) goto channel_process_end;
 	// Processing each channel.
 	for (chx_idx=0 ; chx_idx<ADC_NUMBER_OF_ACI_CHANNELS ; chx_idx++) {
 		// Compute channel buffer.
@@ -441,6 +442,7 @@ static void _MEASURE_compute_period_data(void) {
 		_MEASURE_add_chx_sample(measure_data.chx_rolling_mean[chx_idx], apparent_power_mva, apparent_power_mva);
 		_MEASURE_add_chx_sample(measure_data.chx_rolling_mean[chx_idx], power_factor, power_factor);
 	}
+channel_process_end:
 	// Update read indexes.
 	measure_sampling.acv_read_idx = ((measure_sampling.acv_read_idx + 1) % MEASURE_PERIOD_ADCX_DMA_BUFFER_DEPTH);
 	measure_sampling.aci_read_idx = ((measure_sampling.aci_read_idx + 1) % MEASURE_PERIOD_ADCX_DMA_BUFFER_DEPTH);
