@@ -108,17 +108,17 @@ NODE_status_t COMMON_check_register(uint8_t reg_addr) {
 	NODE_status_t status = NODE_SUCCESS;
 	uint32_t reg_value = 0;
 	// Read register.
-	NODE_read_register(NODE_REQUEST_SOURCE_INTERNAL, COMMON_REG_ADDR_STATUS_CONTROL_0, &reg_value);
+	NODE_read_register(NODE_REQUEST_SOURCE_INTERNAL, COMMON_REG_ADDR_CONTROL_0, &reg_value);
 	// Check address.
 	switch (reg_addr) {
-	case COMMON_REG_ADDR_STATUS_CONTROL_0:
+	case COMMON_REG_ADDR_CONTROL_0:
 		// Reset trigger bit.
-		if ((DINFOX_read_field(reg_value, COMMON_REG_STATUS_CONTROL_0_MASK_RTRG)) != 0) {
+		if ((DINFOX_read_field(reg_value, COMMON_REG_CONTROL_0_MASK_RTRG)) != 0) {
 			// Reset MCU.
 			PWR_software_reset();
 		}
 		// Measure trigger bit.
-		if ((DINFOX_read_field(reg_value, COMMON_REG_STATUS_CONTROL_0_MASK_MTRG)) != 0) {
+		if ((DINFOX_read_field(reg_value, COMMON_REG_CONTROL_0_MASK_MTRG)) != 0) {
 			// Perform measurements.
 			_COMMON_mtrg_callback();
 		}

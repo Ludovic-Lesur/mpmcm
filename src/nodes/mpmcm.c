@@ -20,8 +20,10 @@
 void MPMCM_init_registers(void) {
 	// Local variables.
 	uint8_t reg_addr = 0;
+	// Read init state.
+	MPMCM_update_register(MPMCM_REG_ADDR_STATUS);
 	// Load default values.
-	for (reg_addr=MPMCM_REG_ADDR_STATUS_CONTROL_1 ; reg_addr<MPMCM_REG_ADDR_LAST ; reg_addr++) {
+	for (reg_addr=MPMCM_REG_ADDR_CONTROL_1 ; reg_addr<MPMCM_REG_ADDR_LAST ; reg_addr++) {
 		NODE_write_register(NODE_REQUEST_SOURCE_INTERNAL, reg_addr, DINFOX_REG_MASK_ALL, 0);
 	}
 }
@@ -37,20 +39,20 @@ NODE_status_t MPMCM_update_register(uint8_t reg_addr) {
 	uint8_t generic_u8 = 0;
 	// Check address.
 	switch (reg_addr) {
-	case MPMCM_REG_ADDR_STATUS_CONTROL_1:
+	case MPMCM_REG_ADDR_STATUS:
 		// Update probe detect flags.
 		for (channel_idx=0 ; channel_idx<ADC_NUMBER_OF_ACI_CHANNELS ; channel_idx++) {
 			// Read flag.
 			measure_status = MEASURE_get_probe_detect_flag(channel_idx, &generic_u8);
 			MEASURE_exit_error(NODE_ERROR_BASE_MEASURE);
 			// Update field.
-			DINFOX_write_field(&reg_value, &reg_mask, (uint32_t) generic_u8, (0b1 << ((channel_idx << 1) + 1)));
+			DINFOX_write_field(&reg_value, &reg_mask, (uint32_t) generic_u8, (0b1 << channel_idx));
 		}
 		// Update mains detect flag.
 		measure_status = MEASURE_get_mains_detect_flag(&generic_u8);
 		MEASURE_exit_error(NODE_ERROR_BASE_MEASURE);
 		// Update field.
-		DINFOX_write_field(&reg_value, &reg_mask, (uint32_t) generic_u8, MPMCM_REG_STATUS_CONTROL_1_MASK_MVD);
+		DINFOX_write_field(&reg_value, &reg_mask, (uint32_t) generic_u8, MPMCM_REG_STATUS_MASK_MVD);
 		break;
 	default:
 		// Nothing to do for other registers.
@@ -81,11 +83,11 @@ NODE_status_t MPMCM_check_register(uint8_t reg_addr) {
 	NODE_read_register(NODE_REQUEST_SOURCE_INTERNAL, reg_addr, &reg_value);
 	// Check address.
 	switch (reg_addr) {
-	case MPMCM_REG_ADDR_STATUS_CONTROL_1:
+	case MPMCM_REG_ADDR_CONTROL_1:
 		// Check frequency store control bit.
-		if (DINFOX_read_field(reg_value, MPMCM_REG_STATUS_CONTROL_1_MASK_FRQS) != 0) {
+		if (DINFOX_read_field(reg_value, MPMCM_REG_CONTROL_1_MASK_FRQS) != 0) {
 			// Clear request.
-			DINFOX_write_field(&new_reg_value, &new_reg_mask, 0, MPMCM_REG_STATUS_CONTROL_1_MASK_FRQS);
+			DINFOX_write_field(&new_reg_value, &new_reg_mask, 0b0, MPMCM_REG_CONTROL_1_MASK_FRQS);
 			// Read and reset measurements.
 			measure_status = MEASURE_get_accumulated_data(MEASURE_DATA_TYPE_MAINS_FREQUENCY, &data);
 			MEASURE_exit_error(NODE_ERROR_BASE_MEASURE);
@@ -106,9 +108,9 @@ NODE_status_t MPMCM_check_register(uint8_t reg_addr) {
 		// Check measurements store control bits.
 		for (channel_idx=0 ; channel_idx<ADC_NUMBER_OF_ACI_CHANNELS ; channel_idx++) {
 			// Check CHxS bit.
-			if (DINFOX_read_field(reg_value, (0b1 << (channel_idx << 1))) != 0) {
+			if (DINFOX_read_field(reg_value, (0b1 << channel_idx)) != 0) {
 				// Clear request.
-				DINFOX_write_field(&new_reg_value, &new_reg_mask, 0, (0b1 << (channel_idx << 1)));
+				DINFOX_write_field(&new_reg_value, &new_reg_mask, 0b0, (0b1 << channel_idx));
 				// Read and reset measurements.
 				measure_status = MEASURE_get_channel_accumulated_data(channel_idx, &channel_data);
 				MEASURE_exit_error(NODE_ERROR_BASE_MEASURE);
