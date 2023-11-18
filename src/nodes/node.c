@@ -32,14 +32,14 @@ errors:
 }
 
 /*******************************************************************/
-static NODE_status_t _NODE_check_register(uint8_t reg_addr) {
+static NODE_status_t _NODE_check_register(uint8_t reg_addr, uint32_t reg_mask) {
 	// Local variables.
 	NODE_status_t status = NODE_SUCCESS;
 	// Check common registers.
-	status = COMMON_check_register(reg_addr);
+	status = COMMON_check_register(reg_addr, reg_mask);
 	if (status != NODE_SUCCESS) goto errors;
 	// Check specific registers.
-	status = MPMCM_check_register(reg_addr);
+	status = MPMCM_check_register(reg_addr, reg_mask);
 errors:
 	return status;
 }
@@ -137,7 +137,7 @@ NODE_status_t NODE_write_register(NODE_request_source_t request_source, uint8_t 
 	// Check actions.
 	if (request_source == NODE_REQUEST_SOURCE_EXTERNAL) {
 		// Check control bits.
-		status = _NODE_check_register(reg_addr);
+		status = _NODE_check_register(reg_addr, reg_mask);
 	}
 errors:
 	return status;

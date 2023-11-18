@@ -35,9 +35,10 @@ NODE_status_t COMMON_update_register(uint8_t reg_addr);
  * \fn NODE_status_t COMMON_check_register(uint8_t reg_addr)
  * \brief Check common register.
  * \param[in]  	reg_addr: Address of the register to check.
+ * \param[in]	reg_mask: Mask of the bits to check.
  * \param[out] 	none
  * \retval		Function execution status.
  *******************************************************************/
-NODE_status_t COMMON_check_register(uint8_t reg_addr);
+NODE_status_t COMMON_check_register(uint8_t reg_addr, uint32_t reg_mask);
 
 #endif /* __COMMON_H__ */

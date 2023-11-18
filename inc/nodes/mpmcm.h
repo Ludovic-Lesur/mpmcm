@@ -36,7 +36,9 @@
 
 static const DINFOX_register_access_t NODE_REG_ACCESS[MPMCM_REG_ADDR_LAST] = {
 	COMMON_REG_ACCESS
+	DINFOX_REG_ACCESS_READ_ONLY,
 	DINFOX_REG_ACCESS_READ_WRITE,
+	MPMCM_DATA_REG_ACCESS
 	MPMCM_CHANNEL_REG_ACCESS
 	MPMCM_CHANNEL_REG_ACCESS
 	MPMCM_CHANNEL_REG_ACCESS
@@ -67,10 +69,11 @@ NODE_status_t MPMCM_update_register(uint8_t reg_addr);
  * \fn NODE_status_t MPMCM_check_register(uint8_t reg_addr)
  * \brief Check MPMCM register.
  * \param[in]  	reg_addr: Address of the register to check.
+ * \param[in]	reg_mask: Mask of the bits to check.
  * \param[out] 	none
  * \retval		Function execution status.
  *******************************************************************/
-NODE_status_t MPMCM_check_register(uint8_t reg_addr);
+NODE_status_t MPMCM_check_register(uint8_t reg_addr, uint32_t reg_mask);
 
 /*!******************************************************************
  * \fn NODE_status_t MPMCM_mtrg_callback(none)
