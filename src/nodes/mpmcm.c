@@ -210,7 +210,6 @@ NODE_status_t MPMCM_mtrg_callback(void) {
 	uint32_t data_reg_value = 0;
 	uint32_t data_reg_mask = 0;
 	uint8_t channel_idx = 0;
-	// Update run register for mains frequency.
 	// Read run data.
 	measure_status = MEASURE_get_run_data(MEASURE_DATA_TYPE_MAINS_FREQUENCY, &data);
 	MEASURE_exit_error(NODE_ERROR_BASE_MEASURE);

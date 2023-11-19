@@ -113,7 +113,8 @@ NODE_status_t COMMON_check_register(uint8_t reg_addr, uint32_t reg_mask) {
 	NODE_status_t status = NODE_SUCCESS;
 	uint32_t reg_value = 0;
 	// Read register.
-	NODE_read_register(NODE_REQUEST_SOURCE_INTERNAL, COMMON_REG_ADDR_CONTROL_0, &reg_value);
+	status = NODE_read_register(NODE_REQUEST_SOURCE_INTERNAL, reg_addr, &reg_value);
+	if (status != NODE_SUCCESS) goto errors;
 	// Check address.
 	switch (reg_addr) {
 	case COMMON_REG_ADDR_CONTROL_0:
@@ -129,18 +130,21 @@ NODE_status_t COMMON_check_register(uint8_t reg_addr, uint32_t reg_mask) {
 		if ((reg_mask & COMMON_REG_CONTROL_0_MASK_MTRG) != 0) {
 			// Read bit.
 			if ((DINFOX_read_field(reg_value, COMMON_REG_CONTROL_0_MASK_MTRG)) != 0) {
+				// Clear request.
+				NODE_write_register(NODE_REQUEST_SOURCE_INTERNAL, COMMON_REG_ADDR_CONTROL_0, COMMON_REG_CONTROL_0_MASK_MTRG, 0b0);
 				// Perform measurements.
-				_COMMON_mtrg_callback();
+				status = _COMMON_mtrg_callback();
+				if (status != NODE_SUCCESS) goto errors;
 			}
 		}
 		// BFC.
 		if ((reg_mask & COMMON_REG_CONTROL_0_MASK_BFC) != 0) {
 			// Read bit.
 			if ((DINFOX_read_field(reg_value, COMMON_REG_CONTROL_0_MASK_BFC)) != 0) {
-				// Clear boot flag.
-				NODE_write_register(NODE_REQUEST_SOURCE_INTERNAL, COMMON_REG_ADDR_STATUS_0, COMMON_REG_STATUS_0_MASK_BF, 0b0);
 				// Clear request.
 				NODE_write_register(NODE_REQUEST_SOURCE_INTERNAL, COMMON_REG_ADDR_CONTROL_0, COMMON_REG_CONTROL_0_MASK_BFC, 0b0);
+				// Clear boot flag.
+				NODE_write_register(NODE_REQUEST_SOURCE_INTERNAL, COMMON_REG_ADDR_STATUS_0, COMMON_REG_STATUS_0_MASK_BF, 0b0);
 			}
 		}
 		break;
@@ -148,5 +152,6 @@ NODE_status_t COMMON_check_register(uint8_t reg_addr, uint32_t reg_mask) {
 		// Nothing to do for other registers.
 		break;
 	}
+errors:
 	return status;
 }
