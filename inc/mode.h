@@ -13,6 +13,10 @@
 
 /*** MPMCM options ***/
 
+// Transformer selection.
+//#define BLOCK_VC_10_2_6
+#define BLOCK_VB_2_1_6
+
 // Current sensors selection.
 static const uint8_t MPMCM_SCT013_GAIN[ADC_NUMBER_OF_ACI_CHANNELS] = {5, 5, 10, 20};
 
