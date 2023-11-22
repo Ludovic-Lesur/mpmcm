@@ -17,8 +17,19 @@
 //#define BLOCK_VC_10_2_6
 #define BLOCK_VB_2_1_6
 
-// Current sensors selection.
-static const uint8_t MPMCM_SCT013_GAIN[ADC_NUMBER_OF_ACI_CHANNELS] = {5, 5, 10, 20};
+// Transformer settings.
+#ifdef BLOCK_VC_10_2_6
+#define MPMCM_TRANSFORMER_GAIN		300		// Unit (10 * mV/mV).
+#define MPMCM_TRANSFORMER_ATTEN		11 		// Unit mV/mV.
+#endif
+#ifdef BLOCK_VB_2_1_6
+#define MPMCM_TRANSFORMER_GAIN		236 	// Unit (10 * mV/mV).
+#define MPMCM_TRANSFORMER_ATTEN		15 		// Unit mV/mV.
+#endif
+
+// Current sensors settings.
+static const uint8_t MPMCM_SCT013_GAIN[ADC_NUMBER_OF_ACI_CHANNELS] = {50, 50, 100, 200};	// Unit (10 * mV/mV).
+static const uint8_t MPMCM_SCT013_ATTEN[ADC_NUMBER_OF_ACI_CHANNELS] = {1, 1, 1, 1};			// Unit mV/mV.
 
 // Specific modes.
 //#define ATM

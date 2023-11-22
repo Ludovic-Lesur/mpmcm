@@ -26,6 +26,7 @@
 
 /*******************************************************************/
 #define MPMCM_CHANNEL_REG_ACCESS \
+	DINFOX_REG_ACCESS_READ_ONLY, \
 	MPMCM_DATA_REG_ACCESS        \
 	MPMCM_DATA_REG_ACCESS        \
 	MPMCM_DATA_REG_ACCESS        \
@@ -36,6 +37,7 @@
 
 static const DINFOX_register_access_t NODE_REG_ACCESS[MPMCM_REG_ADDR_LAST] = {
 	COMMON_REG_ACCESS
+	DINFOX_REG_ACCESS_READ_ONLY,
 	DINFOX_REG_ACCESS_READ_ONLY,
 	DINFOX_REG_ACCESS_READ_WRITE,
 	MPMCM_DATA_REG_ACCESS

@@ -11,6 +11,7 @@
 #include "dinfox.h"
 #include "error.h"
 #include "measure.h"
+#include "mode.h"
 #include "mpmcm_reg.h"
 #include "node.h"
 
@@ -21,6 +22,11 @@ void MPMCM_init_registers(void) {
 	// Local variables.
 	uint8_t reg_addr = 0;
 	// Read init state.
+	MPMCM_update_register(MPMCM_REG_ADDR_CONFIGURATION_0);
+	MPMCM_update_register(MPMCM_REG_ADDR_CH1_CONFIGURATION);
+	MPMCM_update_register(MPMCM_REG_ADDR_CH2_CONFIGURATION);
+	MPMCM_update_register(MPMCM_REG_ADDR_CH3_CONFIGURATION);
+	MPMCM_update_register(MPMCM_REG_ADDR_CH4_CONFIGURATION);
 	MPMCM_update_register(MPMCM_REG_ADDR_STATUS_1);
 	// Load default values.
 	for (reg_addr=MPMCM_REG_ADDR_CONTROL_1 ; reg_addr<MPMCM_REG_ADDR_LAST ; reg_addr++) {
@@ -39,6 +45,31 @@ NODE_status_t MPMCM_update_register(uint8_t reg_addr) {
 	uint8_t generic_u8 = 0;
 	// Check address.
 	switch (reg_addr) {
+	case MPMCM_REG_ADDR_CONFIGURATION_0:
+		// Transformer gain and atten.
+		DINFOX_write_field(&reg_value, &reg_mask, MPMCM_TRANSFORMER_GAIN,  MPMCM_REG_X_MASK_GAIN);
+		DINFOX_write_field(&reg_value, &reg_mask, MPMCM_TRANSFORMER_ATTEN, MPMCM_REG_X_MASK_ATTEN);
+		break;
+	case MPMCM_REG_ADDR_CH1_CONFIGURATION:
+		// SCT013 gain and atten.
+		DINFOX_write_field(&reg_value, &reg_mask, (uint32_t) MPMCM_SCT013_GAIN[0],  MPMCM_REG_X_MASK_GAIN);
+		DINFOX_write_field(&reg_value, &reg_mask, (uint32_t) MPMCM_SCT013_ATTEN[0], MPMCM_REG_X_MASK_ATTEN);
+		break;
+	case MPMCM_REG_ADDR_CH2_CONFIGURATION:
+		// SCT013 gain and atten.
+		DINFOX_write_field(&reg_value, &reg_mask, (uint32_t) MPMCM_SCT013_GAIN[1],  MPMCM_REG_X_MASK_GAIN);
+		DINFOX_write_field(&reg_value, &reg_mask, (uint32_t) MPMCM_SCT013_ATTEN[1], MPMCM_REG_X_MASK_ATTEN);
+		break;
+	case MPMCM_REG_ADDR_CH3_CONFIGURATION:
+		// SCT013 gain and atten.
+		DINFOX_write_field(&reg_value, &reg_mask, (uint32_t) MPMCM_SCT013_GAIN[2],  MPMCM_REG_X_MASK_GAIN);
+		DINFOX_write_field(&reg_value, &reg_mask, (uint32_t) MPMCM_SCT013_ATTEN[2], MPMCM_REG_X_MASK_ATTEN);
+		break;
+	case MPMCM_REG_ADDR_CH4_CONFIGURATION:
+		// SCT013 gain and atten.
+		DINFOX_write_field(&reg_value, &reg_mask, (uint32_t) MPMCM_SCT013_GAIN[3],  MPMCM_REG_X_MASK_GAIN);
+		DINFOX_write_field(&reg_value, &reg_mask, (uint32_t) MPMCM_SCT013_ATTEN[3], MPMCM_REG_X_MASK_ATTEN);
+		break;
 	case MPMCM_REG_ADDR_STATUS_1:
 		// Update probe detect flags.
 		for (channel_idx=0 ; channel_idx<ADC_NUMBER_OF_ACI_CHANNELS ; channel_idx++) {

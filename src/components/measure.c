@@ -28,24 +28,8 @@
 #define MEASURE_MAINS_PERIOD_US							20000
 #define MEASURE_ZERO_CROSS_PER_PERIOD					2
 
-#ifdef BLOCK_VC_10_2_6
-#define MEASURE_TRANSFORMER_GAIN_NUM					300 // Unit (10 * mV/mV).
-#define MEASURE_TRANSFORMER_ATTEN						11 // Unit mV/mV.
-#endif
-#ifdef BLOCK_VB_2_1_6
-#define MEASURE_TRANSFORMER_GAIN_NUM					237 // Unit (10 * mV/mV).
-#define MEASURE_TRANSFORMER_ATTEN						15 // Unit mV/mV.
-#endif
-#define MEASURE_TRANSFORMER_GAIN_DEN					10
-#define MEASURE_ACV_FACTOR_NUM							((int64_t) MEASURE_TRANSFORMER_GAIN_NUM * (int64_t) MEASURE_TRANSFORMER_ATTEN * (int64_t) ADC_VREF_MV)
-#define MEASURE_ACV_FACTOR_DEN							((int64_t) MEASURE_TRANSFORMER_GAIN_DEN * (int64_t) ADC_FULL_SCALE)
-
-#define MEASURE_SCT013_ATTEN							1 // Unit mV/mV
-#define MEASURE_ACI_FACTOR_NUM							((int64_t) MPMCM_SCT013_GAIN[chx_idx] * (int64_t) MEASURE_SCT013_ATTEN * (int64_t) ADC_VREF_MV)
-#define MEASURE_ACI_FACTOR_DEN							((int64_t) ADC_FULL_SCALE)
-
-#define MEASURE_ACP_FACTOR_NUM							(MEASURE_ACV_FACTOR_NUM * MEASURE_ACI_FACTOR_NUM)
-#define MEASURE_ACP_FACTOR_DEN							(MEASURE_ACV_FACTOR_DEN * MEASURE_ACI_FACTOR_DEN * (int64_t) 1000) // To get mW from mV and mA.
+#define MEASURE_TRANSFORMER_GAIN_FACTOR					10	// For (10 * mV/mV) input unit.
+#define MEASURE_SCT013_GAIN_FACTOR						10	// For (10 * mV/mV) input unit.
 
 // Note: this factor is used to add a margin to the buffer length (more than 1 mains periods long).
 // Buffer switch then is triggered by zero cross detection instead of a fixed number of samples.
@@ -59,8 +43,6 @@
 // ADC buffers with size out of this range are not computed.
 // Warning: it limits the acceptable input frequency range around 50Hz.
 #define MEASURE_PERIOD_ADCX_BUFFER_SIZE_ERROR_PERCENT	20
-#define MEASURE_PERIOD_ADCX_BUFFER_SIZE_LOW_LIMIT		((100 - MEASURE_PERIOD_ADCX_BUFFER_SIZE_ERROR_PERCENT) * MEASURE_PERIOD_BUFFER_SIZE) / (100)
-#define MEASURE_PERIOD_ADCX_BUFFER_SIZE_HIGH_LIMIT		((100 + MEASURE_PERIOD_ADCX_BUFFER_SIZE_ERROR_PERCENT) * MEASURE_PERIOD_BUFFER_SIZE) / (100)
 
 #define MEASURE_POWER_FACTOR_MULTIPLIER					100
 
@@ -105,11 +87,20 @@ typedef struct {
 
 /*******************************************************************/
 typedef struct {
+	// Factors.
+	int64_t acv_factor_num;
+	int64_t acv_factor_den;
+	int64_t aci_factor_num[ADC_NUMBER_OF_ACI_CHANNELS];
+	int64_t aci_factor_den;
+	int64_t acp_factor_num[ADC_NUMBER_OF_ACI_CHANNELS];
+	int64_t acp_factor_den;
 	// Temporary variables for individual channel processing on 1 period.
 	q31_t period_acvx_buffer_q31[MEASURE_PERIOD_ADCX_BUFFER_SIZE];
 	q31_t period_acix_buffer_q31[MEASURE_PERIOD_ADCX_BUFFER_SIZE];
 	q31_t period_acpx_buffer_q31[MEASURE_PERIOD_ADCX_BUFFER_SIZE];
 	uint32_t period_acxx_buffer_size;
+	uint32_t period_acxx_buffer_size_low_limit;
+	uint32_t period_acxx_buffer_size_high_limit;
 	q31_t period_active_power_q31;
 	q31_t period_rms_voltage_q31;
 	q31_t period_rms_current_q31;
@@ -254,6 +245,31 @@ static volatile MEASURE_context_t measure_ctx;
 }
 
 /*******************************************************************/
+static void _MEASURE_compute_factors(void) {
+	// Local variables.
+	uint8_t chx_idx = 0;
+	// ACV.
+	measure_data.acv_factor_num = ((int64_t) MPMCM_TRANSFORMER_GAIN * (int64_t) MPMCM_TRANSFORMER_ATTEN * (int64_t) ADC_VREF_MV);
+	measure_data.acv_factor_den = ((int64_t) MEASURE_TRANSFORMER_GAIN_FACTOR * (int64_t) ADC_FULL_SCALE);
+	// ACI.
+	for (chx_idx=0 ; chx_idx<ADC_NUMBER_OF_ACI_CHANNELS ; chx_idx++) {
+		measure_data.aci_factor_num[chx_idx] = ((int64_t) MPMCM_SCT013_GAIN[chx_idx] * (int64_t) MPMCM_SCT013_ATTEN[chx_idx] * (int64_t) ADC_VREF_MV);
+	}
+	measure_data.aci_factor_den = ((int64_t) MEASURE_SCT013_GAIN_FACTOR * (int64_t) ADC_FULL_SCALE);
+	// ACP.
+	for (chx_idx=0 ; chx_idx<ADC_NUMBER_OF_ACI_CHANNELS ; chx_idx++) {
+		// Note: 1000 factor is used to get mW from mV and mA.
+		// Conversion is done here to limit numerator value and avoid overflow during power computation.
+		// There is no precision loss since ACV and ACI factors multiplication is necesarily a multiple of 1000 thanks to ADC_VREF_MV.
+		measure_data.acp_factor_num[chx_idx] = (measure_data.acv_factor_num * measure_data.aci_factor_num[chx_idx]) / ((int64_t) 1000);
+	}
+	measure_data.acp_factor_den = (measure_data.acv_factor_den * measure_data.aci_factor_den);
+	// Buffer size limits.
+	measure_data.period_acxx_buffer_size_low_limit =  ((100 - MEASURE_PERIOD_ADCX_BUFFER_SIZE_ERROR_PERCENT) * MEASURE_PERIOD_BUFFER_SIZE) / (100);
+	measure_data.period_acxx_buffer_size_high_limit = ((100 + MEASURE_PERIOD_ADCX_BUFFER_SIZE_ERROR_PERCENT) * MEASURE_PERIOD_BUFFER_SIZE) / (100);
+}
+
+/*******************************************************************/
 static void _MEASURE_reset(void) {
 	// Local variables.
 	uint8_t chx_idx = 0;
@@ -393,14 +409,17 @@ static void _MEASURE_compute_period_data(void) {
 	int64_t temp_s64 = 0;
 	uint32_t idx = 0;
 	// Check enable flag.
-	if (measure_ctx.processing_enable == 0) return;
+	if (measure_ctx.processing_enable == 0) goto index_process;
 	// Get size.
 	acv_buffer_size = (uint32_t) ((measure_sampling.acv[measure_sampling.acv_read_idx].size) / (ADC_NUMBER_OF_ACI_CHANNELS));
 	aci_buffer_size = (uint32_t) ((measure_sampling.aci[measure_sampling.acv_read_idx].size) / (ADC_NUMBER_OF_ACI_CHANNELS));
 	// Take the minimum size between voltage and current.
 	measure_data.period_acxx_buffer_size = (acv_buffer_size < aci_buffer_size) ? acv_buffer_size : aci_buffer_size;
 	// Check size.
-	if ((measure_data.period_acxx_buffer_size < MEASURE_PERIOD_ADCX_BUFFER_SIZE_LOW_LIMIT) || (measure_data.period_acxx_buffer_size > MEASURE_PERIOD_ADCX_BUFFER_SIZE_HIGH_LIMIT)) goto channel_process_end;
+	if ((measure_data.period_acxx_buffer_size < measure_data.period_acxx_buffer_size_low_limit) ||
+		(measure_data.period_acxx_buffer_size > measure_data.period_acxx_buffer_size_high_limit)) {
+		goto frequency_process;
+	}
 	// Processing each channel.
 	for (chx_idx=0 ; chx_idx<ADC_NUMBER_OF_ACI_CHANNELS ; chx_idx++) {
 		// Compute channel buffer.
@@ -426,16 +445,16 @@ static void _MEASURE_compute_period_data(void) {
 		// Active power.
 		arm_mean_q31((q31_t*) measure_data.period_acpx_buffer_q31, measure_data.period_acxx_buffer_size, (q31_t*) &(measure_data.period_active_power_q31));
 		temp_s64 = (int64_t) (measure_data.period_active_power_q31 >> MEASURE_Q31_SHIFT_MULT);
-		temp_s64 *= MEASURE_ACP_FACTOR_NUM;
-		active_power_mw = (int32_t) (temp_s64 / MEASURE_ACP_FACTOR_DEN);
+		temp_s64 *= measure_data.acp_factor_num[chx_idx];
+		active_power_mw = (int32_t) (temp_s64 / measure_data.acp_factor_den);
 		// RMS voltage.
 		arm_rms_q31((q31_t*) measure_data.period_acvx_buffer_q31, measure_data.period_acxx_buffer_size, (q31_t*) &(measure_data.period_rms_voltage_q31));
-		temp_s64 = MEASURE_ACV_FACTOR_NUM * (int64_t) (measure_data.period_rms_voltage_q31 >> MEASURE_Q31_SHIFT_ADC);
-		rms_voltage_mv = (int32_t) (temp_s64 / MEASURE_ACV_FACTOR_DEN);
+		temp_s64 = measure_data.acv_factor_num * (int64_t) (measure_data.period_rms_voltage_q31 >> MEASURE_Q31_SHIFT_ADC);
+		rms_voltage_mv = (int32_t) (temp_s64 / measure_data.acv_factor_den);
 		// RMS current.
 		arm_rms_q31((q31_t*) measure_data.period_acix_buffer_q31, measure_data.period_acxx_buffer_size, (q31_t*) &(measure_data.period_rms_current_q31));
-		temp_s64 = MEASURE_ACI_FACTOR_NUM * (int64_t) (measure_data.period_rms_current_q31 >> MEASURE_Q31_SHIFT_ADC);
-		rms_current_ma = (int32_t) (temp_s64 / MEASURE_ACI_FACTOR_DEN);
+		temp_s64 = measure_data.aci_factor_num[chx_idx] * (int64_t) (measure_data.period_rms_current_q31 >> MEASURE_Q31_SHIFT_ADC);
+		rms_current_ma = (int32_t) (temp_s64 / measure_data.aci_factor_den);
 		// Apparent power.
 		temp_s64 = ((int64_t) rms_voltage_mv) * ((int64_t) rms_current_ma);
 		apparent_power_mva = (int32_t) ((temp_s64) / ((int64_t) 1000));
@@ -449,10 +468,7 @@ static void _MEASURE_compute_period_data(void) {
 		_MEASURE_add_chx_sample(measure_data.chx_rolling_mean[chx_idx], apparent_power_mva, apparent_power_mva);
 		_MEASURE_add_chx_sample(measure_data.chx_rolling_mean[chx_idx], power_factor, power_factor);
 	}
-channel_process_end:
-	// Update read indexes.
-	measure_sampling.acv_read_idx = ((measure_sampling.acv_read_idx + 1) % MEASURE_PERIOD_ADCX_DMA_BUFFER_DEPTH);
-	measure_sampling.aci_read_idx = ((measure_sampling.aci_read_idx + 1) % MEASURE_PERIOD_ADCX_DMA_BUFFER_DEPTH);
+frequency_process:
 	// Compute mains frequency.
 	idx = 0;
 	while (idx < MEASURE_PERIOD_TIM2_DMA_BUFFER_SIZE) {
@@ -473,6 +489,10 @@ channel_process_end:
 		// Update accumulated data.
 		_MEASURE_add_sample(measure_data.acv_frequency_rolling_mean, frequency_mhz);
 	}
+index_process:
+	// Update read indexes.
+	measure_sampling.acv_read_idx = ((measure_sampling.acv_read_idx + 1) % MEASURE_PERIOD_ADCX_DMA_BUFFER_DEPTH);
+	measure_sampling.aci_read_idx = ((measure_sampling.aci_read_idx + 1) % MEASURE_PERIOD_ADCX_DMA_BUFFER_DEPTH);
 }
 
 /*******************************************************************/
@@ -508,7 +528,7 @@ static MEASURE_status_t _MEASURE_compute_accumulated_data(void) {
 	int64_t temp_s64 = 0;
 	// Compute AC channels accumulated data.
 	for (chx_idx=0 ; chx_idx<ADC_NUMBER_OF_ACI_CHANNELS ; chx_idx++) {
-		// Copy all rolling means.s
+		// Copy all rolling means.
 		_MEASURE_add_chx_accumulated_sample(measure_data.chx_accumulated_data[chx_idx], active_power_mw, measure_data.chx_run_data[chx_idx].active_power_mw.value);
 		_MEASURE_add_chx_accumulated_sample(measure_data.chx_accumulated_data[chx_idx], rms_voltage_mv, measure_data.chx_run_data[chx_idx].rms_voltage_mv.value);
 		_MEASURE_add_chx_accumulated_sample(measure_data.chx_accumulated_data[chx_idx], rms_current_ma, measure_data.chx_run_data[chx_idx].rms_current_ma.value);
@@ -655,6 +675,7 @@ MEASURE_status_t MEASURE_init(void) {
 	DMA1_tim2_init();
 	DMA1_tim2_set_destination_address((uint32_t) &(measure_sampling.tim2_ccr1), MEASURE_PERIOD_TIM2_DMA_BUFFER_SIZE);
 errors:
+	_MEASURE_compute_factors();
 	_MEASURE_reset();
 	return status;
 }
@@ -663,22 +684,19 @@ errors:
 MEASURE_status_t MEASURE_tick(void) {
 	// Local variables.
 	MEASURE_status_t status = MEASURE_SUCCESS;
+	MEASURE_status_t measure_status = MEASURE_SUCCESS;
 	// Check state.
 	if (measure_ctx.state != MEASURE_STATE_STOPPED) {
-		// Disable processing during data copy.
-		measure_ctx.processing_enable = 0;
 		// Compute run data from last second.
+		measure_ctx.processing_enable = 0;
 		_MEASURE_compute_run_data();
+		measure_ctx.processing_enable = 1;
 		// Compute accumulated data.
-		status = _MEASURE_compute_accumulated_data();
-		if (status != MEASURE_SUCCESS) goto errors;
+		measure_status = _MEASURE_compute_accumulated_data();
+		MEASURE_stack_error();
 	}
 	// Manage LED.
 	status = _MEASURE_led_single_pulse();
-	if (status != MEASURE_SUCCESS) goto errors;
-errors:
-	// Enable processing.
-	measure_ctx.processing_enable = 1;
 	return status;
 }
 
