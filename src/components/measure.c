@@ -27,6 +27,7 @@
 
 #define MEASURE_MAINS_PERIOD_US							20000
 #define MEASURE_ZERO_CROSS_PER_PERIOD					2
+#define MEASURE_ZERO_CROSS_START_THRESHOLD				((1000000 * MEASURE_ZERO_CROSS_PER_PERIOD) / (MEASURE_MAINS_PERIOD_US)) // Wait for 1 second of mains voltage presence.
 
 #define MEASURE_TRANSFORMER_GAIN_FACTOR					10	// For (10 * mV/mV) input unit.
 
@@ -329,8 +330,6 @@ MEASURE_status_t _MEASURE_stop_analog_transfer(void) {
 	// Local variables.
 	MEASURE_status_t status = MEASURE_SUCCESS;
 	ADC_status_t adc_status = ADC_SUCCESS;
-	// Clear count.
-	measure_ctx.zero_cross_count = 0;
 	// Stop trigger.
 	TIM6_stop();
 	// Stop DMA.
@@ -408,7 +407,7 @@ static void _MEASURE_compute_period_data(void) {
 	int64_t temp_s64 = 0;
 	uint32_t idx = 0;
 	// Check enable flag.
-	if (measure_ctx.processing_enable == 0) goto index_process;
+	if (measure_ctx.processing_enable == 0) goto errors;
 	// Get size.
 	acv_buffer_size = (uint32_t) ((measure_sampling.acv[measure_sampling.acv_read_idx].size) / (ADC_NUMBER_OF_ACI_CHANNELS));
 	aci_buffer_size = (uint32_t) ((measure_sampling.aci[measure_sampling.acv_read_idx].size) / (ADC_NUMBER_OF_ACI_CHANNELS));
@@ -417,7 +416,7 @@ static void _MEASURE_compute_period_data(void) {
 	// Check size.
 	if ((measure_data.period_acxx_buffer_size < measure_data.period_acxx_buffer_size_low_limit) ||
 		(measure_data.period_acxx_buffer_size > measure_data.period_acxx_buffer_size_high_limit)) {
-		goto frequency_process;
+		goto errors;
 	}
 	// Processing each channel.
 	for (chx_idx=0 ; chx_idx<ADC_NUMBER_OF_ACI_CHANNELS ; chx_idx++) {
@@ -467,7 +466,6 @@ static void _MEASURE_compute_period_data(void) {
 		_MEASURE_add_chx_sample(measure_data.chx_rolling_mean[chx_idx], apparent_power_mva, apparent_power_mva);
 		_MEASURE_add_chx_sample(measure_data.chx_rolling_mean[chx_idx], power_factor, power_factor);
 	}
-frequency_process:
 	// Compute mains frequency.
 	idx = 0;
 	while (idx < MEASURE_PERIOD_TIM2_DMA_BUFFER_SIZE) {
@@ -488,7 +486,7 @@ frequency_process:
 		// Update accumulated data.
 		_MEASURE_add_sample(measure_data.acv_frequency_rolling_mean, frequency_mhz);
 	}
-index_process:
+errors:
 	// Update read indexes.
 	measure_sampling.acv_read_idx = ((measure_sampling.acv_read_idx + 1) % MEASURE_PERIOD_ADCX_DMA_BUFFER_DEPTH);
 	measure_sampling.aci_read_idx = ((measure_sampling.aci_read_idx + 1) % MEASURE_PERIOD_ADCX_DMA_BUFFER_DEPTH);
@@ -578,7 +576,7 @@ static MEASURE_status_t _MEASURE_internal_process(void) {
 	switch (measure_ctx.state) {
 	case MEASURE_STATE_STOPPED:
 		// Synchronize on zero cross.
-		if (measure_ctx.zero_cross_count > MEASURE_ZERO_CROSS_PER_PERIOD) {
+		if (measure_ctx.zero_cross_count >= MEASURE_ZERO_CROSS_START_THRESHOLD) {
 			// Reset context.
 			_MEASURE_reset();
 			// Start measure.
@@ -602,7 +600,8 @@ static MEASURE_status_t _MEASURE_internal_process(void) {
 		}
 		// Check DMA transfer end flag.
 		if (measure_ctx.dma_transfer_end_flag != 0) {
-			// Clear flag.
+			// Clear counters.
+			measure_ctx.zero_cross_count = 0;
 			measure_ctx.dma_transfer_end_flag = 0;
 			// Stop measure.
 			_MEASURE_stop();
