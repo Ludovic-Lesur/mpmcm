@@ -114,6 +114,8 @@ static void _AT_BUS_reply_add_string(char_t* tx_string) {
 	// Fill reply buffer with new bytes.
 	while (*tx_string) {
 		_AT_BUS_reply_add_char(*(tx_string++));
+		// Detect rollover.
+		if (at_bus_ctx.reply_size == 0) break;
 	}
 }
 
