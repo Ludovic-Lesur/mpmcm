@@ -89,6 +89,8 @@ typedef struct {
 	MEASURE_accumulated_data_t rms_current_ma;
 	MEASURE_accumulated_data_t apparent_power_mva;
 	MEASURE_accumulated_data_t power_factor;
+	int32_t active_energy_mwh;
+	int32_t apparent_energy_mvah;
 } MEASURE_channel_accumulated_data_t;
 
 /*** MEASURE functions ***/
@@ -103,13 +105,13 @@ typedef struct {
 MEASURE_status_t MEASURE_init(void);
 
 /*!******************************************************************
- * \fn MEASURE_status_t MEASURE_tick(void)
+ * \fn MEASURE_status_t MEASURE_tick_second(void)
  * \brief Function to call every second.
  * \param[in]  	none
  * \param[out] 	none
  * \retval		Function execution status.
  *******************************************************************/
-MEASURE_status_t MEASURE_tick(void);
+MEASURE_status_t MEASURE_tick_second(void);
 
 /*!******************************************************************
  * \fn MEASURE_status_t MEASURE_get_probe_detect_flag(uint8_t ac_channel_index, uint8_t* current_probe_connected)

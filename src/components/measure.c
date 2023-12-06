@@ -55,6 +55,8 @@
 #define MEASURE_LED_PULSE_DURATION_MS					50
 #define MEASURE_LED_PULSE_PERIOD_SECONDS				5
 
+#define MEASURE_SECONDS_PER_HOUR						3600
+
 #define MEASURE_TIMEOUT_COUNT							10000000
 
 /*** MEASURE local structures ***/
@@ -110,6 +112,8 @@ typedef struct {
 	MEASURE_channel_data_t chx_rolling_mean[ADC_NUMBER_OF_ACI_CHANNELS];
 	MEASURE_channel_data_t chx_run_data[ADC_NUMBER_OF_ACI_CHANNELS];
 	MEASURE_channel_accumulated_data_t chx_accumulated_data[ADC_NUMBER_OF_ACI_CHANNELS];
+	int64_t active_energy_mws_sum[ADC_NUMBER_OF_ACI_CHANNELS];
+	int64_t apparent_energy_mvas_sum[ADC_NUMBER_OF_ACI_CHANNELS];
 	// Mains frequency.
 	MEASURE_data_t acv_frequency_rolling_mean;
 	MEASURE_data_t acv_frequency_run_data;
@@ -122,7 +126,7 @@ typedef struct {
 	uint8_t processing_enable;
 	uint8_t zero_cross_count;
 	uint8_t dma_transfer_end_flag;
-	uint32_t tick_led_count;
+	uint32_t tick_led_seconds_count;
 } MEASURE_context_t;
 
 /*** MEASURE local global variables ***/
@@ -180,6 +184,8 @@ static volatile MEASURE_context_t measure_ctx;
 	_MEASURE_reset_accumulated_data(source[channel_index].rms_current_ma); \
 	_MEASURE_reset_accumulated_data(source[channel_index].apparent_power_mva); \
 	_MEASURE_reset_accumulated_data(source[channel_index].power_factor); \
+	source[channel_index].active_energy_mwh = 0; \
+	source[channel_index].apparent_energy_mvah = 0; \
 }
 
 /*******************************************************************/
@@ -531,6 +537,9 @@ static MEASURE_status_t _MEASURE_compute_accumulated_data(void) {
 		_MEASURE_add_chx_accumulated_sample(measure_data.chx_accumulated_data[chx_idx], rms_current_ma, measure_data.chx_run_data[chx_idx].rms_current_ma.value);
 		_MEASURE_add_chx_accumulated_sample(measure_data.chx_accumulated_data[chx_idx], apparent_power_mva, measure_data.chx_run_data[chx_idx].apparent_power_mva.value);
 		_MEASURE_add_chx_accumulated_sample(measure_data.chx_accumulated_data[chx_idx], power_factor, measure_data.chx_run_data[chx_idx].power_factor.value);
+		// Increment energy.
+		measure_data.active_energy_mws_sum[chx_idx] += measure_data.chx_run_data[chx_idx].active_power_mw.value;
+		measure_data.apparent_energy_mvas_sum[chx_idx] += measure_data.chx_run_data[chx_idx].apparent_power_mva.value;
 		// Reset results.
 		_MEASURE_reset_chx_data(measure_data.chx_rolling_mean, chx_idx);
 	}
@@ -546,12 +555,10 @@ static MEASURE_status_t _MEASURE_led_single_pulse(void) {
 	MEASURE_status_t status = MEASURE_SUCCESS;
 	LED_status_t led_status = LED_SUCCESS;
 	LED_color_t led_color = LED_COLOR_OFF;
-	// Increment tick count.
-	measure_ctx.tick_led_count++;
 	// Check LED period.
-	if (measure_ctx.tick_led_count >= MEASURE_LED_PULSE_PERIOD_SECONDS) {
+	if (measure_ctx.tick_led_seconds_count >= MEASURE_LED_PULSE_PERIOD_SECONDS) {
 		// Reset count.
-		measure_ctx.tick_led_count = 0;
+		measure_ctx.tick_led_seconds_count = 0;
 		// Compute LED color according to state.
 		if (measure_ctx.state == MEASURE_STATE_STOPPED) {
 			// Check current number of samples (CH1 RMS voltage as reference).
@@ -649,7 +656,12 @@ MEASURE_status_t MEASURE_init(void) {
 	uint8_t chx_idx = 0;
 	// Init context.
 	measure_ctx.state = MEASURE_STATE_STOPPED;
-	measure_ctx.tick_led_count = 0;
+	measure_ctx.tick_led_seconds_count = 0;
+	// Init energy data.
+	for (chx_idx=0 ; chx_idx<ADC_NUMBER_OF_ACI_CHANNELS ; chx_idx++) {
+		measure_data.active_energy_mws_sum[chx_idx] = 0;
+		measure_data.apparent_energy_mvas_sum[chx_idx] = 0;
+	}
 	// Init detect pins.
 	for (chx_idx=0 ; chx_idx<ADC_NUMBER_OF_ACI_CHANNELS ; chx_idx++) {
 		GPIO_configure(MEASURE_GPIO_ACI_DETECT[chx_idx], GPIO_MODE_INPUT, GPIO_TYPE_PUSH_PULL, GPIO_SPEED_LOW, GPIO_PULL_NONE);
@@ -679,10 +691,12 @@ errors:
 }
 
 /*******************************************************************/
-MEASURE_status_t MEASURE_tick(void) {
+MEASURE_status_t MEASURE_tick_second(void) {
 	// Local variables.
 	MEASURE_status_t status = MEASURE_SUCCESS;
 	MEASURE_status_t measure_status = MEASURE_SUCCESS;
+	// Increment seconds count.
+	measure_ctx.tick_led_seconds_count++;
 	// Check state.
 	if (measure_ctx.state != MEASURE_STATE_STOPPED) {
 		// Compute run data from last second.
@@ -823,8 +837,13 @@ MEASURE_status_t MEASURE_get_channel_accumulated_data(uint8_t ac_channel, MEASUR
 	_MEASURE_copy_accumulated_data(measure_data.chx_accumulated_data[ac_channel].rms_current_ma, (ac_channel_accumulated_data -> rms_current_ma));
 	_MEASURE_copy_accumulated_data(measure_data.chx_accumulated_data[ac_channel].apparent_power_mva, (ac_channel_accumulated_data -> apparent_power_mva));
 	_MEASURE_copy_accumulated_data(measure_data.chx_accumulated_data[ac_channel].power_factor, (ac_channel_accumulated_data -> power_factor));
+	// Compute energy.
+	(ac_channel_accumulated_data -> active_energy_mwh) = (int32_t) ((measure_data.active_energy_mws_sum[ac_channel]) / ((uint64_t) MEASURE_SECONDS_PER_HOUR));
+	(ac_channel_accumulated_data -> apparent_energy_mvah) = (int32_t) ((measure_data.apparent_energy_mvas_sum[ac_channel]) / ((uint64_t) MEASURE_SECONDS_PER_HOUR));
 	// Reset data.
 	_MEASURE_reset_chx_accumulated_data(measure_data.chx_accumulated_data, ac_channel);
+	measure_data.active_energy_mws_sum[ac_channel] = 0;
+	measure_data.apparent_energy_mvas_sum[ac_channel] = 0;
 errors:
 	return status;
 }

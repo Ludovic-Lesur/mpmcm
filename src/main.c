@@ -88,7 +88,7 @@ int main(void) {
 			// Clear flag.
 			RTC_clear_wakeup_timer_flag();
 			// Call measure tick.
-			measure_status = MEASURE_tick();
+			measure_status = MEASURE_tick_second();
 			MEASURE_stack_error();
 #ifdef HIGH_SPEED_LOG
 			AT_BUS_high_speed_log();
