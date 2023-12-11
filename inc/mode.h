@@ -11,7 +11,13 @@
 #include "adc.h"
 #include "types.h"
 
-/*** MPMCM options ***/
+/*** Board modes ***/
+
+//#define ATM
+//#define HIGH_SPEED_LOG
+//#define DEBUG
+
+/*** Board options ***/
 
 // Transformer selection.
 //#define BLOCK_VC_10_2_6
@@ -30,12 +36,5 @@
 // Current sensors settings.
 static const uint8_t MPMCM_SCT013_GAIN[ADC_NUMBER_OF_ACI_CHANNELS] = {5, 5, 10, 20};	// Unit A/V.
 static const uint8_t MPMCM_SCT013_ATTEN[ADC_NUMBER_OF_ACI_CHANNELS] = {1, 1, 1, 1};		// Unit V/V.
-
-// Specific modes.
-//#define ATM
-//#define HIGH_SPEED_LOG
-
-// Debug mode.
-//#define DEBUG
 
 #endif /* __MODE_H__ */
