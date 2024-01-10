@@ -538,8 +538,8 @@ static MEASURE_status_t _MEASURE_compute_accumulated_data(void) {
 		_MEASURE_add_chx_accumulated_sample(measure_data.chx_accumulated_data[chx_idx], apparent_power_mva, measure_data.chx_run_data[chx_idx].apparent_power_mva.value);
 		_MEASURE_add_chx_accumulated_sample(measure_data.chx_accumulated_data[chx_idx], power_factor, measure_data.chx_run_data[chx_idx].power_factor.value);
 		// Increment energy.
-		measure_data.active_energy_mws_sum[chx_idx] += measure_data.chx_run_data[chx_idx].active_power_mw.value;
-		measure_data.apparent_energy_mvas_sum[chx_idx] += measure_data.chx_run_data[chx_idx].apparent_power_mva.value;
+		measure_data.active_energy_mws_sum[chx_idx] += (int64_t) (measure_data.chx_run_data[chx_idx].active_power_mw.value);
+		measure_data.apparent_energy_mvas_sum[chx_idx] += (int64_t) (measure_data.chx_run_data[chx_idx].apparent_power_mva.value);
 		// Reset results.
 		_MEASURE_reset_chx_data(measure_data.chx_rolling_mean, chx_idx);
 	}
@@ -838,8 +838,8 @@ MEASURE_status_t MEASURE_get_channel_accumulated_data(uint8_t ac_channel, MEASUR
 	_MEASURE_copy_accumulated_data(measure_data.chx_accumulated_data[ac_channel].apparent_power_mva, (ac_channel_accumulated_data -> apparent_power_mva));
 	_MEASURE_copy_accumulated_data(measure_data.chx_accumulated_data[ac_channel].power_factor, (ac_channel_accumulated_data -> power_factor));
 	// Compute energy.
-	(ac_channel_accumulated_data -> active_energy_mwh) = (int32_t) ((measure_data.active_energy_mws_sum[ac_channel]) / ((uint64_t) MEASURE_SECONDS_PER_HOUR));
-	(ac_channel_accumulated_data -> apparent_energy_mvah) = (int32_t) ((measure_data.apparent_energy_mvas_sum[ac_channel]) / ((uint64_t) MEASURE_SECONDS_PER_HOUR));
+	(ac_channel_accumulated_data -> active_energy_mwh) = (int32_t) ((measure_data.active_energy_mws_sum[ac_channel]) / ((int64_t) MEASURE_SECONDS_PER_HOUR));
+	(ac_channel_accumulated_data -> apparent_energy_mvah) = (int32_t) ((measure_data.apparent_energy_mvas_sum[ac_channel]) / ((int64_t) MEASURE_SECONDS_PER_HOUR));
 	// Reset data.
 	_MEASURE_reset_chx_accumulated_data(measure_data.chx_accumulated_data, ac_channel);
 	measure_data.active_energy_mws_sum[ac_channel] = 0;
