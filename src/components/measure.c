@@ -462,9 +462,15 @@ static void _MEASURE_compute_period_data(void) {
 		// Apparent power.
 		temp_s64 = ((int64_t) rms_voltage_mv) * ((int64_t) rms_current_ma);
 		apparent_power_mva = (int32_t) ((temp_s64) / ((int64_t) 1000));
+		if (((active_power_mw > 0) && (apparent_power_mva < 0)) || ((active_power_mw < 0) && (apparent_power_mva > 0))) {
+			apparent_power_mva *= (-1);
+		}
 		// Power factor.
 		temp_s64 = (int64_t) MEASURE_POWER_FACTOR_MULTIPLIER * ((int64_t) active_power_mw);
 		power_factor = (apparent_power_mva != 0) ? (int32_t) ((temp_s64) / ((int64_t) apparent_power_mva)) : 0;
+		if (((active_power_mw > 0) && (power_factor < 0)) || ((active_power_mw < 0) && (power_factor > 0))) {
+			power_factor *= (-1);
+		}
 		// Update accumulated data.
 		_MEASURE_add_chx_sample(measure_data.chx_rolling_mean[chx_idx], active_power_mw, active_power_mw);
 		_MEASURE_add_chx_sample(measure_data.chx_rolling_mean[chx_idx], rms_voltage_mv, rms_voltage_mv);
