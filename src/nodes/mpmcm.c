@@ -23,12 +23,18 @@ void MPMCM_init_registers(void) {
 	uint8_t reg_addr = 0;
 	// Read init state.
 	MPMCM_update_register(MPMCM_REG_ADDR_CONFIGURATION_0);
-	MPMCM_update_register(MPMCM_REG_ADDR_CH1_CONFIGURATION);
-	MPMCM_update_register(MPMCM_REG_ADDR_CH2_CONFIGURATION);
-	MPMCM_update_register(MPMCM_REG_ADDR_CH3_CONFIGURATION);
-	MPMCM_update_register(MPMCM_REG_ADDR_CH4_CONFIGURATION);
+	MPMCM_update_register(MPMCM_REG_ADDR_CH1_CONFIGURATION_0);
+	MPMCM_update_register(MPMCM_REG_ADDR_CH2_CONFIGURATION_0);
+	MPMCM_update_register(MPMCM_REG_ADDR_CH3_CONFIGURATION_0);
+	MPMCM_update_register(MPMCM_REG_ADDR_CH4_CONFIGURATION_0);
 	MPMCM_update_register(MPMCM_REG_ADDR_STATUS_1);
 	// Load default values.
+	NODE_write_register(NODE_REQUEST_SOURCE_INTERNAL, MPMCM_REG_ADDR_CONFIGURATION_1,     MPMCM_REG_CONFIGURATION_1_MASK_GAIN, (uint32_t) MPMCM_TRANSFORMER_GAIN);
+	NODE_write_register(NODE_REQUEST_SOURCE_INTERNAL, MPMCM_REG_ADDR_CH1_CONFIGURATION_1, MPMCM_REG_CONFIGURATION_1_MASK_GAIN, (uint32_t) MPMCM_SCT013_GAIN[0]);
+	NODE_write_register(NODE_REQUEST_SOURCE_INTERNAL, MPMCM_REG_ADDR_CH2_CONFIGURATION_1, MPMCM_REG_CONFIGURATION_1_MASK_GAIN, (uint32_t) MPMCM_SCT013_GAIN[1]);
+	NODE_write_register(NODE_REQUEST_SOURCE_INTERNAL, MPMCM_REG_ADDR_CH3_CONFIGURATION_1, MPMCM_REG_CONFIGURATION_1_MASK_GAIN, (uint32_t) MPMCM_SCT013_GAIN[2]);
+	NODE_write_register(NODE_REQUEST_SOURCE_INTERNAL, MPMCM_REG_ADDR_CH4_CONFIGURATION_1, MPMCM_REG_CONFIGURATION_1_MASK_GAIN, (uint32_t) MPMCM_SCT013_GAIN[3]);
+
 	for (reg_addr=MPMCM_REG_ADDR_CONTROL_1 ; reg_addr<MPMCM_REG_ADDR_LAST ; reg_addr++) {
 		NODE_write_register(NODE_REQUEST_SOURCE_INTERNAL, reg_addr, DINFOX_REG_MASK_ALL, 0);
 	}
@@ -46,29 +52,24 @@ NODE_status_t MPMCM_update_register(uint8_t reg_addr) {
 	// Check address.
 	switch (reg_addr) {
 	case MPMCM_REG_ADDR_CONFIGURATION_0:
-		// Transformer gain and attenuation.
-		DINFOX_write_field(&reg_value, &reg_mask, MPMCM_TRANSFORMER_GAIN,  MPMCM_REG_MASK_GAIN);
-		DINFOX_write_field(&reg_value, &reg_mask, MPMCM_TRANSFORMER_ATTEN, MPMCM_REG_MASK_ATTEN);
+		// Transformer attenuation.
+		DINFOX_write_field(&reg_value, &reg_mask, (uint32_t) MPMCM_TRANSFORMER_ATTEN, MPMCM_REG_CONFIGURATION_0_MASK_ATTEN);
 		break;
-	case MPMCM_REG_ADDR_CH1_CONFIGURATION:
-		// SCT013 gain and attenuation.
-		DINFOX_write_field(&reg_value, &reg_mask, (uint32_t) MPMCM_SCT013_GAIN[0],  MPMCM_REG_MASK_GAIN);
-		DINFOX_write_field(&reg_value, &reg_mask, (uint32_t) MPMCM_SCT013_ATTEN[0], MPMCM_REG_MASK_ATTEN);
+	case MPMCM_REG_ADDR_CH1_CONFIGURATION_0:
+		// SCT013 attenuation.
+		DINFOX_write_field(&reg_value, &reg_mask, (uint32_t) MPMCM_SCT013_ATTEN[0], MPMCM_REG_CONFIGURATION_0_MASK_ATTEN);
 		break;
-	case MPMCM_REG_ADDR_CH2_CONFIGURATION:
-		// SCT013 gain and attenuation.
-		DINFOX_write_field(&reg_value, &reg_mask, (uint32_t) MPMCM_SCT013_GAIN[1],  MPMCM_REG_MASK_GAIN);
-		DINFOX_write_field(&reg_value, &reg_mask, (uint32_t) MPMCM_SCT013_ATTEN[1], MPMCM_REG_MASK_ATTEN);
+	case MPMCM_REG_ADDR_CH2_CONFIGURATION_0:
+		// SCT013 attenuation.
+		DINFOX_write_field(&reg_value, &reg_mask, (uint32_t) MPMCM_SCT013_ATTEN[1], MPMCM_REG_CONFIGURATION_0_MASK_ATTEN);
 		break;
-	case MPMCM_REG_ADDR_CH3_CONFIGURATION:
-		// SCT013 gain and attenuation.
-		DINFOX_write_field(&reg_value, &reg_mask, (uint32_t) MPMCM_SCT013_GAIN[2],  MPMCM_REG_MASK_GAIN);
-		DINFOX_write_field(&reg_value, &reg_mask, (uint32_t) MPMCM_SCT013_ATTEN[2], MPMCM_REG_MASK_ATTEN);
+	case MPMCM_REG_ADDR_CH3_CONFIGURATION_0:
+		// SCT013 attenuation.
+		DINFOX_write_field(&reg_value, &reg_mask, (uint32_t) MPMCM_SCT013_ATTEN[2], MPMCM_REG_CONFIGURATION_0_MASK_ATTEN);
 		break;
-	case MPMCM_REG_ADDR_CH4_CONFIGURATION:
-		// SCT013 gain and attenuation.
-		DINFOX_write_field(&reg_value, &reg_mask, (uint32_t) MPMCM_SCT013_GAIN[3],  MPMCM_REG_MASK_GAIN);
-		DINFOX_write_field(&reg_value, &reg_mask, (uint32_t) MPMCM_SCT013_ATTEN[3], MPMCM_REG_MASK_ATTEN);
+	case MPMCM_REG_ADDR_CH4_CONFIGURATION_0:
+		// SCT013 attenuation.
+		DINFOX_write_field(&reg_value, &reg_mask, (uint32_t) MPMCM_SCT013_ATTEN[3], MPMCM_REG_CONFIGURATION_0_MASK_ATTEN);
 		break;
 	case MPMCM_REG_ADDR_STATUS_1:
 		// Update probe detect flags.

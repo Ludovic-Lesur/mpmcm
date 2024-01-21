@@ -266,7 +266,7 @@ static void _MEASURE_compute_factors(void) {
 	for (chx_idx=0 ; chx_idx<ADC_NUMBER_OF_ACI_CHANNELS ; chx_idx++) {
 		// Note: 1000 factor is used to get mW from mV and mA.
 		// Conversion is done here to limit numerator value and avoid overflow during power computation.
-		// There is no precision loss since ACV and ACI factors multiplication is necesarily a multiple of 1000 thanks to ADC_VREF_MV.
+		// There is no precision loss since ACV and ACI factors multiplication is necessarily a multiple of 1000 thanks to ADC_VREF_MV.
 		measure_data.acp_factor_num[chx_idx] = (measure_data.acv_factor_num * measure_data.aci_factor_num[chx_idx]) / ((int64_t) 1000);
 	}
 	measure_data.acp_factor_den = (measure_data.acv_factor_den * measure_data.aci_factor_den);
