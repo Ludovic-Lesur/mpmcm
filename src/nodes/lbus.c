@@ -109,11 +109,11 @@ LBUS_status_t LBUS_send(uint8_t* data, uint32_t data_size_bytes) {
 	lbus_header[LBUS_FRAME_FIELD_INDEX_SOURCE_ADDRESS] = lbus_ctx.self_address;
 	// Send header.
 	lpuart1_status = LPUART1_write(lbus_header, LBUS_FRAME_FIELD_INDEX_DATA);
-	LPUART1_exit_error(LBUS_ERROR_BASE_LPUART);
+	LPUART1_exit_error(LBUS_ERROR_BASE_LPUART1);
 #endif
 	// Send command.
 	lpuart1_status = LPUART1_write(data, data_size_bytes);
-	LPUART1_exit_error(LBUS_ERROR_BASE_LPUART);
+	LPUART1_exit_error(LBUS_ERROR_BASE_LPUART1);
 errors:
 	// Reset RX byte for next reception.
 	lbus_ctx.rx_byte_count = 0;
