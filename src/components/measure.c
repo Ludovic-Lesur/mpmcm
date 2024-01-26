@@ -659,6 +659,9 @@ MEASURE_status_t MEASURE_init(void) {
 	// Local variables.
 	MEASURE_status_t status = MEASURE_SUCCESS;
 	POWER_status_t power_status = POWER_SUCCESS;
+	TIM_status_t tim2_status = TIM_SUCCESS;
+	TIM_status_t tim6_status = TIM_SUCCESS;
+	LED_status_t led_status = LED_SUCCESS;
 	uint8_t chx_idx = 0;
 	// Init context.
 	measure_ctx.state = MEASURE_STATE_STOPPED;
@@ -676,14 +679,17 @@ MEASURE_status_t MEASURE_init(void) {
 	power_status = POWER_enable(POWER_DOMAIN_ANALOG, LPTIM_DELAY_MODE_ACTIVE);
 	POWER_exit_error(MEASURE_ERROR_BASE_POWER);
 	// Init RGB LED.
-	LED_init();
+	led_status = LED_init();
+	LED_exit_error(MEASURE_ERROR_BASE_LED);
 	// Init zero cross pulse GPIO.
 	GPIO_configure(&GPIO_ZERO_CROSS_PULSE, GPIO_MODE_INPUT, GPIO_TYPE_PUSH_PULL, GPIO_SPEED_LOW, GPIO_PULL_NONE);
 	EXTI_configure_gpio(&GPIO_ZERO_CROSS_PULSE, EXTI_TRIGGER_RISING_EDGE, &_MEASURE_increment_zero_cross_count);
 	NVIC_enable_interrupt(NVIC_INTERRUPT_EXTI2, NVIC_PRIORITY_EXTI2);
 	// Init frequency measurement timer and ADC timer.
-	TIM2_init(MEASURE_ACV_FREQUENCY_SAMPLING_HZ);
-	TIM6_init();
+	tim2_status = TIM2_init(MEASURE_ACV_FREQUENCY_SAMPLING_HZ);
+	TIM2_exit_error(MEASURE_ERROR_BASE_TIM2);
+	tim6_status = TIM6_init();
+	TIM6_exit_error(MEASURE_ERROR_BASE_TIM6);
 	// Init ADC DMA.
 	DMA1_adcx_init(&_MEASURE_set_dma_transfer_end_flag);
 	DMA1_adcx_set_destination_address((uint32_t) &(measure_sampling.acv[measure_sampling.acv_write_idx].data), (uint32_t) &(measure_sampling.aci[measure_sampling.aci_write_idx].data), MEASURE_PERIOD_ADCX_DMA_BUFFER_SIZE);

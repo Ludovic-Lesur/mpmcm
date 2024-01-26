@@ -8,9 +8,25 @@
 #ifndef __TIM_H__
 #define __TIM_H__
 
+#include "rcc.h"
 #include "types.h"
 
 /*** TIM structures ***/
+
+/*!******************************************************************
+ * \enum TIM_status_t
+ * \brief TIM driver error codes.
+ *******************************************************************/
+typedef enum {
+	// Driver errors.
+	TIM_SUCCESS = 0,
+	TIM_ERROR_NULL_PARAMETER,
+	TIM_ERROR_CAPTURE_TIMEOUT,
+	// Low level drivers errors.
+	TIM_ERROR_BASE_RCC = 0x0100,
+	// Last base value.
+	TIM_ERROR_BASE_LAST = (TIM_ERROR_BASE_RCC + RCC_ERROR_BASE_LAST)
+} TIM_status_t;
 
 /*!******************************************************************
  * \enum TIM4_channel_t
@@ -44,9 +60,9 @@ typedef enum {
  * \brief Init TIM2 peripheral for mains voltage frequency measurement.
  * \param[in]  	sampling_frequency_hz: Input capture sampling frequency in Hz.
  * \param[out] 	none
- * \retval		none
+ * \retval		Function execution status.
  *******************************************************************/
-void TIM2_init(uint32_t sampling_frequency_hz);
+TIM_status_t TIM2_init(uint32_t sampling_frequency_hz);
 
 /*!******************************************************************
  * \fn void TIM2_start(void)
@@ -71,9 +87,9 @@ void TIM2_stop(void);
  * \brief Init TIM4 peripheral for RGB LED blinking operation.
  * \param[in]  	none
  * \param[out] 	none
- * \retval		none
+ * \retval		Function execution status.
  *******************************************************************/
-void TIM4_init(void);
+TIM_status_t TIM4_init(void);
 
 /*!******************************************************************
  * \fn void TIM4_single_pulse(uint32_t pulse_duration_ms, TIM4_channel_mask_t led_color)
@@ -90,9 +106,9 @@ void TIM4_single_pulse(uint32_t pulse_duration_ms, TIM4_channel_mask_t led_color
  * \brief Init TIM6 peripheral for ADC trigger operation.
  * \param[in]  	none
  * \param[out] 	none
- * \retval		none
+ * \retval		Function execution status.
  *******************************************************************/
-void TIM6_init(void);
+TIM_status_t TIM6_init(void);
 
 /*!******************************************************************
  * \fn void TIM6_start(void)
@@ -111,5 +127,69 @@ void TIM6_start(void);
  * \retval		none
  *******************************************************************/
 void TIM6_stop(void);
+
+/*!******************************************************************
+ * \fn void TIM17_init(void)
+ * \brief Init TIM17 peripheral for internal oscillators frequency measurement.
+ * \param[in]  	none
+ * \param[out] 	none
+ * \retval		none
+ *******************************************************************/
+void TIM17_init(void);
+
+/*!******************************************************************
+ * \fn void TIM17_de_init(void)
+ * \brief Release TIM17 peripheral.
+ * \param[in]  	none
+ * \param[out] 	none
+ * \retval		none
+ *******************************************************************/
+void TIM17_de_init(void);
+
+/*!******************************************************************
+ * \fn TIM_status_t TIM17_mco_capture(uint16_t* ref_clock_pulse_count, uint16_t* mco_pulse_count)
+ * \brief Perform MCO clock capture.
+ * \param[in]  	none
+ * \param[out] 	ref_clock_pulse_count: Pointer to the number of pulses of the timer reference clock during the capture.
+ * \param[out]	mco_pulse_count: Pointer to the number of pulses of the MCO clock during the capture.
+ * \retval		Function execution status.
+ *******************************************************************/
+TIM_status_t TIM17_mco_capture(uint16_t* ref_clock_pulse_count, uint16_t* mco_pulse_count);
+
+/*******************************************************************/
+#define TIM2_exit_error(error_base) { if (tim2_status != TIM_SUCCESS) { status = (error_base + tim2_status); goto errors; } }
+
+/*******************************************************************/
+#define TIM2_stack_error(void) { if (tim2_status != TIM_SUCCESS) { ERROR_stack_add(ERROR_BASE_TIM2 + tim2_status); } }
+
+/*******************************************************************/
+#define TIM2_stack_exit_error(error_code) { if (tim2_status != TIM_SUCCESS) { ERROR_stack_add(ERROR_BASE_TIM2 + tim2_status); status = error_code; goto errors; } }
+
+/*******************************************************************/
+#define TIM4_exit_error(error_base) { if (tim4_status != TIM_SUCCESS) { status = (error_base + tim4_status); goto errors; } }
+
+/*******************************************************************/
+#define TIM4_stack_error(void) { if (tim4_status != TIM_SUCCESS) { ERROR_stack_add(ERROR_BASE_TIM4 + tim4_status); } }
+
+/*******************************************************************/
+#define TIM4_stack_exit_error(error_code) { if (tim4_status != TIM_SUCCESS) { ERROR_stack_add(ERROR_BASE_TIM4 + tim4_status); status = error_code; goto errors; } }
+
+/*******************************************************************/
+#define TIM6_exit_error(error_base) { if (tim6_status != TIM_SUCCESS) { status = (error_base + tim6_status); goto errors; } }
+
+/*******************************************************************/
+#define TIM6_stack_error(void) { if (tim6_status != TIM_SUCCESS) { ERROR_stack_add(ERROR_BASE_TIM6 + tim6_status); } }
+
+/*******************************************************************/
+#define TIM6_stack_exit_error(error_code) { if (tim6_status != TIM_SUCCESS) { ERROR_stack_add(ERROR_BASE_TIM6 + tim6_status); status = error_code; goto errors; } }
+
+/*******************************************************************/
+#define TIM17_exit_error(error_base) { if (tim17_status != TIM_SUCCESS) { status = (error_base + tim17_status); goto errors; } }
+
+/*******************************************************************/
+#define TIM17_stack_error(void) { if (tim17_status != TIM_SUCCESS) { ERROR_stack_add(ERROR_BASE_TIM17 + tim17_status); } }
+
+/*******************************************************************/
+#define TIM17_stack_exit_error(error_code) { if (tim17_status != TIM_SUCCESS) { ERROR_stack_add(ERROR_BASE_TIM17 + tim17_status); status = error_code; goto errors; } }
 
 #endif /* __TIM_H__ */

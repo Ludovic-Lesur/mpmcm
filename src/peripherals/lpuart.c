@@ -80,16 +80,25 @@ errors:
 /*** LPUART functions ***/
 
 /*******************************************************************/
-void LPUART1_init(NODE_address_t self_address, LPUART_rx_irq_cb_t irq_callback) {
+LPUART_status_t LPUART1_init(NODE_address_t self_address, LPUART_rx_irq_cb_t irq_callback) {
 	// Local variables.
-	uint32_t brr = 0;
+	LPUART_status_t status = LPUART_SUCCESS;
+	RCC_status_t rcc_status = RCC_SUCCESS;
+	RCC_clock_t lpuart_clock = RCC_CLOCK_LSE;
+	uint32_t lpuart_clock_hz = 0;
+	uint64_t brr = 0;
 #ifdef HIGH_SPEED_LOG
 	// Select SYSCLK as clock source.
 	RCC -> CCIPR |= (0b01 << 10); // LPUART1SEL='01'.
+	lpuart_clock = RCC_CLOCK_SYSTEM;
 #else
 	// Select LSE as clock source.
 	RCC -> CCIPR |= (0b11 << 10); // LPUART1SEL='11'.
+	lpuart_clock = RCC_CLOCK_LSE;
 #endif
+	// Get clock source frequency.
+	rcc_status = RCC_get_frequency_hz(lpuart_clock, &lpuart_clock_hz);
+	RCC_exit_error(LPUART_ERROR_BASE_RCC);
 	// Enable peripheral clock.
 	RCC -> APB1ENR2 |= (0b1 << 0); // LPUARTEN='1'.
 	// Configure peripheral.
@@ -97,15 +106,13 @@ void LPUART1_init(NODE_address_t self_address, LPUART_rx_irq_cb_t irq_callback) 
 	LPUART1 -> CR2 |= (self_address << 24) | (0b1 << 4);
 	LPUART1 -> CR3 |= 0x00005000;
 	// Baud rate.
+	brr = ((uint64_t) lpuart_clock_hz) << 8;
+	brr /= (uint64_t) LPUART_BAUD_RATE;
 #ifdef HIGH_SPEED_LOG
 	LPUART1 -> PRESC |= 0b0110;
-	brr = ((RCC_SYSCLK_FREQUENCY_KHZ * 1000) / (12));
-	brr *= 256;
-#else
-	brr = (RCC_LSE_FREQUENCY_HZ * 256);
+	brr /= (uint64_t) 12;
 #endif
-	brr /= LPUART_BAUD_RATE;
-	LPUART1 -> BRR = (brr & 0x000FFFFF); // BRR = (256*fCK)/(baud rate). See p.730 of RM0377 datasheet.
+	LPUART1 -> BRR = (uint32_t) (brr & 0x000FFFFF); // BRR = (256*fCK)/(baud rate). See p.730 of RM0377 datasheet.
 	// Configure interrupt.
 	EXTI_configure_line(EXTI_LINE_LPUART1, EXTI_TRIGGER_RISING_EDGE);
 	// Enable transmitter.
@@ -126,6 +133,8 @@ void LPUART1_init(NODE_address_t self_address, LPUART_rx_irq_cb_t irq_callback) 
 #endif
 	// Register callback.
 	lpuart1_rx_irq_callback = irq_callback;
+errors:
+	return status;
 }
 
 /*******************************************************************/

@@ -9,6 +9,7 @@
 #define __LPUART_H__
 
 #include "node_common.h"
+#include "rcc.h"
 #include "types.h"
 
 /*** LPUART structures ***/
@@ -23,8 +24,10 @@ typedef enum {
 	LPUART_ERROR_NULL_PARAMETER,
 	LPUART_ERROR_TX_TIMEOUT,
 	LPUART_ERROR_TC_TIMEOUT,
+	// Low level drivers errors.
+	LPUART_ERROR_BASE_RCC = 0x0100,
 	// Last base value.
-	LPUART_ERROR_BASE_LAST = 0x0100
+	LPUART_ERROR_BASE_LAST = (LPUART_ERROR_BASE_RCC + RCC_ERROR_BASE_LAST)
 } LPUART_status_t;
 
 /*!******************************************************************
@@ -41,9 +44,9 @@ typedef void (*LPUART_rx_irq_cb_t)(uint8_t data);
  * \param[in]  	self_address: RS485 address of the node.
  * \param[in]  	irq_callback: Function to call on RX interrupt.
  * \param[out] 	none
- * \retval		none
+ * \retval		Function execution status.
  *******************************************************************/
-void LPUART1_init(NODE_address_t self_address, LPUART_rx_irq_cb_t irq_callback);
+LPUART_status_t LPUART1_init(NODE_address_t self_address, LPUART_rx_irq_cb_t irq_callback);
 
 /*!******************************************************************
  * \fn void LPUART1_enable_rx(void)

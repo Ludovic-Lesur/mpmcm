@@ -28,9 +28,14 @@ static void _LED_off(void) {
 /*** LED functions ***/
 
 /*******************************************************************/
-void LED_init(void) {
+LED_status_t LED_init(void) {
+	// Local variables.
+	LED_status_t status = LED_SUCCESS;
+	TIM_status_t tim4_status = TIM_SUCCESS;
 	// Init timer.
-	TIM4_init();
+	tim4_status = TIM4_init();
+	TIM4_exit_error(LED_ERROR_BASE_TIM4);
+errors:
 	// Turn LED off.
 	_LED_off();
 }

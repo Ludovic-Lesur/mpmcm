@@ -53,6 +53,9 @@ static void _MPMCM_init_hw(void) {
 	IWDG_stack_error();
 	IWDG_reload();
 #endif
+	// Calibrate clocks.
+	rcc_status = RCC_calibrate();
+	RCC_stack_error();
 	// High speed oscillator.
 	rcc_status = RCC_switch_to_pll();
 	RCC_stack_error();
