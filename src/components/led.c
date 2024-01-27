@@ -38,6 +38,7 @@ LED_status_t LED_init(void) {
 errors:
 	// Turn LED off.
 	_LED_off();
+	return status;
 }
 
 /*******************************************************************/
