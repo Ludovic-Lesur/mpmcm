@@ -47,7 +47,7 @@ typedef enum {
 /*** LED functions ***/
 
 /*!******************************************************************
- * \fn void LED_init(void)
+ * \fn LED_status_t LED_init(void)
  * \brief Init LED driver.
  * \param[in]  	none
  * \param[out] 	none

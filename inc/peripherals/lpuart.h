@@ -39,7 +39,7 @@ typedef void (*LPUART_rx_irq_cb_t)(uint8_t data);
 /*** LPUART functions ***/
 
 /*!******************************************************************
- * \fn void LPUART1_init(NODE_address_t self_address, LPUART_rx_irq_cb_t irq_callback)
+ * \fn LPUART_status_t LPUART1_init(NODE_address_t self_address, LPUART_rx_irq_cb_t irq_callback)
  * \brief Init LPUART1 peripheral.
  * \param[in]  	self_address: RS485 address of the node.
  * \param[in]  	irq_callback: Function to call on RX interrupt.

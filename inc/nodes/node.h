@@ -52,7 +52,7 @@ typedef enum {
 /*** NODE functions ***/
 
 /*!******************************************************************
- * \fn void NODE_init(void)
+ * \fn void NODE_init(NODE_address_t self_address)
  * \brief Init node registers to their default value.
  * \param[in]  	self_address: RS485 address of the node.
  * \param[out] 	none

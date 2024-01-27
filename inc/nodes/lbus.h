@@ -42,7 +42,7 @@ typedef void (*LBUS_rx_irq_cb)(uint8_t data);
 /*** LBUS functions ***/
 
 /*!******************************************************************
- * \fn LBUS_status_t LBUS_init(NODE_address_t self_address)
+ * \fn LBUS_status_t LBUS_init(NODE_address_t self_address, LBUS_rx_irq_cb irq_callback)
  * \brief Init LBUS interface.
  * \param[in]  	self_address: RS485 address of the node.
  * \param[in]  	irq_callback: Function to call on frame reception interrupt.

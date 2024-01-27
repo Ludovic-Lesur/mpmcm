@@ -21,7 +21,7 @@ typedef void (*DMA_transfer_complete_irq_cb_t)(void);
 /*** DMA functions ***/
 
 /*!******************************************************************
- * \fn void DMA1_adcx_init(void)
+ * \fn void DMA1_adcx_init(DMA_transfer_complete_irq_cb_t irq_callback)
  * \brief Init DMA1 for ADC samples transfer.
  * \param[in]  	irq_callback: Function to call on transfer complete interrupt.
  * \param[out] 	none

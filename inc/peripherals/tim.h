@@ -56,7 +56,7 @@ typedef enum {
 /*** TIM functions ***/
 
 /*!******************************************************************
- * \fn void TIM2_init(void)
+ * \fn TIM_status_t TIM2_init(uint32_t sampling_frequency_hz)
  * \brief Init TIM2 peripheral for mains voltage frequency measurement.
  * \param[in]  	sampling_frequency_hz: Input capture sampling frequency in Hz.
  * \param[out] 	none
@@ -83,7 +83,7 @@ void TIM2_start(void);
 void TIM2_stop(void);
 
 /*!******************************************************************
- * \fn void TIM4_init(void)
+ * \fn TIM_status_t TIM4_init(void)
  * \brief Init TIM4 peripheral for RGB LED blinking operation.
  * \param[in]  	none
  * \param[out] 	none
@@ -102,7 +102,7 @@ TIM_status_t TIM4_init(void);
 void TIM4_single_pulse(uint32_t pulse_duration_ms, TIM4_channel_mask_t led_color);
 
 /*!******************************************************************
- * \fn void TIM6_init(void)
+ * \fn TIM_status_t TIM6_init(void)
  * \brief Init TIM6 peripheral for ADC trigger operation.
  * \param[in]  	none
  * \param[out] 	none
