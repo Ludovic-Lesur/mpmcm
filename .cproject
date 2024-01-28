@@ -54,6 +54,7 @@
 									<listOptionValue builtIn="false" value="HW1_0"/>
 									<listOptionValue builtIn="false" value="__GNUC_PYTHON__"/>
 									<listOptionValue builtIn="false" value="ARM_MATH_DSP"/>
+									<listOptionValue builtIn="false" value="MPMCM"/>
 								</option>
 								<option IS_BUILTIN_EMPTY="false" IS_VALUE_EMPTY="false" id="ilg.gnuarmeclipse.managedbuild.cross.option.assembler.include.paths.953551726" name="Include paths (-I)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.assembler.include.paths" useByScannerDiscovery="true" valueType="includePath">
 									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/inc&quot;"/>
@@ -77,6 +78,7 @@
 									<listOptionValue builtIn="false" value="HW1_0"/>
 									<listOptionValue builtIn="false" value="__GNUC_PYTHON__"/>
 									<listOptionValue builtIn="false" value="ARM_MATH_DSP"/>
+									<listOptionValue builtIn="false" value="MPMCM"/>
 								</option>
 								<option IS_BUILTIN_EMPTY="false" IS_VALUE_EMPTY="false" id="ilg.gnuarmeclipse.managedbuild.cross.option.c.compiler.include.paths.954853377" name="Include paths (-I)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.c.compiler.include.paths" useByScannerDiscovery="true" valueType="includePath">
 									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/inc&quot;"/>

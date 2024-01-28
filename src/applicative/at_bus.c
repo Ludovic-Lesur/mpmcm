@@ -9,6 +9,7 @@
 
 #include "common_reg.h"
 #include "dinfox.h"
+#include "flash.h"
 #include "error.h"
 #include "lbus.h"
 #include "measure.h"
@@ -30,6 +31,9 @@
 #define AT_BUS_STRING_VALUE_BUFFER_SIZE		16
 #define AT_BUS_FRAME_END					STRING_CHAR_CR
 #define AT_BUS_REPLY_TAB					"     "
+#ifdef ATM
+#define AT_BUS_COMMAND_NVM
+#endif
 
 /*** AT callbacks declaration ***/
 
@@ -43,6 +47,12 @@ static void _AT_BUS_print_ok(void);
 static void _AT_BUS_print_command_list(void);
 static void _AT_BUS_print_sw_version(void);
 static void _AT_BUS_print_error_stack(void);
+#endif
+
+#if (defined ATM) && (defined AT_BUS_COMMAND_NVM)
+/*******************************************************************/
+static void _AT_BUS_nvm_read_callback(void);
+static void _AT_BUS_nvm_write_callback(void);
 #endif
 
 /*** AT local structures ***/
@@ -79,6 +89,10 @@ static const AT_BUS_command_t AT_BUS_COMMAND_LIST[] = {
 	{PARSER_MODE_COMMAND, "AT$V?", STRING_NULL, "Get SW version", _AT_BUS_print_sw_version},
 	{PARSER_MODE_COMMAND, "AT$ERROR?", STRING_NULL, "Read error stack", _AT_BUS_print_error_stack},
 	{PARSER_MODE_COMMAND, "AT$RST", STRING_NULL, "Reset MCU", PWR_software_reset},
+#endif
+#if (defined ATM) && (defined AT_BUS_COMMAND_NVM)
+	{PARSER_MODE_HEADER,  "AT$NVMR=", "address[hex]", "Read FLASH byte", _AT_BUS_nvm_read_callback},
+	{PARSER_MODE_HEADER,  "AT$NVMW=", "address[hex],value[hex]", "Write FLASH byte", _AT_BUS_nvm_write_callback},
 #endif
 };
 static AT_BUS_context_t at_bus_ctx;
@@ -322,6 +336,58 @@ static void _AT_BUS_print_error_stack(void) {
 }
 #endif
 
+#if (defined ATM) && (defined AT_BUS_COMMAND_NVM)
+//*******************************************************************/
+static void _AT_BUS_nvm_read_callback(void) {
+	// Local variables.
+	ERROR_code_t status = SUCCESS;
+	PARSER_status_t parser_status = PARSER_ERROR_UNKNOWN_COMMAND;
+	FLASH_status_t flash_status = FLASH_SUCCESS;
+	uint32_t address = 0;
+	uint32_t nvm_data = 0;
+	// Read address parameter.
+	parser_status = DINFOX_parse_register(&at_bus_ctx.parser, STRING_CHAR_NULL, &address);
+	PARSER_stack_exit_error(ERROR_BASE_PARSER + parser_status);
+	// Read byte at requested address.
+	flash_status = FLASH_read_word((FLASH_address_t) address, &nvm_data);
+	FLASH_stack_exit_error(ERROR_BASE_FLASH + flash_status);
+	// Print data.
+	_AT_BUS_reply_add_register(nvm_data);
+	_AT_BUS_reply_send();
+	_AT_BUS_print_ok();
+	return;
+errors:
+	_AT_BUS_print_error(status);
+	return;
+}
+#endif
+
+#if (defined ATM) && (defined AT_BUS_COMMAND_NVM)
+/*******************************************************************/
+static void _AT_BUS_nvm_write_callback(void) {
+	// Local variables.
+	ERROR_code_t status = SUCCESS;
+	PARSER_status_t parser_status = PARSER_ERROR_UNKNOWN_COMMAND;
+	FLASH_status_t flash_status = FLASH_SUCCESS;
+	uint32_t address = 0;
+	uint32_t value = 0;
+	// Read address parameters.
+	parser_status = DINFOX_parse_register(&at_bus_ctx.parser, AT_BUS_CHAR_SEPARATOR, &address);
+	PARSER_stack_exit_error(ERROR_BASE_PARSER + parser_status);
+	// Read value.
+	parser_status = DINFOX_parse_register(&at_bus_ctx.parser, STRING_CHAR_NULL, &value);
+	PARSER_stack_exit_error(ERROR_BASE_PARSER + parser_status);
+	// Read byte at requested address.
+	flash_status = FLASH_write_word((FLASH_address_t) address, value);
+	FLASH_stack_exit_error(ERROR_BASE_FLASH + flash_status);
+	_AT_BUS_print_ok();
+	return;
+errors:
+	_AT_BUS_print_error(status);
+	return;
+}
+#endif
+
 /*******************************************************************/
 static void _AT_BUS_reset_parser(void) {
 	// Flush buffers.
@@ -367,12 +433,17 @@ errors:
 /*******************************************************************/
 void AT_BUS_init(void) {
 	// Local variables.
+	FLASH_status_t flash_status = FLASH_SUCCESS;
 	LBUS_status_t lbus_status = LBUS_SUCCESS;
+	uint32_t self_address = 0;
+	// Read self address in NVM.
+	flash_status = FLASH_read_word(FLASH_ADDRESS_SELF_ADDRESS, &self_address);
+	FLASH_stack_error();
 	// Init LBUS layer.
-	lbus_status = LBUS_init(DINFOX_NODE_ADDRESS_MPMCM_START, &_AT_BUS_fill_rx_buffer);
+	lbus_status = LBUS_init((NODE_address_t) self_address, &_AT_BUS_fill_rx_buffer);
 	LBUS_stack_error();
 	// Init registers.
-	NODE_init(DINFOX_NODE_ADDRESS_MPMCM_START);
+	NODE_init((NODE_address_t) self_address);
 	// Init context.
 	_AT_BUS_reset_parser();
 	// Enable receiver.
