@@ -29,7 +29,8 @@
 #define MEASURE_ZERO_CROSS_PER_PERIOD					2
 #define MEASURE_ZERO_CROSS_START_THRESHOLD				((1000000 * MEASURE_ZERO_CROSS_PER_PERIOD) / (MEASURE_MAINS_PERIOD_US)) // Wait for 1 second of mains voltage presence.
 
-#define MEASURE_TRANSFORMER_GAIN_FACTOR					10	// For (10 * mV/mV) input unit.
+#define MEASURE_TRANSFORMER_GAIN_FACTOR					10	// For (10 * V/V) input unit.
+#define MEASURE_CURRENT_SENSOR_GAIN_FACTOR				10	// For (10 * A/V) input unit.
 
 // Note: this factor is used to add a margin to the buffer length (more than 1 mains periods long).
 // Buffer switch then is triggered by zero cross detection instead of a fixed number of samples.
@@ -248,31 +249,6 @@ static volatile MEASURE_context_t measure_ctx;
 	temp_s64 = ((int64_t) source.result.rolling_mean * (int64_t) source.result.number_of_samples) + (int64_t) new_sample; \
 	source.result.rolling_mean = (int32_t) ((temp_s64) / ((int64_t) (source.result.number_of_samples + 1))); \
 	source.result.number_of_samples++; \
-}
-
-/*******************************************************************/
-static void _MEASURE_compute_factors(void) {
-	// Local variables.
-	uint8_t chx_idx = 0;
-	// ACV.
-	measure_data.acv_factor_num = ((int64_t) MPMCM_TRANSFORMER_GAIN * (int64_t) MPMCM_TRANSFORMER_ATTEN * (int64_t) ADC_VREF_MV);
-	measure_data.acv_factor_den = ((int64_t) MEASURE_TRANSFORMER_GAIN_FACTOR * (int64_t) ADC_FULL_SCALE);
-	// ACI.
-	for (chx_idx=0 ; chx_idx<ADC_NUMBER_OF_ACI_CHANNELS ; chx_idx++) {
-		measure_data.aci_factor_num[chx_idx] = ((int64_t) MPMCM_SCT013_GAIN[chx_idx] * (int64_t) MPMCM_SCT013_ATTEN[chx_idx] * (int64_t) ADC_VREF_MV);
-	}
-	measure_data.aci_factor_den = (int64_t) ADC_FULL_SCALE;
-	// ACP.
-	for (chx_idx=0 ; chx_idx<ADC_NUMBER_OF_ACI_CHANNELS ; chx_idx++) {
-		// Note: 1000 factor is used to get mW from mV and mA.
-		// Conversion is done here to limit numerator value and avoid overflow during power computation.
-		// There is no precision loss since ACV and ACI factors multiplication is necessarily a multiple of 1000 thanks to ADC_VREF_MV.
-		measure_data.acp_factor_num[chx_idx] = (measure_data.acv_factor_num * measure_data.aci_factor_num[chx_idx]) / ((int64_t) 1000);
-	}
-	measure_data.acp_factor_den = (measure_data.acv_factor_den * measure_data.aci_factor_den);
-	// Buffer size limits.
-	measure_data.period_acxx_buffer_size_low_limit =  ((100 - MEASURE_PERIOD_ADCX_BUFFER_SIZE_ERROR_PERCENT) * MEASURE_PERIOD_BUFFER_SIZE) / (100);
-	measure_data.period_acxx_buffer_size_high_limit = ((100 + MEASURE_PERIOD_ADCX_BUFFER_SIZE_ERROR_PERCENT) * MEASURE_PERIOD_BUFFER_SIZE) / (100);
 }
 
 /*******************************************************************/
@@ -697,8 +673,40 @@ MEASURE_status_t MEASURE_init(void) {
 	DMA1_tim2_init();
 	DMA1_tim2_set_destination_address((uint32_t) &(measure_sampling.tim2_ccr1), MEASURE_PERIOD_TIM2_DMA_BUFFER_SIZE);
 errors:
-	_MEASURE_compute_factors();
 	_MEASURE_reset();
+	return status;
+}
+
+/*******************************************************************/
+MEASURE_status_t MEASURE_set_gains(uint16_t transformer_gain, uint16_t current_sensors_gain[ADC_NUMBER_OF_ACI_CHANNELS]) {
+	// Local variables.
+	MEASURE_status_t status = MEASURE_SUCCESS;
+	uint8_t chx_idx = 0;
+	// Check parameters.
+	if (current_sensors_gain == NULL) {
+		status = MEASURE_ERROR_NULL_PARAMETER;
+		goto errors;
+	}
+	// ACV.
+	measure_data.acv_factor_num = ((int64_t) transformer_gain * (int64_t) MPMCM_TRANSFORMER_ATTEN * (int64_t) ADC_VREF_MV);
+	measure_data.acv_factor_den = ((int64_t) MEASURE_TRANSFORMER_GAIN_FACTOR * (int64_t) ADC_FULL_SCALE);
+	// ACI.
+	for (chx_idx=0 ; chx_idx<ADC_NUMBER_OF_ACI_CHANNELS ; chx_idx++) {
+		measure_data.aci_factor_num[chx_idx] = ((int64_t) current_sensors_gain[chx_idx] * (int64_t) MPMCM_SCT013_ATTEN[chx_idx] * (int64_t) ADC_VREF_MV);
+	}
+	measure_data.aci_factor_den = ((int64_t) MEASURE_CURRENT_SENSOR_GAIN_FACTOR * (int64_t) ADC_FULL_SCALE);
+	// ACP.
+	for (chx_idx=0 ; chx_idx<ADC_NUMBER_OF_ACI_CHANNELS ; chx_idx++) {
+		// Note: 1000 factor is used to get mW from mV and mA.
+		// Conversion is done here to limit numerator value and avoid overflow during power computation.
+		// There is no precision loss since ACV and ACI factors multiplication is necessarily a multiple of 1000 thanks to ADC_VREF_MV.
+		measure_data.acp_factor_num[chx_idx] = (measure_data.acv_factor_num * measure_data.aci_factor_num[chx_idx]) / ((int64_t) 1000);
+	}
+	measure_data.acp_factor_den = (measure_data.acv_factor_den * measure_data.aci_factor_den);
+	// Buffer size limits.
+	measure_data.period_acxx_buffer_size_low_limit =  ((100 - MEASURE_PERIOD_ADCX_BUFFER_SIZE_ERROR_PERCENT) * MEASURE_PERIOD_BUFFER_SIZE) / (100);
+	measure_data.period_acxx_buffer_size_high_limit = ((100 + MEASURE_PERIOD_ADCX_BUFFER_SIZE_ERROR_PERCENT) * MEASURE_PERIOD_BUFFER_SIZE) / (100);
+errors:
 	return status;
 }
 

@@ -15,29 +15,74 @@
 #include "mpmcm_reg.h"
 #include "node.h"
 
+/*** MPMCM local functions ***/
+
+/*******************************************************************/
+static void _MPMCM_load_fixed_configuration(void) {
+	// Local variables.
+	uint32_t reg_value = 0;
+	uint32_t reg_mask = 0;
+	// Transformer attenuation ratio.
+	DINFOX_write_field(&reg_value, &reg_mask, (uint32_t) MPMCM_TRANSFORMER_ATTEN, MPMCM_REG_CONFIGURATION_0_MASK_TRANSFORMER_ATTEN);
+	NODE_write_register(NODE_REQUEST_SOURCE_INTERNAL, MPMCM_REG_ADDR_CONFIGURATION_0, reg_mask, reg_value);
+	// Current sensors attenuation ratio.
+	reg_value = 0;
+	reg_mask = 0;
+	DINFOX_write_field(&reg_value, &reg_mask, (uint32_t) MPMCM_SCT013_ATTEN[0], MPMCM_REG_CONFIGURATION_1_MASK_CH1_CURRENT_SENSOR_ATTEN);
+	DINFOX_write_field(&reg_value, &reg_mask, (uint32_t) MPMCM_SCT013_ATTEN[1], MPMCM_REG_CONFIGURATION_1_MASK_CH2_CURRENT_SENSOR_ATTEN);
+	DINFOX_write_field(&reg_value, &reg_mask, (uint32_t) MPMCM_SCT013_ATTEN[2], MPMCM_REG_CONFIGURATION_1_MASK_CH3_CURRENT_SENSOR_ATTEN);
+	DINFOX_write_field(&reg_value, &reg_mask, (uint32_t) MPMCM_SCT013_ATTEN[3], MPMCM_REG_CONFIGURATION_1_MASK_CH4_CURRENT_SENSOR_ATTEN);
+	NODE_write_register(NODE_REQUEST_SOURCE_INTERNAL, MPMCM_REG_ADDR_CONFIGURATION_1, reg_mask, reg_value);
+}
+
+/*******************************************************************/
+static void _MPMCM_load_dynamic_configuration(void) {
+	// Local variables.
+	uint8_t reg_addr = 0;
+	uint32_t reg_value = 0;
+	// Load configuration registers from NVM.
+	for (reg_addr=MPMCM_REG_ADDR_CONFIGURATION_2 ; reg_addr<MPMCM_REG_ADDR_STATUS_1 ; reg_addr++) {
+		// Read NVM.
+		reg_value = DINFOX_read_nvm_register(reg_addr);
+		// Write register.
+		NODE_write_register(NODE_REQUEST_SOURCE_INTERNAL, reg_addr, DINFOX_REG_MASK_ALL, reg_value);
+	}
+}
+
+/*******************************************************************/
+static void _MPMCM_set_gains(void) {
+	// Local variables.
+	MEASURE_status_t measure_status = MEASURE_SUCCESS;
+	uint32_t reg_config_2 = 0;
+	uint32_t reg_config_3 = 0;
+	uint32_t reg_config_4 = 0;
+	uint16_t transformer_gain = 0;
+	uint16_t current_sensors_gain[ADC_NUMBER_OF_ACI_CHANNELS];
+	// Read registers.
+	NODE_read_register(NODE_REQUEST_SOURCE_INTERNAL, MPMCM_REG_ADDR_CONFIGURATION_2, &reg_config_2);
+	NODE_read_register(NODE_REQUEST_SOURCE_INTERNAL, MPMCM_REG_ADDR_CONFIGURATION_3, &reg_config_3);
+	NODE_read_register(NODE_REQUEST_SOURCE_INTERNAL, MPMCM_REG_ADDR_CONFIGURATION_4, &reg_config_4);
+	// Compute gains.
+	transformer_gain = DINFOX_read_field(reg_config_2, MPMCM_REG_CONFIGURATION_2_MASK_TRANSFORMER_GAIN);
+	current_sensors_gain[0] = DINFOX_read_field(reg_config_3, MPMCM_REG_CONFIGURATION_3_MASK_CH1_CURRENT_SENSOR_GAIN);
+	current_sensors_gain[1] = DINFOX_read_field(reg_config_3, MPMCM_REG_CONFIGURATION_3_MASK_CH2_CURRENT_SENSOR_GAIN);
+	current_sensors_gain[2] = DINFOX_read_field(reg_config_4, MPMCM_REG_CONFIGURATION_4_MASK_CH3_CURRENT_SENSOR_GAIN);
+	current_sensors_gain[3] = DINFOX_read_field(reg_config_4, MPMCM_REG_CONFIGURATION_4_MASK_CH4_CURRENT_SENSOR_GAIN);
+	// Set gains.
+	measure_status = MEASURE_set_gains(transformer_gain, current_sensors_gain);
+	MEASURE_stack_error();
+}
+
 /*** MPMCM functions ***/
 
 /*******************************************************************/
 void MPMCM_init_registers(void) {
-	// Local variables.
-	uint8_t reg_addr = 0;
 	// Read init state.
-	MPMCM_update_register(MPMCM_REG_ADDR_CONFIGURATION_0);
-	MPMCM_update_register(MPMCM_REG_ADDR_CH1_CONFIGURATION_0);
-	MPMCM_update_register(MPMCM_REG_ADDR_CH2_CONFIGURATION_0);
-	MPMCM_update_register(MPMCM_REG_ADDR_CH3_CONFIGURATION_0);
-	MPMCM_update_register(MPMCM_REG_ADDR_CH4_CONFIGURATION_0);
 	MPMCM_update_register(MPMCM_REG_ADDR_STATUS_1);
 	// Load default values.
-	NODE_write_register(NODE_REQUEST_SOURCE_INTERNAL, MPMCM_REG_ADDR_CONFIGURATION_1,     MPMCM_REG_CONFIGURATION_1_MASK_GAIN, (uint32_t) MPMCM_TRANSFORMER_GAIN);
-	NODE_write_register(NODE_REQUEST_SOURCE_INTERNAL, MPMCM_REG_ADDR_CH1_CONFIGURATION_1, MPMCM_REG_CONFIGURATION_1_MASK_GAIN, (uint32_t) MPMCM_SCT013_GAIN[0]);
-	NODE_write_register(NODE_REQUEST_SOURCE_INTERNAL, MPMCM_REG_ADDR_CH2_CONFIGURATION_1, MPMCM_REG_CONFIGURATION_1_MASK_GAIN, (uint32_t) MPMCM_SCT013_GAIN[1]);
-	NODE_write_register(NODE_REQUEST_SOURCE_INTERNAL, MPMCM_REG_ADDR_CH3_CONFIGURATION_1, MPMCM_REG_CONFIGURATION_1_MASK_GAIN, (uint32_t) MPMCM_SCT013_GAIN[2]);
-	NODE_write_register(NODE_REQUEST_SOURCE_INTERNAL, MPMCM_REG_ADDR_CH4_CONFIGURATION_1, MPMCM_REG_CONFIGURATION_1_MASK_GAIN, (uint32_t) MPMCM_SCT013_GAIN[3]);
-
-	for (reg_addr=MPMCM_REG_ADDR_CONTROL_1 ; reg_addr<MPMCM_REG_ADDR_LAST ; reg_addr++) {
-		NODE_write_register(NODE_REQUEST_SOURCE_INTERNAL, reg_addr, DINFOX_REG_MASK_ALL, 0);
-	}
+	_MPMCM_load_fixed_configuration();
+	_MPMCM_load_dynamic_configuration();
+	_MPMCM_set_gains();
 }
 
 /*******************************************************************/
@@ -51,26 +96,6 @@ NODE_status_t MPMCM_update_register(uint8_t reg_addr) {
 	uint8_t generic_u8 = 0;
 	// Check address.
 	switch (reg_addr) {
-	case MPMCM_REG_ADDR_CONFIGURATION_0:
-		// Transformer attenuation.
-		DINFOX_write_field(&reg_value, &reg_mask, (uint32_t) MPMCM_TRANSFORMER_ATTEN, MPMCM_REG_CONFIGURATION_0_MASK_ATTEN);
-		break;
-	case MPMCM_REG_ADDR_CH1_CONFIGURATION_0:
-		// SCT013 attenuation.
-		DINFOX_write_field(&reg_value, &reg_mask, (uint32_t) MPMCM_SCT013_ATTEN[0], MPMCM_REG_CONFIGURATION_0_MASK_ATTEN);
-		break;
-	case MPMCM_REG_ADDR_CH2_CONFIGURATION_0:
-		// SCT013 attenuation.
-		DINFOX_write_field(&reg_value, &reg_mask, (uint32_t) MPMCM_SCT013_ATTEN[1], MPMCM_REG_CONFIGURATION_0_MASK_ATTEN);
-		break;
-	case MPMCM_REG_ADDR_CH3_CONFIGURATION_0:
-		// SCT013 attenuation.
-		DINFOX_write_field(&reg_value, &reg_mask, (uint32_t) MPMCM_SCT013_ATTEN[2], MPMCM_REG_CONFIGURATION_0_MASK_ATTEN);
-		break;
-	case MPMCM_REG_ADDR_CH4_CONFIGURATION_0:
-		// SCT013 attenuation.
-		DINFOX_write_field(&reg_value, &reg_mask, (uint32_t) MPMCM_SCT013_ATTEN[3], MPMCM_REG_CONFIGURATION_0_MASK_ATTEN);
-		break;
 	case MPMCM_REG_ADDR_STATUS_1:
 		// Update probe detect flags.
 		for (channel_idx=0 ; channel_idx<ADC_NUMBER_OF_ACI_CHANNELS ; channel_idx++) {
@@ -115,6 +140,17 @@ NODE_status_t MPMCM_check_register(uint8_t reg_addr, uint32_t reg_mask) {
 	NODE_read_register(NODE_REQUEST_SOURCE_INTERNAL, reg_addr, &reg_value);
 	// Check address.
 	switch (reg_addr) {
+	case MPMCM_REG_ADDR_CONFIGURATION_2:
+	case MPMCM_REG_ADDR_CONFIGURATION_3:
+	case MPMCM_REG_ADDR_CONFIGURATION_4:
+		// Check mask.
+		if (reg_mask != 0) {
+			// Store new value in NVM.
+			DINFOX_write_nvm_register(reg_addr, reg_value);
+			// Update measurements gains.
+			_MPMCM_set_gains();
+		}
+		break;
 	case MPMCM_REG_ADDR_CONTROL_1:
 		// FRQS.
 		if ((reg_mask & MPMCM_REG_CONTROL_1_MASK_FRQS) != 0) {

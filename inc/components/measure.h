@@ -108,6 +108,16 @@ typedef struct {
 MEASURE_status_t MEASURE_init(void);
 
 /*!******************************************************************
+ * \fn void MEASURE_set_gains(uint16_t transformer_gain, uint16_t current_sensors_gain[ADC_NUMBER_OF_ACI_CHANNELS])
+ * \brief Set ACV and ACI measurements gains.
+ * \param[in]	transformer_gain: Transformer gain in (10 * V/V).
+ * \param[in] 	current_sensors_gain: Current sensors gain table in (10 * A/V).
+ * \param[out]	none
+ * \retval		Function execution status.
+ *******************************************************************/
+MEASURE_status_t MEASURE_set_gains(uint16_t transformer_gain, uint16_t current_sensors_gain[ADC_NUMBER_OF_ACI_CHANNELS]);
+
+/*!******************************************************************
  * \fn MEASURE_status_t MEASURE_tick_second(void)
  * \brief Function to call every second.
  * \param[in]  	none
