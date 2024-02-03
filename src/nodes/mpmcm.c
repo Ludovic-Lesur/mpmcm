@@ -77,6 +77,25 @@ static void _MPMCM_set_gains(void) {
 
 /*******************************************************************/
 void MPMCM_init_registers(void) {
+#ifdef NVM_FACTORY_RESET
+	// Local variables.
+	uint32_t reg_value = 0;
+	uint32_t reg_mask = 0;
+	// Transformer gain.
+	DINFOX_write_field(&reg_value, &reg_mask, (uint32_t) MPMCM_TRANSFORMER_GAIN, MPMCM_REG_CONFIGURATION_2_MASK_TRANSFORMER_GAIN);
+	NODE_write_register(NODE_REQUEST_SOURCE_EXTERNAL, MPMCM_REG_ADDR_CONFIGURATION_2, reg_mask, reg_value);
+	// Current sensors gain.
+	reg_value = 0;
+	reg_mask = 0;
+	DINFOX_write_field(&reg_value, &reg_mask, (uint32_t) MPMCM_SCT013_GAIN[0], MPMCM_REG_CONFIGURATION_3_MASK_CH1_CURRENT_SENSOR_GAIN);
+	DINFOX_write_field(&reg_value, &reg_mask, (uint32_t) MPMCM_SCT013_GAIN[1], MPMCM_REG_CONFIGURATION_3_MASK_CH2_CURRENT_SENSOR_GAIN);
+	NODE_write_register(NODE_REQUEST_SOURCE_EXTERNAL, MPMCM_REG_ADDR_CONFIGURATION_3, reg_mask, reg_value);
+	reg_value = 0;
+	reg_mask = 0;
+	DINFOX_write_field(&reg_value, &reg_mask, (uint32_t) MPMCM_SCT013_GAIN[2], MPMCM_REG_CONFIGURATION_4_MASK_CH3_CURRENT_SENSOR_GAIN);
+	DINFOX_write_field(&reg_value, &reg_mask, (uint32_t) MPMCM_SCT013_GAIN[3], MPMCM_REG_CONFIGURATION_4_MASK_CH4_CURRENT_SENSOR_GAIN);
+	NODE_write_register(NODE_REQUEST_SOURCE_EXTERNAL, MPMCM_REG_ADDR_CONFIGURATION_4, reg_mask, reg_value);
+#endif
 	// Read init state.
 	MPMCM_update_register(MPMCM_REG_ADDR_STATUS_1);
 	// Load default values.
