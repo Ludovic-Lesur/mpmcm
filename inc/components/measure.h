@@ -51,8 +51,8 @@ typedef enum {
 } MEASURE_data_type_t;
 
 /*!******************************************************************
- * \struct MEASURE_channel_data_t
- * \brief Single channel run data structure.
+ * \struct MEASURE_data_t
+ * \brief Single run data structure.
  *******************************************************************/
 typedef struct {
 	int32_t value;
@@ -148,7 +148,7 @@ MEASURE_status_t MEASURE_get_mains_detect_flag(uint8_t* mains_voltage_detected);
  * \fn MEASURE_status_t MEASURE_get_run_data(MEASURE_data_type_t data_type, MEASURE_data_t* run_data)
  * \brief Get run data.
  * \param[in]  	data_type: Data to read.
- * \param[out] 	data: Pointer to the run data.
+ * \param[out] 	run_data: Pointer to the run data.
  * \retval		Function execution status.
  *******************************************************************/
 MEASURE_status_t MEASURE_get_run_data(MEASURE_data_type_t data_type, MEASURE_data_t* run_data);
@@ -157,7 +157,7 @@ MEASURE_status_t MEASURE_get_run_data(MEASURE_data_type_t data_type, MEASURE_dat
  * \fn MEASURE_status_t MEASURE_get_accumulated_data(MEASURE_data_type_t data_type, MEASURE_accumulated_data_t* accumulated_data)
  * \brief Get accumulated data.
  * \param[in]  	data_type: Data to read.
- * \param[out] 	data: Pointer to the accumulated data.
+ * \param[out] 	accumulated_data: Pointer to the accumulated data.
  * \retval		Function execution status.
  *******************************************************************/
 MEASURE_status_t MEASURE_get_accumulated_data(MEASURE_data_type_t data_type, MEASURE_accumulated_data_t* accumulated_data);

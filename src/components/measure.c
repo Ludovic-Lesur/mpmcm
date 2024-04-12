@@ -292,7 +292,7 @@ static void _MEASURE_reset(void) {
 }
 
 /*******************************************************************/
-MEASURE_status_t _MEASURE_start_analog_transfer(void) {
+static MEASURE_status_t _MEASURE_start_analog_transfer(void) {
 	// Local variables.
 	MEASURE_status_t status = MEASURE_SUCCESS;
 	ADC_status_t adc_status = ADC_SUCCESS;
@@ -308,7 +308,7 @@ errors:
 }
 
 /*******************************************************************/
-MEASURE_status_t _MEASURE_stop_analog_transfer(void) {
+static MEASURE_status_t _MEASURE_stop_analog_transfer(void) {
 	// Local variables.
 	MEASURE_status_t status = MEASURE_SUCCESS;
 	ADC_status_t adc_status = ADC_SUCCESS;
@@ -324,7 +324,7 @@ errors:
 }
 
 /*******************************************************************/
-MEASURE_status_t _MEASURE_start(void) {
+static MEASURE_status_t _MEASURE_start(void) {
 	// Local variables.
 	MEASURE_status_t status = MEASURE_SUCCESS;
 	// Start frequency measurement timer.
@@ -338,7 +338,7 @@ MEASURE_status_t _MEASURE_start(void) {
 }
 
 /*******************************************************************/
-MEASURE_status_t _MEASURE_stop(void) {
+static MEASURE_status_t _MEASURE_stop(void) {
 	// Local variables.
 	MEASURE_status_t status = MEASURE_SUCCESS;
 	// Update flag.
@@ -634,6 +634,7 @@ static void _MEASURE_set_dma_transfer_end_flag(void) {
 MEASURE_status_t MEASURE_init(void) {
 	// Local variables.
 	MEASURE_status_t status = MEASURE_SUCCESS;
+	ADC_status_t adc_status = ADC_SUCCESS;
 	POWER_status_t power_status = POWER_SUCCESS;
 	TIM_status_t tim2_status = TIM_SUCCESS;
 	TIM_status_t tim6_status = TIM_SUCCESS;
@@ -654,6 +655,9 @@ MEASURE_status_t MEASURE_init(void) {
 	// Turn analog front-end on to have VREF+ for ADC calibration.
 	power_status = POWER_enable(POWER_DOMAIN_ANALOG, LPTIM_DELAY_MODE_ACTIVE);
 	POWER_exit_error(MEASURE_ERROR_BASE_POWER);
+	// Init ADC.
+	adc_status = ADC_init();
+	ADC_exit_error(MEASURE_ERROR_BASE_ADC);
 	// Init RGB LED.
 	led_status = LED_init();
 	LED_exit_error(MEASURE_ERROR_BASE_LED);

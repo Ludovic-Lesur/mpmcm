@@ -9,6 +9,7 @@
 
 #include "gpio.h"
 #include "mapping.h"
+#include "mode.h"
 #include "tim.h"
 #include "types.h"
 

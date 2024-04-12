@@ -105,6 +105,8 @@ void __attribute__((optimize("-O0"))) RCC_init(void) {
 	// Enable low speed oscillators.
 	_RCC_enable_lsi();
 	_RCC_enable_lse();
+	// Configure TCXO power enable pin.
+	GPIO_configure(&GPIO_TCXO_POWER_ENABLE, GPIO_MODE_OUTPUT, GPIO_TYPE_PUSH_PULL, GPIO_SPEED_LOW, GPIO_PULL_NONE);
 }
 
 /*******************************************************************/
@@ -114,7 +116,6 @@ RCC_status_t RCC_switch_to_pll(void) {
 	FLASH_status_t flash_status = FLASH_SUCCESS;
 	uint32_t loop_count = 0;
 	// Turn TCXO on.
-	GPIO_configure(&GPIO_TCXO_POWER_ENABLE, GPIO_MODE_OUTPUT, GPIO_TYPE_PUSH_PULL, GPIO_SPEED_LOW, GPIO_PULL_NONE);
 	GPIO_write(&GPIO_TCXO_POWER_ENABLE, 1);
 	// No prescaler.
 	RCC -> CFGR &= ~(0b111 << 11);

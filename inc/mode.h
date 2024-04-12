@@ -20,6 +20,13 @@
 
 /*** Board options ***/
 
+#define ANALOG_MEASURE_ENABLE
+//#define LINKY_TIC_ENABLE
+
+// Linky TIC mode.
+#define LINKY_TIC_MODE_HISTORIC
+//#define LINKY_TIC_MODE_STANDARD
+
 // Transformer selection.
 //#define BLOCK_VC_10_2_6
 #define BLOCK_VB_2_1_6

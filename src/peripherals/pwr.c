@@ -23,8 +23,20 @@ void PWR_init(void) {
 
 /*******************************************************************/
 void PWR_enter_sleep_mode(void) {
+	// Enter stop mode.
+	SCB -> SCR &= ~(0b1 << 2); // SLEEPDEEP='0'.
 	 // Wait For Interrupt core instruction.
 	__asm volatile ("wfi");
+}
+
+/*******************************************************************/
+void PWR_enter_stop_mode_1(void) {
+	// Select low power mode.
+	PWR -> CR1 &= ~(0b111) << 0; // Reset bits 0-2.
+	PWR -> CR1 |= (0b001) << 0; // LPMS='001'.
+	// Enter stop mode.
+	SCB -> SCR |= (0b1 << 2); // SLEEPDEEP='1'.
+	__asm volatile ("wfi"); // Wait For Interrupt core instruction.
 }
 
 /*******************************************************************/

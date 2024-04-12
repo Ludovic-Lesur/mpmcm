@@ -16,6 +16,7 @@
 /*** POWER local macros ***/
 
 #define POWER_ON_DELAY_MS_ANALOG	2000
+#define POWER_ON_DELAY_MS_TIC		1000
 
 /*** POWER local global variables ***/
 
@@ -29,6 +30,7 @@ void POWER_init(void) {
 	POWER_domain_t domain = 0;
 	// Init power control pins.
 	GPIO_configure(&GPIO_ANA_POWER_ENABLE, GPIO_MODE_OUTPUT, GPIO_TYPE_PUSH_PULL, GPIO_SPEED_LOW, GPIO_PULL_NONE);
+	GPIO_configure(&GPIO_TIC_POWER_ENABLE, GPIO_MODE_OUTPUT, GPIO_TYPE_PUSH_PULL, GPIO_SPEED_LOW, GPIO_PULL_NONE);
 	// Disable all domains by default.
 	for (domain=0 ; domain<POWER_DOMAIN_LAST ; domain++) {
 		POWER_disable(domain);
@@ -39,7 +41,6 @@ void POWER_init(void) {
 POWER_status_t POWER_enable(POWER_domain_t domain, LPTIM_delay_mode_t delay_mode) {
 	// Local variables.
 	POWER_status_t status = POWER_SUCCESS;
-	ADC_status_t adc_status = ADC_SUCCESS;
 	LPTIM_status_t lptim1_status = LPTIM_SUCCESS;
 	uint32_t delay_ms = 0;
 	// Check domain.
@@ -48,9 +49,11 @@ POWER_status_t POWER_enable(POWER_domain_t domain, LPTIM_delay_mode_t delay_mode
 		// Turn analog front-end on.
 		GPIO_write(&GPIO_ANA_POWER_ENABLE, 1);
 		delay_ms = POWER_ON_DELAY_MS_ANALOG;
-		// Init ADC.
-		adc_status = ADC_init();
-		ADC_exit_error(POWER_ERROR_BASE_ADC);
+		break;
+	case POWER_DOMAIN_TIC:
+		// Turn TIC interface on.
+		GPIO_write(&GPIO_TIC_POWER_ENABLE, 1);
+		delay_ms = POWER_ON_DELAY_MS_TIC;
 		break;
 	default:
 		status = POWER_ERROR_DOMAIN;
@@ -71,15 +74,15 @@ errors:
 POWER_status_t POWER_disable(POWER_domain_t domain) {
 	// Local variables.
 	POWER_status_t status = POWER_SUCCESS;
-	ADC_status_t adc_status = ADC_SUCCESS;
 	// Check domain.
 	switch (domain) {
 	case POWER_DOMAIN_ANALOG:
 		// Turn analog front-end off and release ADC.
 		GPIO_write(&GPIO_ANA_POWER_ENABLE, 0);
-		// Release ADC.
-		adc_status = ADC_de_init();
-		ADC_exit_error(POWER_ERROR_BASE_ADC);
+		break;
+	case POWER_DOMAIN_TIC:
+		// Turn TIC interface off.
+		GPIO_write(&GPIO_TIC_POWER_ENABLE, 0);
 		break;
 	default:
 		status = POWER_ERROR_DOMAIN;

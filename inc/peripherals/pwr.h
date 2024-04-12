@@ -29,6 +29,15 @@ void PWR_init(void);
 void PWR_enter_sleep_mode(void);
 
 /*!******************************************************************
+ * \fn void PWR_enter_stop_mode_1(void)
+ * \brief Enter stop mode 1.
+ * \param[in]  	none
+ * \param[out] 	none
+ * \retval		none
+ *******************************************************************/
+void PWR_enter_stop_mode_1(void);
+
+/*!******************************************************************
  * \fn void PWR_software_reset(void)
  * \brief Reset the MCU.
  * \param[in]  	none

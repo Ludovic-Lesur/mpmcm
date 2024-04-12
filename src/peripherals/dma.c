@@ -13,6 +13,7 @@
 #include "nvic.h"
 #include "rcc_reg.h"
 #include "tim_reg.h"
+#include "usart_reg.h"
 #include "types.h"
 
 /*** DMA local structures ***/
@@ -21,20 +22,23 @@
 typedef enum {
 	DMA_CHANNEL_INDEX_ADC1 = 0,
 	DMA_CHANNEL_INDEX_ADC2,
-	DMA_CHANNEL_INDEX_TIM2
+	DMA_CHANNEL_INDEX_TIM2,
+	DMA_CHANNEL_INDEX_USART2
 } DMA_channel_index_t;
 
 /*******************************************************************/
 typedef struct {
 	uint16_t adcx_buffer_size;
-	DMA_transfer_complete_irq_cb_t tc_irq_callback;
+	DMA_transfer_complete_irq_cb_t adcx_tc_irq_callback;
+	DMA_transfer_complete_irq_cb_t usart2_tc_irq_callback;
 } DMA_context_t;
 
 /*** DMA local global variables ***/
 
 static DMA_context_t dma_ctx = {
 	.adcx_buffer_size = 0,
-	.tc_irq_callback = NULL
+	.adcx_tc_irq_callback = NULL,
+	.usart2_tc_irq_callback = NULL
 };
 
 /*** DMA local functions ***/
@@ -42,8 +46,8 @@ static DMA_context_t dma_ctx = {
 /*******************************************************************/
 void __attribute__((optimize("-O0"))) DMA1_CH1_IRQHandler(void) {
 	// Execute callback.
-	if (dma_ctx.tc_irq_callback != NULL) {
-		dma_ctx.tc_irq_callback();
+	if (dma_ctx.adcx_tc_irq_callback != NULL) {
+		dma_ctx.adcx_tc_irq_callback();
 	}
 	// Clear flags.
 	DMA1 -> IFCR |= 0x0000000F;
@@ -52,11 +56,21 @@ void __attribute__((optimize("-O0"))) DMA1_CH1_IRQHandler(void) {
 /*******************************************************************/
 void __attribute__((optimize("-O0"))) DMA1_CH2_IRQHandler(void) {
 	// Execute callback.
-	if (dma_ctx.tc_irq_callback != NULL) {
-		dma_ctx.tc_irq_callback();
+	if (dma_ctx.adcx_tc_irq_callback != NULL) {
+		dma_ctx.adcx_tc_irq_callback();
 	}
 	// Clear flags.
 	DMA1 -> IFCR |= 0x000000F0;
+}
+
+/*******************************************************************/
+void __attribute__((optimize("-O0"))) DMA1_CH4_IRQHandler(void) {
+	// Execute callback.
+	if (dma_ctx.usart2_tc_irq_callback != NULL) {
+		dma_ctx.usart2_tc_irq_callback();
+	}
+	// Clear flags.
+	DMA1 -> IFCR |= 0x0000F000;
 }
 
 /*** DMA functions ***/
@@ -79,7 +93,7 @@ void DMA1_adcx_init(DMA_transfer_complete_irq_cb_t irq_callback) {
 	DMAMUX -> CxCR[DMA_CHANNEL_INDEX_ADC1] = 5;
 	DMAMUX -> CxCR[DMA_CHANNEL_INDEX_ADC2] = 36;
 	// Register callback.
-	dma_ctx.tc_irq_callback = irq_callback;
+	dma_ctx.adcx_tc_irq_callback = irq_callback;
 }
 
 /*******************************************************************/
@@ -152,6 +166,7 @@ void DMA1_tim2_start(void) {
 	DMA1 -> IFCR |= 0x00000F00;
 	// Start transfer.
 	(DMA1 -> CHx[DMA_CHANNEL_INDEX_TIM2]).CCR |= (0b1 << 0); // EN='1'.
+
 }
 
 /*******************************************************************/
@@ -160,4 +175,47 @@ void DMA1_tim2_stop(void) {
 	(DMA1 -> CHx[DMA_CHANNEL_INDEX_TIM2]).CCR &= ~(0b1 << 0); // EN='0'.
 	// Clear all flags.
 	DMA1 -> IFCR |= 0x00000F00;
+}
+
+/*******************************************************************/
+void DMA1_usart2_init(DMA_transfer_complete_irq_cb_t irq_callback) {
+	// Enable peripheral clock.
+	RCC -> AHB1ENR |= (0b101 << 0);
+	// Memory and peripheral sizes = 8bits.
+	// Memory increment enabled.
+	// Read from peripheral.
+	// Transfer complete interrupt enable.
+	(DMA1 -> CHx[DMA_CHANNEL_INDEX_USART2]).CCR |= (0b1 << 7) | (0b1 << 1);
+	(DMA1 -> CHx[DMA_CHANNEL_INDEX_USART2]).CPAR = (uint32_t) &(USART2 -> RDR);
+	// Configure DMA multiplexer.
+	DMAMUX -> CxCR[DMA_CHANNEL_INDEX_USART2] = 26;
+	// Register callback.
+	dma_ctx.usart2_tc_irq_callback = irq_callback;
+}
+
+/*******************************************************************/
+void DMA1_usart2_set_destination_address(uint32_t usart2_buffer_address, uint16_t usart2_buffer_size) {
+	// Set capture address for TIM2.
+	(DMA1 -> CHx[DMA_CHANNEL_INDEX_USART2]).CMAR = usart2_buffer_address;
+	(DMA1 -> CHx[DMA_CHANNEL_INDEX_USART2]).CNDTR = usart2_buffer_size;
+}
+
+/*******************************************************************/
+void DMA1_usart2_start(void) {
+	// Clear all flags.
+	DMA1 -> IFCR |= 0x0000F000;
+	// Enable interrupt.
+	NVIC_enable_interrupt(NVIC_INTERRUPT_DMA1_CH4, NVIC_PRIORITY_DMA1_CH4);
+	// Start transfer.
+	(DMA1 -> CHx[DMA_CHANNEL_INDEX_USART2]).CCR |= (0b1 << 0); // EN='1'.
+}
+
+/*******************************************************************/
+void DMA1_usart2_stop(void) {
+	// Stop transfer.
+	(DMA1 -> CHx[DMA_CHANNEL_INDEX_USART2]).CCR &= ~(0b1 << 0); // EN='0'.
+	// Disable interrupt.
+	NVIC_disable_interrupt(NVIC_INTERRUPT_DMA1_CH4);
+	// Clear all flags.
+	DMA1 -> IFCR |= 0x0000F000;
 }

@@ -24,8 +24,7 @@ typedef enum {
 	POWER_ERROR_NULL_PARAMETER,
 	POWER_ERROR_DOMAIN,
 	// Low level drivers errors.
-	POWER_ERROR_BASE_ADC = 0x0100,
-	POWER_ERROR_BASE_LPTIM1 = (POWER_ERROR_BASE_ADC + ADC_ERROR_BASE_LAST),
+	POWER_ERROR_BASE_LPTIM1 = 0x0100,
 	// Last base value.
 	POWER_ERROR_BASE_LAST = (POWER_ERROR_BASE_LPTIM1 + LPTIM_ERROR_BASE_LAST)
 } POWER_status_t;
@@ -36,6 +35,7 @@ typedef enum {
  *******************************************************************/
 typedef enum {
 	POWER_DOMAIN_ANALOG = 0,
+	POWER_DOMAIN_TIC,
 	POWER_DOMAIN_LAST
 } POWER_domain_t;
 

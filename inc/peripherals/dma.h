@@ -105,4 +105,41 @@ void DMA1_tim2_start(void);
  *******************************************************************/
 void DMA1_tim2_stop(void);
 
+/*!******************************************************************
+ * \fn void DMA1_usart2_init(DMA_transfer_complete_irq_cb_t irq_callback)
+ * \brief Init DMA1 for USART2 data transfer.
+ * \param[in]  	irq_callback: Function to call on transfer complete interrupt.
+ * \param[out] 	none
+ * \retval		none
+ *******************************************************************/
+void DMA1_usart2_init(DMA_transfer_complete_irq_cb_t irq_callback);
+
+/*!******************************************************************
+ * \fn void DMA1_usart2_set_destination_address(uint32_t usart2_buffer_address, uint16_t usart2_buffer_size)
+ * \brief Set DMA1 USART2 destination buffers address.
+ * \param[in]  	usart2_buffer_address: USART2 bytes destination buffer address.
+ * \param[in] 	usart2_buffer_size: Destination buffer size (number of bytes to transfer).
+ * \param[out] 	none
+ * \retval		none
+ *******************************************************************/
+void DMA1_usart2_set_destination_address(uint32_t usart2_buffer_address, uint16_t tusart2_buffer_size);
+
+/*!******************************************************************
+ * \fn void DMA1_usart2_start(void)
+ * \brief Start DMA1 USART2 transfer.
+ * \param[in]  	none
+ * \param[out] 	none
+ * \retval		none
+ *******************************************************************/
+void DMA1_usart2_start(void);
+
+/*!******************************************************************
+ * \fn void DMA1_usart2_stop(void)
+ * \brief Stop DMA1 USART2 transfer.
+ * \param[in]  	none
+ * \param[out] 	none
+ * \retval		none
+ *******************************************************************/
+void DMA1_usart2_stop(void);
+
 #endif /* __DMA_H__ */
