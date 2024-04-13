@@ -13,6 +13,7 @@
 #include "measure.h"
 #include "node_common.h"
 #include "power.h"
+#include "tic.h"
 #include "types.h"
 
 /*** NODE structures ***/
@@ -35,8 +36,9 @@ typedef enum {
 	NODE_ERROR_BASE_ADC1 = 0x0100,
 	NODE_ERROR_BASE_LPTIM1 = (NODE_ERROR_BASE_ADC1 + ADC_ERROR_BASE_LAST),
 	NODE_ERROR_BASE_MEASURE = (NODE_ERROR_BASE_LPTIM1 + LPTIM_ERROR_BASE_LAST),
+	NODE_ERROR_BASE_TIC = (NODE_ERROR_BASE_MEASURE + MEASURE_ERROR_BASE_LAST),
 	// Last base value.
-	NODE_ERROR_BASE_LAST = (NODE_ERROR_BASE_MEASURE + MEASURE_ERROR_BASE_LAST)
+	NODE_ERROR_BASE_LAST = (NODE_ERROR_BASE_TIC + TIC_ERROR_BASE_LAST)
 } NODE_status_t;
 
 /*!******************************************************************

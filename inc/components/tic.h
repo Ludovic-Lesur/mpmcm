@@ -13,6 +13,10 @@
 #include "types.h"
 #include "usart.h"
 
+/*** TIC macros ***/
+
+#define TIC_SAMPLING_PERIOD_DEFAULT_SECONDS		10
+
 /*** TIC structures ***/
 
 /*!******************************************************************
@@ -25,6 +29,8 @@ typedef enum {
 	TIC_ERROR_NULL_PARAMETER,
 	TIC_ERROR_STATE,
 	TIC_ERROR_DATA_INDEX,
+	TIC_ERROR_SAMPLING_PERIOD_UNDERFLOW,
+	TIC_ERROR_SAMPLING_PERIOD_OVERFLOW,
 	// Low level drivers errors.
 	TIC_ERROR_BASE_USART2 = 0x0100,
 	TIC_ERROR_BASE_MATH = (TIC_ERROR_BASE_USART2 + USART_ERROR_BASE_LAST),
@@ -38,7 +44,7 @@ typedef enum {
  * \brief TIC single data list.
  *******************************************************************/
 typedef enum {
-	TIC_DATA_INDEX_APPARENT_POWER = 0,
+	TIC_DATA_INDEX_APPARENT_POWER_MVA = 0,
 	TIC_DATA_INDEX_LAST
 } TIC_data_index_t;
 
@@ -71,6 +77,15 @@ typedef struct {
 TIC_status_t TIC_init(void);
 
 /*!******************************************************************
+ * \fn TIC_status_t TIC_set_sampling_period(uint32_t period_seconds)
+ * \brief Set TIC data sampling period.
+ * \param[in]  	period_seconds: Sampling period in seconds.
+ * \param[out] 	none
+ * \retval		Function execution status.
+ *******************************************************************/
+TIC_status_t TIC_set_sampling_period(uint32_t period_seconds);
+
+/*!******************************************************************
  * \fn TIC_status_t TIC_tick_second(void)
  * \brief Function to call every second.
  * \param[in]  	none
@@ -78,6 +93,15 @@ TIC_status_t TIC_init(void);
  * \retval		Function execution status.
  *******************************************************************/
 TIC_status_t TIC_tick_second(void);
+
+/*!******************************************************************
+ * \fn TIC_status_t TIC_get_detect_flag(uint8_t* linky_tic_connected)
+ * \brief Get Linky TIC detect flag.
+ * \param[in]  	none
+ * \param[out] 	linky_tic_connected: Pointer to the Linky TIC detection flag.
+ * \retval		Function execution status.
+ *******************************************************************/
+TIC_status_t TIC_get_detect_flag(uint8_t* linky_tic_connected);
 
 /*!******************************************************************
  * \fn TIC_status_t TIC_get_run_data(TIC_data_index_t data_index, TIC_data_t* run_data)

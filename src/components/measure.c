@@ -771,7 +771,7 @@ errors:
 }
 
 /*******************************************************************/
-MEASURE_status_t MEASURE_get_run_data(MEASURE_data_type_t data_type, MEASURE_data_t* run_data) {
+MEASURE_status_t MEASURE_get_run_data(MEASURE_data_index_t data_index, MEASURE_data_t* run_data) {
 	// Local variables.
 	MEASURE_status_t status = MEASURE_SUCCESS;
 	// Check parameters.
@@ -780,8 +780,8 @@ MEASURE_status_t MEASURE_get_run_data(MEASURE_data_type_t data_type, MEASURE_dat
 		goto errors;
 	}
 	// Check data type.
-	switch (data_type) {
-	case MEASURE_DATA_TYPE_MAINS_FREQUENCY:
+	switch (data_index) {
+	case MEASURE_DATA_INDEX_MAINS_FREQUENCY_MHZ:
 		// Copy data.
 		(run_data -> value) = measure_data.acv_frequency_run_data.value;
 		(run_data -> number_of_samples) = measure_data.acv_frequency_run_data.number_of_samples;
@@ -795,7 +795,7 @@ errors:
 }
 
 /*******************************************************************/
-MEASURE_status_t MEASURE_get_accumulated_data(MEASURE_data_type_t data_type, MEASURE_accumulated_data_t* accumulated_data) {
+MEASURE_status_t MEASURE_get_accumulated_data(MEASURE_data_index_t data_index, MEASURE_accumulated_data_t* accumulated_data) {
 	// Local variables.
 	MEASURE_status_t status = MEASURE_SUCCESS;
 	// Check parameters.
@@ -804,8 +804,8 @@ MEASURE_status_t MEASURE_get_accumulated_data(MEASURE_data_type_t data_type, MEA
 		goto errors;
 	}
 	// Check data type.
-	switch (data_type) {
-	case MEASURE_DATA_TYPE_MAINS_FREQUENCY:
+	switch (data_index) {
+	case MEASURE_DATA_INDEX_MAINS_FREQUENCY_MHZ:
 		// Copy data.
 		_MEASURE_copy_accumulated_data(measure_data.acv_frequency_accumulated_data, (*accumulated_data));
 		// Reset data.

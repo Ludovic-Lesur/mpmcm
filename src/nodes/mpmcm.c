@@ -22,6 +22,25 @@ static void _MPMCM_load_fixed_configuration(void) {
 	// Local variables.
 	uint32_t reg_value = 0;
 	uint32_t reg_mask = 0;
+	// Analog measure enable flag.
+#ifdef ANALOG_MEASURE_ENABLE
+	DINFOX_write_field(&reg_value, &reg_mask, 0b1, MPMCM_REG_CONFIGURATION_0_MASK_AME);
+#else
+	DINFOX_write_field(&reg_value, &reg_mask, 0b0, MPMCM_REG_CONFIGURATION_0_MASK_AME);
+#endif
+	// Linky TIC enable flag.
+#ifdef LINKY_TIC_ENABLE
+	DINFOX_write_field(&reg_value, &reg_mask, 0b1, MPMCM_REG_CONFIGURATION_0_MASK_LTE);
+#else
+	DINFOX_write_field(&reg_value, &reg_mask, 0b0, MPMCM_REG_CONFIGURATION_0_MASK_LTE);
+#endif
+	// Linky TIC mode.
+#ifdef LINKY_TIC_MODE_HISTORIC
+	DINFOX_write_field(&reg_value, &reg_mask, 0b0, MPMCM_REG_CONFIGURATION_0_MASK_LTM);
+#endif
+#ifdef LINKY_TIC_MODE_STANDARD
+	DINFOX_write_field(&reg_value, &reg_mask, 0b1, MPMCM_REG_CONFIGURATION_0_MASK_LTM);
+#endif
 	// Transformer attenuation ratio.
 	DINFOX_write_field(&reg_value, &reg_mask, (uint32_t) MPMCM_TRANSFORMER_ATTEN, MPMCM_REG_CONFIGURATION_0_MASK_TRANSFORMER_ATTEN);
 	NODE_write_register(NODE_REQUEST_SOURCE_INTERNAL, MPMCM_REG_ADDR_CONFIGURATION_0, reg_mask, reg_value);
@@ -50,7 +69,7 @@ static void _MPMCM_load_dynamic_configuration(void) {
 }
 
 /*******************************************************************/
-static void _MPMCM_set_gains(void) {
+static void _MPMCM_set_analog_gains(void) {
 	// Local variables.
 	MEASURE_status_t measure_status = MEASURE_SUCCESS;
 	uint32_t reg_config_2 = 0;
@@ -71,6 +90,21 @@ static void _MPMCM_set_gains(void) {
 	// Set gains.
 	measure_status = MEASURE_set_gains(transformer_gain, current_sensors_gain);
 	MEASURE_stack_error();
+}
+
+/*******************************************************************/
+static void _MPMCM_set_tic_sampling_period(void) {
+	// Local variables.
+	TIC_status_t tic_status = MEASURE_SUCCESS;
+	uint32_t reg_config_5 = 0;
+	uint32_t period_seconds = 0;
+	// Read register.
+	NODE_read_register(NODE_REQUEST_SOURCE_INTERNAL, MPMCM_REG_ADDR_CONFIGURATION_5, &reg_config_5);
+	// Compute period.
+	period_seconds = DINFOX_get_seconds(DINFOX_read_field(reg_config_5, MPMCM_REG_CONFIGURATION_5_MASK_TIC_SAMPLING_PERIOD));
+	// Set period.
+	tic_status = TIC_set_sampling_period(period_seconds);
+	TIC_stack_error();
 }
 
 /*** MPMCM functions ***/
@@ -95,13 +129,18 @@ void MPMCM_init_registers(void) {
 	DINFOX_write_field(&reg_value, &reg_mask, (uint32_t) MPMCM_SCT013_GAIN[2], MPMCM_REG_CONFIGURATION_4_MASK_CH3_CURRENT_SENSOR_GAIN);
 	DINFOX_write_field(&reg_value, &reg_mask, (uint32_t) MPMCM_SCT013_GAIN[3], MPMCM_REG_CONFIGURATION_4_MASK_CH4_CURRENT_SENSOR_GAIN);
 	NODE_write_register(NODE_REQUEST_SOURCE_EXTERNAL, MPMCM_REG_ADDR_CONFIGURATION_4, reg_mask, reg_value);
+	// Linky TIC period.
+	reg_value = 0;
+	reg_mask = 0;
+	DINFOX_write_field(&reg_value, &reg_mask, (uint32_t) DINFOX_convert_seconds(TIC_SAMPLING_PERIOD_DEFAULT_SECONDS), MPMCM_REG_CONFIGURATION_5_MASK_TIC_SAMPLING_PERIOD);
 #endif
 	// Read init state.
 	MPMCM_update_register(MPMCM_REG_ADDR_STATUS_1);
 	// Load default values.
 	_MPMCM_load_fixed_configuration();
 	_MPMCM_load_dynamic_configuration();
-	_MPMCM_set_gains();
+	_MPMCM_set_analog_gains();
+	_MPMCM_set_tic_sampling_period();
 }
 
 /*******************************************************************/
@@ -109,6 +148,7 @@ NODE_status_t MPMCM_update_register(uint8_t reg_addr) {
 	// Local variables.
 	NODE_status_t status = NODE_SUCCESS;
 	MEASURE_status_t measure_status = MEASURE_SUCCESS;
+	TIC_status_t tic_status = TIC_SUCCESS;
 	uint32_t reg_value = 0;
 	uint32_t reg_mask = 0;
 	uint8_t channel_idx = 0;
@@ -129,6 +169,11 @@ NODE_status_t MPMCM_update_register(uint8_t reg_addr) {
 		MEASURE_exit_error(NODE_ERROR_BASE_MEASURE);
 		// Update field.
 		DINFOX_write_field(&reg_value, &reg_mask, (uint32_t) generic_u8, MPMCM_REG_STATUS_1_MASK_MVD);
+		// Update Linky TIC detect flag.
+		tic_status = TIC_get_detect_flag(&generic_u8);
+		TIC_exit_error(NODE_ERROR_BASE_TIC);
+		// Update field.
+		DINFOX_write_field(&reg_value, &reg_mask, (uint32_t) generic_u8, MPMCM_REG_STATUS_1_MASK_LTD);
 		break;
 	default:
 		// Nothing to do for other registers.
@@ -145,8 +190,10 @@ NODE_status_t MPMCM_check_register(uint8_t reg_addr, uint32_t reg_mask) {
 	// Local variables.
 	NODE_status_t status = NODE_SUCCESS;
 	MEASURE_status_t measure_status = MEASURE_SUCCESS;
-	MEASURE_accumulated_data_t data;
+	TIC_status_t tic_status = TIC_SUCCESS;
+	MEASURE_accumulated_data_t measure_data;
 	MEASURE_channel_accumulated_data_t channel_data;
+	TIC_accumulated_data_t tic_data;
 	uint8_t channel_idx = 0;
 	uint8_t reg_offset = 0;
 	uint32_t reg_value = 0;
@@ -167,7 +214,16 @@ NODE_status_t MPMCM_check_register(uint8_t reg_addr, uint32_t reg_mask) {
 			// Store new value in NVM.
 			DINFOX_write_nvm_register(reg_addr, reg_value);
 			// Update measurements gains.
-			_MPMCM_set_gains();
+			_MPMCM_set_analog_gains();
+		}
+		break;
+	case MPMCM_REG_ADDR_CONFIGURATION_5:
+		// Check mask.
+		if (reg_mask != 0) {
+			// Store new value in NVM.
+			DINFOX_write_nvm_register(reg_addr, reg_value);
+			// Update TIC sampling period.
+			_MPMCM_set_tic_sampling_period();
 		}
 		break;
 	case MPMCM_REG_ADDR_CONTROL_1:
@@ -178,19 +234,19 @@ NODE_status_t MPMCM_check_register(uint8_t reg_addr, uint32_t reg_mask) {
 				// Clear request.
 				DINFOX_write_field(&new_reg_value, &new_reg_mask, 0b0, MPMCM_REG_CONTROL_1_MASK_FRQS);
 				// Read and reset measurements.
-				measure_status = MEASURE_get_accumulated_data(MEASURE_DATA_TYPE_MAINS_FREQUENCY, &data);
+				measure_status = MEASURE_get_accumulated_data(MEASURE_DATA_INDEX_MAINS_FREQUENCY_MHZ, &measure_data);
 				MEASURE_exit_error(NODE_ERROR_BASE_MEASURE);
 				// Write registers.
 				data_reg_value = 0;
 				data_reg_mask = 0;
-				field_value = (data.number_of_samples > 0) ? (uint32_t) (data.rolling_mean / 10) : DINFOX_MAINS_FREQUENCY_ERROR_VALUE;
+				field_value = (measure_data.number_of_samples > 0) ? (uint32_t) (measure_data.rolling_mean / 10) : DINFOX_MAINS_FREQUENCY_ERROR_VALUE;
 				DINFOX_write_field(&data_reg_value, &data_reg_mask, field_value, MPMCM_REG_MASK_MEAN);
 				NODE_write_register(NODE_REQUEST_SOURCE_INTERNAL, MPMCM_REG_ADDR_MAINS_FREQUENCY_0, data_reg_mask, data_reg_value);
 				data_reg_value = 0;
 				data_reg_mask = 0;
-				field_value = (data.number_of_samples > 0) ? (uint32_t) (data.min / 10) : DINFOX_MAINS_FREQUENCY_ERROR_VALUE;
+				field_value = (measure_data.number_of_samples > 0) ? (uint32_t) (measure_data.min / 10) : DINFOX_MAINS_FREQUENCY_ERROR_VALUE;
 				DINFOX_write_field(&data_reg_value, &data_reg_mask, field_value, MPMCM_REG_MASK_MIN);
-				field_value = (data.number_of_samples > 0) ? (uint32_t) (data.max / 10) : DINFOX_MAINS_FREQUENCY_ERROR_VALUE;
+				field_value = (measure_data.number_of_samples > 0) ? (uint32_t) (measure_data.max / 10) : DINFOX_MAINS_FREQUENCY_ERROR_VALUE;
 				DINFOX_write_field(&data_reg_value, &data_reg_mask, field_value, MPMCM_REG_MASK_MAX);
 				NODE_write_register(NODE_REQUEST_SOURCE_INTERNAL, MPMCM_REG_ADDR_MAINS_FREQUENCY_1, data_reg_mask, data_reg_value);
 			}
@@ -282,6 +338,29 @@ NODE_status_t MPMCM_check_register(uint8_t reg_addr, uint32_t reg_mask) {
 				}
 			}
 		}
+		// TICS.
+		if ((reg_mask & MPMCM_REG_CONTROL_1_MASK_TICS) != 0) {
+			// Check bit.
+			if (DINFOX_read_field(reg_value, MPMCM_REG_CONTROL_1_MASK_TICS) != 0) {
+				// Clear request.
+				DINFOX_write_field(&new_reg_value, &new_reg_mask, 0b0, MPMCM_REG_CONTROL_1_MASK_TICS);
+				// Apparent power.
+				tic_status = TIC_get_accumulated_data(TIC_DATA_INDEX_APPARENT_POWER_MVA, &tic_data);
+				TIC_exit_error(NODE_ERROR_BASE_TIC);
+				data_reg_value = 0;
+				data_reg_mask = 0;
+				field_value = (tic_data.number_of_samples > 0) ? DINFOX_convert_mw_mva(tic_data.rolling_mean) : DINFOX_ELECTRICAL_POWER_ERROR_VALUE;
+				DINFOX_write_field(&data_reg_value, &data_reg_mask, field_value, MPMCM_REG_MASK_MEAN);
+				NODE_write_register(NODE_REQUEST_SOURCE_INTERNAL, MPMCM_REG_ADDR_TIC_APPARENT_POWER_0, data_reg_mask, data_reg_value);
+				data_reg_value = 0;
+				data_reg_mask = 0;
+				field_value = (tic_data.number_of_samples > 0) ? DINFOX_convert_mw_mva(tic_data.min) : DINFOX_ELECTRICAL_POWER_ERROR_VALUE;
+				DINFOX_write_field(&data_reg_value, &data_reg_mask, field_value, MPMCM_REG_MASK_MIN);
+				field_value = (tic_data.number_of_samples > 0) ? DINFOX_convert_mw_mva(tic_data.max) : DINFOX_ELECTRICAL_POWER_ERROR_VALUE;
+				DINFOX_write_field(&data_reg_value, &data_reg_mask, field_value, MPMCM_REG_MASK_MAX);
+				NODE_write_register(NODE_REQUEST_SOURCE_INTERNAL, MPMCM_REG_ADDR_TIC_APPARENT_POWER_1, data_reg_mask, data_reg_value);
+			}
+		}
 		break;
 	default:
 		break;
@@ -296,20 +375,21 @@ NODE_status_t MPMCM_mtrg_callback(void) {
 	// Local variables.
 	NODE_status_t status = NODE_SUCCESS;
 	MEASURE_status_t measure_status = MEASURE_SUCCESS;
-	MEASURE_data_t data;
+	TIC_status_t tic_status = TIC_SUCCESS;
+	MEASURE_data_t measure_data;
 	MEASURE_channel_data_t channel_data;
+	TIC_data_t tic_data;
 	uint32_t field_value = 0;
 	uint8_t reg_offset = 0;
 	uint32_t data_reg_value = 0;
 	uint32_t data_reg_mask = 0;
 	uint8_t channel_idx = 0;
-	// Read run data.
-	measure_status = MEASURE_get_run_data(MEASURE_DATA_TYPE_MAINS_FREQUENCY, &data);
+	// Mains frequency.
+	measure_status = MEASURE_get_run_data(MEASURE_DATA_INDEX_MAINS_FREQUENCY_MHZ, &measure_data);
 	MEASURE_exit_error(NODE_ERROR_BASE_MEASURE);
-	// Write register.
 	data_reg_value = 0;
 	data_reg_mask = 0;
-	field_value = (data.number_of_samples > 0) ? (uint32_t) (data.value / 10) : DINFOX_MAINS_FREQUENCY_ERROR_VALUE;
+	field_value = (measure_data.number_of_samples > 0) ? (uint32_t) (measure_data.value / 10) : DINFOX_MAINS_FREQUENCY_ERROR_VALUE;
 	DINFOX_write_field(&data_reg_value, &data_reg_mask, field_value, MPMCM_REG_MASK_RUN);
 	NODE_write_register(NODE_REQUEST_SOURCE_INTERNAL, MPMCM_REG_ADDR_MAINS_FREQUENCY_0, data_reg_mask, data_reg_value);
 	// Update run registers for all channels.
@@ -350,6 +430,14 @@ NODE_status_t MPMCM_mtrg_callback(void) {
 		DINFOX_write_field(&data_reg_value, &data_reg_mask, field_value, MPMCM_REG_MASK_RUN);
 		NODE_write_register(NODE_REQUEST_SOURCE_INTERNAL, (MPMCM_REG_ADDR_CH1_POWER_FACTOR_0 + reg_offset), data_reg_mask, data_reg_value);
 	}
+	// TIC apparent power.
+	tic_status = TIC_get_run_data(TIC_DATA_INDEX_APPARENT_POWER_MVA, &tic_data);
+	TIC_exit_error(NODE_ERROR_BASE_TIC);
+	data_reg_value = 0;
+	data_reg_mask = 0;
+	field_value = DINFOX_convert_mw_mva(tic_data);
+	DINFOX_write_field(&data_reg_value, &data_reg_mask, field_value, MPMCM_REG_MASK_RUN);
+	NODE_write_register(NODE_REQUEST_SOURCE_INTERNAL, MPMCM_REG_ADDR_TIC_APPARENT_POWER_0, data_reg_mask, data_reg_value);
 errors:
 	return status;
 }

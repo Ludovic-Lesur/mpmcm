@@ -42,13 +42,13 @@ typedef enum {
 } MEASURE_status_t;
 
 /*!******************************************************************
- * \enum MEASURE_data_type_t
+ * \enum MEASURE_data_index_t
  * \brief MEASURE single data list.
  *******************************************************************/
 typedef enum {
-	MEASURE_DATA_TYPE_MAINS_FREQUENCY = 0,
-	MEASURE_DATA_TYPE_LAST
-} MEASURE_data_type_t;
+	MEASURE_DATA_INDEX_MAINS_FREQUENCY_MHZ = 0,
+	MEASURE_DATA_INDEX_LAST
+} MEASURE_data_index_t;
 
 /*!******************************************************************
  * \struct MEASURE_data_t
@@ -145,22 +145,22 @@ MEASURE_status_t MEASURE_get_probe_detect_flag(uint8_t ac_channel_index, uint8_t
 MEASURE_status_t MEASURE_get_mains_detect_flag(uint8_t* mains_voltage_detected);
 
 /*!******************************************************************
- * \fn MEASURE_status_t MEASURE_get_run_data(MEASURE_data_type_t data_type, MEASURE_data_t* run_data)
+ * \fn MEASURE_status_t MEASURE_get_run_data(MEASURE_data_index_t data_type, MEASURE_data_t* run_data)
  * \brief Get run data.
- * \param[in]  	data_type: Data to read.
+ * \param[in]  	data_index: Data to read.
  * \param[out] 	run_data: Pointer to the run data.
  * \retval		Function execution status.
  *******************************************************************/
-MEASURE_status_t MEASURE_get_run_data(MEASURE_data_type_t data_type, MEASURE_data_t* run_data);
+MEASURE_status_t MEASURE_get_run_data(MEASURE_data_index_t data_index, MEASURE_data_t* run_data);
 
 /*!******************************************************************
- * \fn MEASURE_status_t MEASURE_get_accumulated_data(MEASURE_data_type_t data_type, MEASURE_accumulated_data_t* accumulated_data)
+ * \fn MEASURE_status_t MEASURE_get_accumulated_data(MEASURE_data_index_t data_type, MEASURE_accumulated_data_t* accumulated_data)
  * \brief Get accumulated data.
- * \param[in]  	data_type: Data to read.
+ * \param[in]  	data_index: Data to read.
  * \param[out] 	accumulated_data: Pointer to the accumulated data.
  * \retval		Function execution status.
  *******************************************************************/
-MEASURE_status_t MEASURE_get_accumulated_data(MEASURE_data_type_t data_type, MEASURE_accumulated_data_t* accumulated_data);
+MEASURE_status_t MEASURE_get_accumulated_data(MEASURE_data_index_t data_index, MEASURE_accumulated_data_t* accumulated_data);
 
 /*!******************************************************************
  * \fn MEASURE_status_t MEASURE_get_channel_run_data(uint8_t ac_channel, MEASURE_channel_data_t* ac_channel_run_data)

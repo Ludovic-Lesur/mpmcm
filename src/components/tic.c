@@ -18,14 +18,16 @@
 
 /*** TIC local macros ***/
 
-#define TIC_SAMPLING_PERIOD_SECONDS		10
-#define TIC_RX_BUFFER_SIZE				64
+#define TIC_RX_BUFFER_SIZE					64
+
+#define TIC_SAMPLING_PERIOD_MIN_SECONDS		5
+#define TIC_SAMPLING_PERIOD_MAX_SECONDS		3600
 
 #ifdef LINKY_TIC_MODE_HISTORIC
-#define TIC_BAUD_RATE					1200
-#define TIC_NUMBER_OF_DATA				11
-#define TIC_FRAME_SEPARATOR_CHAR		STRING_CHAR_SPACE
-#define TIC_FRAME_END_CHAR				STRING_CHAR_LF
+#define TIC_BAUD_RATE						1200
+#define TIC_NUMBER_OF_DATA					11
+#define TIC_FRAME_SEPARATOR_CHAR			STRING_CHAR_SPACE
+#define TIC_FRAME_END_CHAR					STRING_CHAR_LF
 #endif
 
 /*** TIC local structures ***/
@@ -46,6 +48,7 @@ typedef struct {
 /*******************************************************************/
 typedef union {
 	struct {
+		unsigned detect : 1;
 		unsigned fill_buffer0 : 1;
 		unsigned frame_received : 1;
 		unsigned decode_success : 1;
@@ -57,6 +60,7 @@ typedef union {
 typedef struct {
 	// State machine.
 	TIC_state_t state;
+	uint32_t sampling_period_seconds;
 	uint32_t second_count;
 	volatile TIC_flags_t flags;
 	// DMA Buffers.
@@ -211,8 +215,8 @@ static TIC_status_t _TIC_decode_sample(uint8_t sample_index) {
 		parser_status = PARSER_get_parameter(&tic_ctx.parser, STRING_FORMAT_DECIMAL, TIC_FRAME_SEPARATOR_CHAR, &sample);
 		if (parser_status == PARSER_SUCCESS) {
 			// Update data.
-			tic_ctx.run_data[sample_index] = sample;
-			_TIC_add_accumulated_sample(tic_ctx.accumulated_data[sample_index], sample);
+			tic_ctx.run_data[sample_index] = (sample / 1000);
+			_TIC_add_accumulated_sample(tic_ctx.accumulated_data[sample_index], (sample * 1000));
 			// Set flag.
 			tic_ctx.flags.decode_success = 1;
 		}
@@ -266,6 +270,7 @@ TIC_status_t TIC_init(void) {
 	uint32_t idx = 0;
 	// Init context.
 	tic_ctx.state = TIC_STATE_SLEEP;
+	tic_ctx.sampling_period_seconds = TIC_SAMPLING_PERIOD_DEFAULT_SECONDS;
 	tic_ctx.second_count = 0;
 	tic_ctx.flags.all = 0;
 	for (idx=0 ; idx<TIC_RX_BUFFER_SIZE ; idx++) tic_ctx.dma_buffer0[idx] = 0;
@@ -286,6 +291,25 @@ errors:
 }
 
 /*******************************************************************/
+TIC_status_t TIC_set_sampling_period(uint32_t period_seconds) {
+	// Local variables.
+	TIC_status_t status = TIC_SUCCESS;
+	// Check period.
+	if (period_seconds < TIC_SAMPLING_PERIOD_MIN_SECONDS) {
+		status = TIC_ERROR_SAMPLING_PERIOD_UNDERFLOW;
+		goto errors;
+	}
+	if (period_seconds > TIC_SAMPLING_PERIOD_MAX_SECONDS) {
+		status = TIC_ERROR_SAMPLING_PERIOD_OVERFLOW;
+		goto errors;
+	}
+	// Update local context.
+	tic_ctx.sampling_period_seconds = period_seconds;
+errors:
+	return status;
+}
+
+/*******************************************************************/
 TIC_status_t TIC_tick_second(void) {
 	// Local variables.
 	TIC_status_t status = TIC_SUCCESS;
@@ -295,7 +319,7 @@ TIC_status_t TIC_tick_second(void) {
 	switch (tic_ctx.state) {
 	case TIC_STATE_SLEEP:
 		// Check seconds count.
-		if (tic_ctx.second_count >= TIC_SAMPLING_PERIOD_SECONDS) {
+		if (tic_ctx.second_count >= tic_ctx.sampling_period_seconds) {
 			// Reset seconds count.
 			tic_ctx.second_count = 0;
 			// Start acquisition.
@@ -312,14 +336,15 @@ TIC_status_t TIC_tick_second(void) {
 		while ((tic_ctx.flags.decode_success == 0) && (tic_ctx.decoding_count <= TIC_NUMBER_OF_DATA)) {
 			// Check RX IRQ flag.
 			if (tic_ctx.flags.frame_received != 0) {
-				// Clear flag.
+				// Update flags.
 				tic_ctx.flags.frame_received = 0;
+				tic_ctx.flags.detect = 1;
 				tic_ctx.decoding_count++;
 				// Build frame.
 				_TIC_build_frame();
 				_TIC_reset_parser();
 				// Decode data.
-				status = _TIC_decode_sample(TIC_DATA_INDEX_APPARENT_POWER);
+				status = _TIC_decode_sample(TIC_DATA_INDEX_APPARENT_POWER_MVA);
 				if (status != TIC_SUCCESS) goto errors;
 			}
 		}
@@ -336,6 +361,20 @@ TIC_status_t TIC_tick_second(void) {
 	return status;
 errors:
 	_TIC_stop();
+	return status;
+}
+
+/*******************************************************************/
+TIC_status_t TIC_get_detect_flag(uint8_t* linky_tic_connected) {
+	// Local variables.
+	TIC_status_t status = TIC_SUCCESS;
+	// Check parameter.
+	if (linky_tic_connected == NULL) {
+		status = TIC_ERROR_NULL_PARAMETER;
+		goto errors;
+	}
+	(*linky_tic_connected) = tic_ctx.flags.detect;
+errors:
 	return status;
 }
 
