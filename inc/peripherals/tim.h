@@ -65,6 +65,15 @@ typedef enum {
 TIM_status_t TIM2_init(uint32_t sampling_frequency_hz);
 
 /*!******************************************************************
+ * \fn void TIM2_de_init(void)
+ * \brief Release TIM2 driver.
+ * \param[in]  	none
+ * \param[out] 	none
+ * \retval		none
+ *******************************************************************/
+void TIM2_de_init(void);
+
+/*!******************************************************************
  * \fn void TIM2_start(void)
  * \brief Start TIM2 operation.
  * \param[in]  	none
@@ -102,6 +111,15 @@ TIM_status_t TIM4_init(void);
 void TIM4_single_pulse(uint32_t pulse_duration_ms, TIM4_channel_mask_t led_color);
 
 /*!******************************************************************
+ * \fn uint8_t TIM4_is_single_pulse_done(void)
+ * \brief Get the pulse status.
+ * \param[in]  	none
+ * \param[out] 	none
+ * \retval		0 if the pulse is running, 1 if it is complete.
+ *******************************************************************/
+uint8_t TIM4_is_single_pulse_done(void);
+
+/*!******************************************************************
  * \fn TIM_status_t TIM6_init(void)
  * \brief Init TIM6 peripheral for ADC trigger operation.
  * \param[in]  	none
@@ -109,6 +127,15 @@ void TIM4_single_pulse(uint32_t pulse_duration_ms, TIM4_channel_mask_t led_color
  * \retval		Function execution status.
  *******************************************************************/
 TIM_status_t TIM6_init(void);
+
+/*!******************************************************************
+ * \fn void TIM6_de_init(void)
+ * \brief Release TIM2 driver.
+ * \param[in]  	none
+ * \param[out] 	none
+ * \retval		none
+ *******************************************************************/
+void TIM6_de_init(void);
 
 /*!******************************************************************
  * \fn void TIM6_start(void)

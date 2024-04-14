@@ -68,3 +68,10 @@ LED_status_t LED_single_pulse(uint32_t pulse_duration_ms, LED_color_t color) {
 errors:
 	return status;
 }
+
+/*******************************************************************/
+LED_state_t LED_get_state(void) {
+	// Local variables.
+	LED_state_t state = (TIM4_is_single_pulse_done() == 0) ? LED_STATE_ACTIVE : LED_STATE_OFF;
+	return state;
+}

@@ -34,14 +34,11 @@ static void _MPMCM_init_hw(void) {
 	// Local variables.
 	RCC_status_t rcc_status = RCC_SUCCESS;
 	RTC_status_t rtc_status = RTC_SUCCESS;
+	MEASURE_status_t measure_status = MEASURE_SUCCESS;
+	TIC_status_t tic_status = TIC_SUCCESS;
+	LED_status_t led_status = LED_SUCCESS;
 #ifndef DEBUG
 	IWDG_status_t iwdg_status = IWDG_SUCCESS;
-#endif
-#ifdef ANALOG_MEASURE_ENABLE
-	MEASURE_status_t measure_status = MEASURE_SUCCESS;
-#endif
-#ifdef LINKY_TIC_ENABLE
-	TIC_status_t tic_status = TIC_SUCCESS;
 #endif
 	// Init error stack
 	ERROR_stack_init();
@@ -62,11 +59,6 @@ static void _MPMCM_init_hw(void) {
 	// Calibrate clocks.
 	rcc_status = RCC_calibrate();
 	RCC_stack_error();
-#ifdef ANALOG_MEASURE_ENABLE
-	// High speed oscillator.
-	rcc_status = RCC_switch_to_pll();
-	RCC_stack_error();
-#endif
 	// Init RTC.
 	rtc_status = RTC_init();
 	RTC_stack_error();
@@ -74,14 +66,12 @@ static void _MPMCM_init_hw(void) {
 	LPTIM1_init();
 	// Init components.
 	POWER_init();
-#ifdef ANALOG_MEASURE_ENABLE
+	led_status = LED_init();
+	LED_stack_error();
 	measure_status = MEASURE_init();
 	MEASURE_stack_error();
-#endif
-#ifdef LINKY_TIC_ENABLE
 	tic_status = TIC_init();
 	TIC_stack_error();
-#endif
 	// Init AT BUS interface.
 	AT_BUS_init();
 }
@@ -103,11 +93,13 @@ int main(void) {
 	while (1) {
 		// Enter sleep mode.
 		IWDG_reload();
-#ifdef ANALOG_MEASURE_ENABLE
-		PWR_enter_sleep_mode();
-#else
-		PWR_enter_stop_mode_1();
-#endif
+		// Check modules state.
+		if ((TIC_get_state() == TIC_STATE_OFF) && (MEASURE_get_state() == MEASURE_STATE_OFF) && (LED_get_state() == LED_STATE_OFF)) {
+			PWR_enter_stop_mode_1();
+		}
+		else {
+			PWR_enter_sleep_mode();
+		}
 		IWDG_reload();
 		// Check RTC flag.
 		if (RTC_get_wakeup_timer_flag() != 0) {
@@ -123,10 +115,14 @@ int main(void) {
 #endif
 #ifdef LINKY_TIC_ENABLE
 			// Call TIC interface tick.
-			tic_status = TIC_tick_second();
-			TIC_stack_error();
+			TIC_tick_second();
 #endif
 		}
+#ifdef LINKY_TIC_ENABLE
+		// Process TIC interface.
+		tic_status = TIC_process();
+		TIC_stack_error();
+#endif
 		// Process AT bus link.
 		AT_BUS_task();
 	}

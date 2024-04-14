@@ -7,7 +7,9 @@
 
 #include "tic.h"
 
+#include "error.h"
 #include "dma.h"
+#include "led.h"
 #include "math_custom.h"
 #include "mode.h"
 #include "parser.h"
@@ -23,6 +25,8 @@
 #define TIC_SAMPLING_PERIOD_MIN_SECONDS		5
 #define TIC_SAMPLING_PERIOD_MAX_SECONDS		3600
 
+#define TIC_LED_PULSE_DURATION_MS			50
+
 #ifdef LINKY_TIC_MODE_HISTORIC
 #define TIC_BAUD_RATE						1200
 #define TIC_NUMBER_OF_DATA					11
@@ -31,13 +35,6 @@
 #endif
 
 /*** TIC local structures ***/
-
-/*******************************************************************/
-typedef enum {
-	TIC_STATE_SLEEP = 0,
-	TIC_STATE_DECODE,
-	TIC_STATE_LAST
-} TIC_state_t;
 
 /*******************************************************************/
 typedef struct {
@@ -78,10 +75,12 @@ typedef struct {
 
 /*** TIC local global variables ***/
 
+#ifdef LINKY_TIC_ENABLE
 #ifdef LINKY_TIC_MODE_HISTORIC
 static const TIC_sample_t TIC_SAMPLE[TIC_DATA_INDEX_LAST] = {
 	{"PAPP ", STRING_FORMAT_DECIMAL}
 };
+#endif
 #endif
 static TIC_context_t tic_ctx;
 
@@ -126,6 +125,7 @@ static TIC_context_t tic_ctx;
 	destination.number_of_samples = source.number_of_samples; \
 }
 
+#ifdef LINKY_TIC_ENABLE
 /*******************************************************************/
 static void _TIC_switch_dma_buffer(uint8_t line_end_flag) {
 	// Stop and start DMA transfer to switch buffer.
@@ -140,23 +140,30 @@ static void _TIC_switch_dma_buffer(uint8_t line_end_flag) {
 		tic_ctx.flags.fill_buffer0 = 0;
 	}
 	// Update flag.
+	tic_ctx.flags.detect = 1;
 	tic_ctx.flags.frame_received = line_end_flag;
 	// Restart DMA transfer.
 	DMA1_usart2_start();
 }
+#endif
 
+#ifdef LINKY_TIC_ENABLE
 /*******************************************************************/
 static void _TIC_usart_cm_irq_callback(void) {
 	// Switch buffer.
 	_TIC_switch_dma_buffer(1);
 }
+#endif
 
+#ifdef LINKY_TIC_ENABLE
 /*******************************************************************/
 static void _TIC_dma_tc_irq_callback(void) {
 	// Switch buffer.
 	_TIC_switch_dma_buffer(0);
 }
+#endif
 
+#ifdef LINKY_TIC_ENABLE
 /*******************************************************************/
 static void _TIC_build_frame(void) {
 	// Local variables.
@@ -184,6 +191,7 @@ static void _TIC_build_frame(void) {
 		}
 	}
 }
+#endif
 
 /*******************************************************************/
 static void _TIC_reset_parser(void) {
@@ -194,6 +202,7 @@ static void _TIC_reset_parser(void) {
 	tic_ctx.parser.start_idx = 0;
 }
 
+#ifdef LINKY_TIC_ENABLE
 /*******************************************************************/
 static TIC_status_t _TIC_decode_sample(uint8_t sample_index) {
 	// Local variables.
@@ -224,7 +233,9 @@ static TIC_status_t _TIC_decode_sample(uint8_t sample_index) {
 errors:
 	return status;
 }
+#endif
 
+#ifdef LINKY_TIC_ENABLE
 /*******************************************************************/
 static TIC_status_t _TIC_start(void) {
 	// Local variables.
@@ -236,6 +247,7 @@ static TIC_status_t _TIC_start(void) {
 	// Clear flags.
 	tic_ctx.flags.all = 0;
 	tic_ctx.flags.fill_buffer0 = 1;
+	tic_ctx.decoding_count = 0;
 	// Start with buffer 1.
 	DMA1_usart2_set_destination_address((uint32_t) &(tic_ctx.dma_buffer0), TIC_RX_BUFFER_SIZE);
 	// Start DMA transfer.
@@ -244,7 +256,9 @@ static TIC_status_t _TIC_start(void) {
 errors:
 	return status;
 }
+#endif
 
+#ifdef LINKY_TIC_ENABLE
 /*******************************************************************/
 static TIC_status_t _TIC_stop(void) {
 	// Local variables.
@@ -259,6 +273,7 @@ static TIC_status_t _TIC_stop(void) {
 errors:
 	return status;
 }
+#endif
 
 /*** TIC functions ***/
 
@@ -266,10 +281,12 @@ errors:
 TIC_status_t TIC_init(void) {
 	// Local variables.
 	TIC_status_t status = TIC_SUCCESS;
+#ifdef LINKY_TIC_ENABLE
 	USART_status_t usart2_status = USART_SUCCESS;
+#endif
 	uint32_t idx = 0;
 	// Init context.
-	tic_ctx.state = TIC_STATE_SLEEP;
+	tic_ctx.state = TIC_STATE_OFF;
 	tic_ctx.sampling_period_seconds = TIC_SAMPLING_PERIOD_DEFAULT_SECONDS;
 	tic_ctx.second_count = 0;
 	tic_ctx.flags.all = 0;
@@ -279,15 +296,89 @@ TIC_status_t TIC_init(void) {
 	// Reset data.
 	for (idx=0 ; idx<TIC_DATA_INDEX_LAST ; idx++) {
 		tic_ctx.run_data[idx] = 0;
-		_TIC_reset_accumulated_data(tic_ctx.accumulated_data[idx])
+		_TIC_reset_accumulated_data(tic_ctx.accumulated_data[idx]);
 	}
+#ifdef LINKY_TIC_ENABLE
 	// Init USART interface.
 	usart2_status = USART2_init(TIC_BAUD_RATE, TIC_FRAME_END_CHAR, &_TIC_usart_cm_irq_callback);
 	USART2_exit_error(TIC_ERROR_BASE_USART2);
 	// Init DMA.
 	DMA1_usart2_init(&_TIC_dma_tc_irq_callback);
 errors:
+#endif
 	return status;
+}
+
+#ifdef LINKY_TIC_ENABLE
+/*******************************************************************/
+TIC_status_t TIC_process(void) {
+	// Local variables.
+	TIC_status_t status = TIC_SUCCESS;
+#ifndef ANALOG_MEASURE_ENABLE
+	LED_status_t led_status = LED_SUCCESS;
+	LED_color_t led_color = LED_COLOR_OFF;
+#endif
+	// Perform state machine.
+	switch (tic_ctx.state) {
+	case TIC_STATE_OFF:
+		// Check period.
+		if (tic_ctx.second_count >= tic_ctx.sampling_period_seconds) {
+			// Reset seconds count.
+			tic_ctx.second_count = 0;
+			// Start acquisition.
+			status = _TIC_start();
+			if (status != TIC_SUCCESS) goto errors;
+			// Update state.
+			tic_ctx.state = TIC_STATE_ACTIVE;
+		}
+		break;
+	case TIC_STATE_ACTIVE:
+		if (tic_ctx.flags.frame_received != 0) {
+			// Build frame.
+			_TIC_build_frame();
+			_TIC_reset_parser();
+			// Decode data.
+			status = _TIC_decode_sample(TIC_DATA_INDEX_APPARENT_POWER_MVA);
+			if (status != TIC_SUCCESS) goto errors;
+			// Increment decoding count.
+			tic_ctx.decoding_count++;
+			// Check decoding status.
+			if ((tic_ctx.flags.decode_success != 0) || (tic_ctx.decoding_count > (TIC_NUMBER_OF_DATA << 1))) {
+				// Update state.
+				tic_ctx.state = TIC_STATE_OFF;
+				// Stop acquisition.
+				status = _TIC_stop();
+				if (status != TIC_SUCCESS) goto errors;
+#ifndef ANALOG_MEASURE_ENABLE
+				// Perform LED pulse.
+				if (tic_ctx.flags.detect == 0) {
+					led_color = LED_COLOR_RED;
+				}
+				else {
+					led_color = (tic_ctx.flags.decode_success) ? LED_COLOR_GREEN : LED_COLOR_YELLOW;
+				}
+				led_status = LED_single_pulse(TIC_LED_PULSE_DURATION_MS, led_color);
+				LED_exit_error(TIC_ERROR_BASE_LED);
+#endif
+			}
+		}
+		break;
+	default:
+		status = TIC_ERROR_STATE;
+		goto errors;
+	}
+	return status;
+errors:
+	// Force state to off.
+	tic_ctx.state = TIC_STATE_OFF;
+	_TIC_stop();
+	return status;
+}
+#endif
+
+/*******************************************************************/
+TIC_state_t TIC_get_state(void) {
+	return (tic_ctx.state);
 }
 
 /*******************************************************************/
@@ -309,60 +400,13 @@ errors:
 	return status;
 }
 
+#ifdef LINKY_TIC_ENABLE
 /*******************************************************************/
-TIC_status_t TIC_tick_second(void) {
-	// Local variables.
-	TIC_status_t status = TIC_SUCCESS;
+void TIC_tick_second(void) {
 	// Increment seconds.
 	tic_ctx.second_count++;
-	// Perform state machine.
-	switch (tic_ctx.state) {
-	case TIC_STATE_SLEEP:
-		// Check seconds count.
-		if (tic_ctx.second_count >= tic_ctx.sampling_period_seconds) {
-			// Reset seconds count.
-			tic_ctx.second_count = 0;
-			// Start acquisition.
-			status = _TIC_start();
-			if (status != TIC_SUCCESS) goto errors;
-			// Update state.
-			tic_ctx.state = TIC_STATE_DECODE;
-		}
-		break;
-	case TIC_STATE_DECODE:
-		// Reset decoding count.
-		tic_ctx.decoding_count = 0;
-		// Loop until data is retrieved.
-		while ((tic_ctx.flags.decode_success == 0) && (tic_ctx.decoding_count <= TIC_NUMBER_OF_DATA)) {
-			// Check RX IRQ flag.
-			if (tic_ctx.flags.frame_received != 0) {
-				// Update flags.
-				tic_ctx.flags.frame_received = 0;
-				tic_ctx.flags.detect = 1;
-				tic_ctx.decoding_count++;
-				// Build frame.
-				_TIC_build_frame();
-				_TIC_reset_parser();
-				// Decode data.
-				status = _TIC_decode_sample(TIC_DATA_INDEX_APPARENT_POWER_MVA);
-				if (status != TIC_SUCCESS) goto errors;
-			}
-		}
-		// Stop acquisition.
-		status = _TIC_stop();
-		if (status != TIC_SUCCESS) goto errors;
-		// Update state.
-		tic_ctx.state = TIC_STATE_SLEEP;
-		break;
-	default:
-		status = TIC_ERROR_STATE;
-		goto errors;
-	}
-	return status;
-errors:
-	_TIC_stop();
-	return status;
 }
+#endif
 
 /*******************************************************************/
 TIC_status_t TIC_get_detect_flag(uint8_t* linky_tic_connected) {

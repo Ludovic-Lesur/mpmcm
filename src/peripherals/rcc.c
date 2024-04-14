@@ -8,10 +8,11 @@
 #include "rcc.h"
 
 #include "error.h"
-#include "flash.h"
 #include "gpio.h"
+#include "flash.h"
 #include "mapping.h"
 #include "nvic.h"
+#include "power.h"
 #include "pwr.h"
 #include "rcc_reg.h"
 #include "tim.h"
@@ -105,8 +106,59 @@ void __attribute__((optimize("-O0"))) RCC_init(void) {
 	// Enable low speed oscillators.
 	_RCC_enable_lsi();
 	_RCC_enable_lse();
-	// Configure TCXO power enable pin.
-	GPIO_configure(&GPIO_TCXO_POWER_ENABLE, GPIO_MODE_OUTPUT, GPIO_TYPE_PUSH_PULL, GPIO_SPEED_LOW, GPIO_PULL_NONE);
+}
+
+/*******************************************************************/
+RCC_status_t RCC_switch_to_hsi(void) {
+	// Local variables.
+	RCC_status_t status = RCC_SUCCESS;
+	FLASH_status_t flash_status = FLASH_SUCCESS;
+	POWER_status_t power_status = POWER_SUCCESS;
+	uint32_t reg_cfgr = 0;
+	uint32_t loop_count = 0;
+	// Check current clock source.
+	if (rcc_ctx.sysclk_source == RCC_CLOCK_HSI) goto errors;
+	// Enable HSI.
+	RCC -> CR |= (0b1 << 8); // Enable HSI (HSI16ON='1').
+	// Wait for HSI to be stable.
+	while (((RCC -> CR) & (0b1 << 10)) == 0) {
+		// Wait for HSIRDYF='1' or timeout.
+		loop_count++;
+		if (loop_count > RCC_TIMEOUT_COUNT) {
+			status = RCC_ERROR_HSI_READY;
+			goto errors;
+		}
+	}
+	// Switch SYSCLK.
+	reg_cfgr = (RCC -> CFGR);
+	reg_cfgr &= ~(0b11 << 0); // Reset bits 0-1.
+	reg_cfgr |= (0b01 << 0); // Use HSI as system clock (SW='01').
+	RCC -> CFGR = reg_cfgr;
+	// Wait for clock switch.
+	loop_count = 0;
+	while (((RCC -> CFGR) & (0b11 << 2)) != (0b01 << 2)) {
+		// Wait for SWS='01' or timeout.
+		loop_count++;
+		if (loop_count > RCC_TIMEOUT_COUNT) {
+			status = RCC_ERROR_HSI_SWITCH;
+			goto errors;
+		}
+	}
+	// Update clocks context.
+	rcc_ctx.sysclk_source = RCC_CLOCK_HSI;
+	// Disable PLL and HSE.
+	RCC -> CR &= ~(0b1 << 24); // PLLON='0'.
+	RCC -> CR &= ~(0b1 << 16); // HSEON='0'.
+	// Set flash latency.
+	flash_status = FLASH_set_latency(1);
+	FLASH_exit_error(RCC_ERROR_BASE_FLASH);
+	// Turn TCXO off.
+	power_status = POWER_disable(POWER_DOMAIN_MCU_TCXO);
+	POWER_exit_error(RCC_ERROR_BASE_POWER);
+errors:
+	// Update system clock.
+	rcc_ctx.clock_frequency[RCC_CLOCK_SYSTEM] = rcc_ctx.clock_frequency[rcc_ctx.sysclk_source];
+	return status;
 }
 
 /*******************************************************************/
@@ -114,9 +166,13 @@ RCC_status_t RCC_switch_to_pll(void) {
 	// Local variables.
 	RCC_status_t status = RCC_SUCCESS;
 	FLASH_status_t flash_status = FLASH_SUCCESS;
+	POWER_status_t power_status = POWER_SUCCESS;
 	uint32_t loop_count = 0;
+	// Check current clock source.
+	if (rcc_ctx.sysclk_source == RCC_CLOCK_PLL) goto errors;
 	// Turn TCXO on.
-	GPIO_write(&GPIO_TCXO_POWER_ENABLE, 1);
+	power_status = POWER_enable(POWER_DOMAIN_MCU_TCXO, LPTIM_DELAY_MODE_ACTIVE);
+	POWER_exit_error(RCC_ERROR_BASE_POWER);
 	// No prescaler.
 	RCC -> CFGR &= ~(0b111 << 11);
 	RCC -> CFGR &= ~(0b111 << 8);
@@ -133,10 +189,12 @@ RCC_status_t RCC_switch_to_pll(void) {
 		if (loop_count > RCC_TIMEOUT_COUNT) {
 			// Store error in stack.
 			ERROR_stack_add(ERROR_BASE_RCC + RCC_ERROR_HSE_READY);
+			// Disable HSE.
+			RCC -> CR &= ~(0b1 << 16); // HSEON='0'.
 			// Turn TCXO off.
-			GPIO_write(&GPIO_TCXO_POWER_ENABLE, 0);
-			RCC -> CR &= ~(0b1 << 16); // Disable HSE (HSEON='0').
-			// Reset flag and exit.
+			power_status = POWER_disable(POWER_DOMAIN_MCU_TCXO);
+			POWER_stack_error();
+			// Reset source.
 			rcc_ctx.pll_source = RCC_CLOCK_HSI;
 			break;
 		}
@@ -159,8 +217,11 @@ RCC_status_t RCC_switch_to_pll(void) {
 		// Wait for PLLRDY='1' or timeout.
 		if (loop_count > RCC_TIMEOUT_COUNT) {
 			// Turn TCXO off.
-			GPIO_write(&GPIO_TCXO_POWER_ENABLE, 0);
-			RCC -> CR &= ~(0b1 << 16); // Disable HSE (HSEON='0').
+			power_status = POWER_disable(POWER_DOMAIN_MCU_TCXO);
+			POWER_stack_error();
+			// Disable PLL and HSE.
+			RCC -> CR &= ~(0b1 << 24); // PLLON='0'.
+			RCC -> CR &= ~(0b1 << 16); // HSEON='0'.
 			// Exit.
 			status = RCC_ERROR_PLL_READY;
 			goto errors;
@@ -177,18 +238,23 @@ RCC_status_t RCC_switch_to_pll(void) {
 		// Wait for SWS='10' or timeout.
 		loop_count++;
 		if (loop_count > RCC_TIMEOUT_COUNT) {
-			// Turn PLL off.
-			RCC -> CR &= ~(0b1 << 24); // Disable PLL (PLLON='0').
+			// Disable PLL and HSE.
+			RCC -> CR &= ~(0b1 << 24); // PLLON='0'.
+			RCC -> CR &= ~(0b1 << 16); // HSEON='0'.
 			// Turn TCXO off.
-			GPIO_write(&GPIO_TCXO_POWER_ENABLE, 0);
-			RCC -> CR &= ~(0b1 << 16); // Disable HSE (HSEON='0').
+			power_status = POWER_disable(POWER_DOMAIN_MCU_TCXO);
+			POWER_stack_error();
 			// Exit.
 			status = RCC_ERROR_PLL_SWITCH;
 			goto errors;
 		}
 	}
+#ifndef LINKY_TIC_ENABLE
 	// Disable HSI.
-	RCC -> CR &= ~(0b1 << 8); // HSION='0'.
+	if (rcc_ctx.pll_source != RCC_CLOCK_HSI) {
+		RCC -> CR &= ~(0b1 << 8); // HSION='0'.
+	}
+#endif
 	// Update clocks context.
 	rcc_ctx.sysclk_source = RCC_CLOCK_PLL;
 	rcc_ctx.clock_frequency[RCC_CLOCK_PLL] = (rcc_ctx.clock_frequency[rcc_ctx.pll_source] * 30) / (4);

@@ -12,7 +12,9 @@
 #include "dma.h"
 #include "led.h"
 #include "math_custom.h"
+#include "mode.h"
 #include "power.h"
+#include "rcc.h"
 #include "tim.h"
 #include "types.h"
 
@@ -34,12 +36,23 @@ typedef enum {
 	MEASURE_ERROR_BASE_ADC = 0x0100,
 	MEASURE_ERROR_BASE_TIM2 = (MEASURE_ERROR_BASE_ADC + ADC_ERROR_BASE_LAST),
 	MEASURE_ERROR_BASE_TIM6 = (MEASURE_ERROR_BASE_TIM2 + TIM_ERROR_BASE_LAST),
-	MEASURE_ERROR_BASE_MATH = (MEASURE_ERROR_BASE_TIM6 + TIM_ERROR_BASE_LAST),
+	MEASURE_ERROR_BASE_RCC = (MEASURE_ERROR_BASE_TIM6 + TIM_ERROR_BASE_LAST),
+	MEASURE_ERROR_BASE_MATH = (MEASURE_ERROR_BASE_RCC + RCC_ERROR_BASE_LAST),
 	MEASURE_ERROR_BASE_POWER = (MEASURE_ERROR_BASE_MATH + MATH_ERROR_BASE_LAST),
 	MEASURE_ERROR_BASE_LED = (MEASURE_ERROR_BASE_POWER + POWER_ERROR_BASE_LAST),
 	// Last base value.
 	MEASURE_ERROR_BASE_LAST = (MEASURE_ERROR_BASE_LED + LED_ERROR_BASE_LAST)
 } MEASURE_status_t;
+
+/*!******************************************************************
+ * \enum MEASURE_state_t
+ * \brief MEASURE states list.
+ *******************************************************************/
+typedef enum {
+	MEASURE_STATE_OFF = 0,
+	MEASURE_STATE_ACTIVE,
+	MEASURE_STATE_LAST
+} MEASURE_state_t;
 
 /*!******************************************************************
  * \enum MEASURE_data_index_t
@@ -108,6 +121,15 @@ typedef struct {
 MEASURE_status_t MEASURE_init(void);
 
 /*!******************************************************************
+ * \fn MEASURE_state_t MEASURE_get_state(void)
+ * \brief Read MEASURE driver state.
+ * \param[in]  	none
+ * \param[out] 	none
+ * \retval		MEASURE driver state.
+ *******************************************************************/
+MEASURE_state_t MEASURE_get_state(void);
+
+/*!******************************************************************
  * \fn void MEASURE_set_gains(uint16_t transformer_gain, uint16_t current_sensors_gain[ADC_NUMBER_OF_ACI_CHANNELS])
  * \brief Set ACV and ACI measurements gains.
  * \param[in]	transformer_gain: Transformer gain in (10 * V/V).
@@ -117,6 +139,7 @@ MEASURE_status_t MEASURE_init(void);
  *******************************************************************/
 MEASURE_status_t MEASURE_set_gains(uint16_t transformer_gain, uint16_t current_sensors_gain[ADC_NUMBER_OF_ACI_CHANNELS]);
 
+#ifdef ANALOG_MEASURE_ENABLE
 /*!******************************************************************
  * \fn MEASURE_status_t MEASURE_tick_second(void)
  * \brief Function to call every second.
@@ -125,6 +148,7 @@ MEASURE_status_t MEASURE_set_gains(uint16_t transformer_gain, uint16_t current_s
  * \retval		Function execution status.
  *******************************************************************/
 MEASURE_status_t MEASURE_tick_second(void);
+#endif
 
 /*!******************************************************************
  * \fn MEASURE_status_t MEASURE_get_probe_detect_flag(uint8_t ac_channel_index, uint8_t* current_probe_connected)

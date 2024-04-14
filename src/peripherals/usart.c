@@ -77,13 +77,8 @@ USART_status_t USART2_init(uint32_t baud_rate, char_t character_match, USART_cha
 	USART2 -> CR2 |= (character_match << 24); // LF character used to trigger CM interrupt (works as is because even parity of LF is 0).
 	USART2 -> CR3 |= (0b1 << 6); // Transfer is performed after each RXNE event.
 	USART2 -> CR1 |= (0b1 << 14) | (0b1 << 8); // Enable CM and PE interrupts (PEIE='1' and CMIE='1').
-	// Enable transmitter and receiver.
-	USART2 -> CR1 |= (0b11 << 2); // TE='1' and RE='1'.
 	// Enable peripheral.
 	USART2 -> CR1 |= (0b1 << 0); // UE='1'.
-	// Configure GPIOs.
-	GPIO_configure(&GPIO_USART2_TX, GPIO_MODE_ALTERNATE_FUNCTION, GPIO_TYPE_PUSH_PULL, GPIO_SPEED_LOW, GPIO_PULL_NONE);
-	GPIO_configure(&GPIO_USART2_RX, GPIO_MODE_ALTERNATE_FUNCTION, GPIO_TYPE_PUSH_PULL, GPIO_SPEED_LOW, GPIO_PULL_NONE);
 	// Register callback.
 	usart_cm_irq_callback = irq_callback;
 errors:
@@ -92,9 +87,8 @@ errors:
 
 /*******************************************************************/
 void USART2_de_init(void) {
-	// Disable USART alternate function.
-	GPIO_configure(&GPIO_USART2_TX, GPIO_MODE_ANALOG, GPIO_TYPE_OPEN_DRAIN, GPIO_SPEED_LOW, GPIO_PULL_NONE);
-	GPIO_configure(&GPIO_USART2_RX, GPIO_MODE_ANALOG, GPIO_TYPE_OPEN_DRAIN, GPIO_SPEED_LOW, GPIO_PULL_NONE);
+	// Disable receiver.
+	USART2_disable_rx();
 	// Disable peripheral.
 	USART2 -> CR1 &= ~(0b1 << 0); // UE='0'.
 	// Disable peripheral clock.
@@ -103,6 +97,11 @@ void USART2_de_init(void) {
 
 /*******************************************************************/
 void USART2_enable_rx(void) {
+	// Enable receiver.
+	USART2 -> CR1 |= (0b1 << 2); // RE='1'.
+	// Enable alternate function.
+	GPIO_configure(&GPIO_USART2_TX, GPIO_MODE_ALTERNATE_FUNCTION, GPIO_TYPE_PUSH_PULL, GPIO_SPEED_LOW, GPIO_PULL_NONE);
+	GPIO_configure(&GPIO_USART2_RX, GPIO_MODE_ALTERNATE_FUNCTION, GPIO_TYPE_PUSH_PULL, GPIO_SPEED_LOW, GPIO_PULL_NONE);
 	// Clear flag and enable interrupt.
 	USART2 -> RQR |= (0b1 << 3);
 	NVIC_enable_interrupt(NVIC_INTERRUPT_USART2, NVIC_PRIORITY_USART2);
@@ -112,33 +111,9 @@ void USART2_enable_rx(void) {
 void USART2_disable_rx(void) {
 	// Disable interrupt.
 	NVIC_disable_interrupt(NVIC_INTERRUPT_USART2);
-}
-
-/*******************************************************************/
-USART_status_t USART2_write(uint8_t* data, uint32_t data_size_bytes) {
-	// Local variables.
-	USART_status_t status = USART_SUCCESS;
-	uint8_t idx = 0;
-	uint32_t loop_count = 0;
-	// Check parameters.
-	if (data == NULL) {
-		status = USART_ERROR_NULL_PARAMETER;
-		goto errors;
-	}
-	// Byte loop.
-	for (idx=0 ; idx<data_size_bytes ; idx++) {
-		// Fill transmit register.
-		USART2 -> TDR = data[idx];
-		// Wait for transmission to complete.
-		while (((USART2 -> ISR) & (0b1 << 7)) == 0) {
-			// Wait for TXE='1' or timeout.
-			loop_count++;
-			if (loop_count > USART_TIMEOUT_COUNT) {
-				status = USART_ERROR_TX_TIMEOUT;
-				goto errors;
-			}
-		}
-	}
-errors:
-	return status;
+	// Disable USART alternate function.
+	GPIO_configure(&GPIO_USART2_TX, GPIO_MODE_ANALOG, GPIO_TYPE_OPEN_DRAIN, GPIO_SPEED_LOW, GPIO_PULL_NONE);
+	GPIO_configure(&GPIO_USART2_RX, GPIO_MODE_ANALOG, GPIO_TYPE_OPEN_DRAIN, GPIO_SPEED_LOW, GPIO_PULL_NONE);
+	// Disable receiver.
+	USART2 -> CR1 &= ~(0b1 << 2); // RE='0'.
 }

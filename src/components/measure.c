@@ -20,6 +20,7 @@
 #include "mode.h"
 #include "nvic.h"
 #include "power.h"
+#include "rcc.h"
 #include "tim.h"
 #include "types.h"
 
@@ -61,13 +62,6 @@
 #define MEASURE_TIMEOUT_COUNT							10000000
 
 /*** MEASURE local structures ***/
-
-/*******************************************************************/
-typedef enum {
-	MEASURE_STATE_STOPPED = 0,
-	MEASURE_STATE_ACTIVE,
-	MEASURE_STATE_LAST
-} MEASURE_state_t;
 
 /*******************************************************************/
 typedef struct {
@@ -291,6 +285,7 @@ static void _MEASURE_reset(void) {
 	DMA1_adcx_set_destination_address((uint32_t) &(measure_sampling.acv[measure_sampling.acv_write_idx].data), (uint32_t) &(measure_sampling.aci[measure_sampling.aci_write_idx].data), MEASURE_PERIOD_ADCX_DMA_BUFFER_SIZE);
 }
 
+#ifdef ANALOG_MEASURE_ENABLE
 /*******************************************************************/
 static MEASURE_status_t _MEASURE_start_analog_transfer(void) {
 	// Local variables.
@@ -306,7 +301,9 @@ static MEASURE_status_t _MEASURE_start_analog_transfer(void) {
 errors:
 	return status;
 }
+#endif
 
+#ifdef ANALOG_MEASURE_ENABLE
 /*******************************************************************/
 static MEASURE_status_t _MEASURE_stop_analog_transfer(void) {
 	// Local variables.
@@ -322,11 +319,32 @@ static MEASURE_status_t _MEASURE_stop_analog_transfer(void) {
 errors:
 	return status;
 }
+#endif
 
+#ifdef ANALOG_MEASURE_ENABLE
 /*******************************************************************/
 static MEASURE_status_t _MEASURE_start(void) {
 	// Local variables.
 	MEASURE_status_t status = MEASURE_SUCCESS;
+	RCC_status_t rcc_status = RCC_SUCCESS;
+	ADC_status_t adc_status = ADC_SUCCESS;
+	LED_status_t led_status = LED_SUCCESS;
+	TIM_status_t tim2_status = TIM_SUCCESS;
+	TIM_status_t tim6_status = TIM_SUCCESS;
+	// Switch to PLL.
+	rcc_status = RCC_switch_to_pll();
+	RCC_exit_error(MEASURE_ERROR_BASE_RCC);
+	// Init ADC.
+	adc_status = ADC_init();
+	ADC_exit_error(MEASURE_ERROR_BASE_ADC);
+	// Init frequency measurement timer and ADC timer.
+	tim2_status = TIM2_init(MEASURE_ACV_FREQUENCY_SAMPLING_HZ);
+	TIM2_exit_error(MEASURE_ERROR_BASE_TIM2);
+	tim6_status = TIM6_init();
+	TIM6_exit_error(MEASURE_ERROR_BASE_TIM6);
+	// Re-init LED to update clock frequency.
+	led_status = LED_init();
+	LED_exit_error(MEASURE_ERROR_BASE_LED);
 	// Start frequency measurement timer.
 	TIM2_start();
 	DMA1_tim2_start();
@@ -334,13 +352,19 @@ static MEASURE_status_t _MEASURE_start(void) {
 	status = _MEASURE_start_analog_transfer();
 	// Update flag.
 	measure_ctx.processing_enable = 1;
+errors:
 	return status;
 }
+#endif
 
+#ifdef ANALOG_MEASURE_ENABLE
 /*******************************************************************/
 static MEASURE_status_t _MEASURE_stop(void) {
 	// Local variables.
 	MEASURE_status_t status = MEASURE_SUCCESS;
+	RCC_status_t rcc_status = RCC_SUCCESS;
+	ADC_status_t adc_status = ADC_SUCCESS;
+	LED_status_t led_status = LED_SUCCESS;
 	// Update flag.
 	measure_ctx.processing_enable = 0;
 	// Stop frequency measurement timer.
@@ -348,9 +372,31 @@ static MEASURE_status_t _MEASURE_stop(void) {
 	TIM2_stop();
 	// Start analog measurements.
 	status = _MEASURE_stop_analog_transfer();
+	if (status != MEASURE_SUCCESS) goto errors;
+	// Release ADC.
+	adc_status = ADC_de_init();
+	ADC_exit_error(MEASURE_ERROR_BASE_ADC);
+	// Release timers.
+	TIM2_de_init();
+	TIM6_de_init();
+	// Switch to HSI.
+	rcc_status = RCC_switch_to_hsi();
+	RCC_exit_error(MEASURE_ERROR_BASE_RCC);
+	// Re-init LED to update clock frequency.
+	led_status = LED_init();
+	LED_exit_error(MEASURE_ERROR_BASE_LED);
+	return status;
+errors:
+	ADC_de_init();
+	TIM2_de_init();
+	TIM6_de_init();
+	RCC_switch_to_hsi();
+	LED_init();
 	return status;
 }
+#endif
 
+#ifdef ANALOG_MEASURE_ENABLE
 /*******************************************************************/
 static MEASURE_status_t _MEASURE_switch_dma_buffer(void) {
 	// Local variables.
@@ -370,7 +416,9 @@ static MEASURE_status_t _MEASURE_switch_dma_buffer(void) {
 errors:
 	return status;
 }
+#endif
 
+#ifdef ANALOG_MEASURE_ENABLE
 /*******************************************************************/
 static void _MEASURE_compute_period_data(void) {
 	// Local variables.
@@ -479,7 +527,9 @@ errors:
 	measure_sampling.acv_read_idx = ((measure_sampling.acv_read_idx + 1) % MEASURE_PERIOD_ADCX_DMA_BUFFER_DEPTH);
 	measure_sampling.aci_read_idx = ((measure_sampling.aci_read_idx + 1) % MEASURE_PERIOD_ADCX_DMA_BUFFER_DEPTH);
 }
+#endif
 
+#ifdef ANALOG_MEASURE_ENABLE
 /*******************************************************************/
 static void _MEASURE_compute_run_data(void) {
 	// Local variables.
@@ -501,7 +551,9 @@ static void _MEASURE_compute_run_data(void) {
 	// Reset results.
 	_MEASURE_reset_data(measure_data.acv_frequency_rolling_mean);
 }
+#endif
 
+#ifdef ANALOG_MEASURE_ENABLE
 /*******************************************************************/
 static MEASURE_status_t _MEASURE_compute_accumulated_data(void) {
 	// Local variables.
@@ -530,7 +582,9 @@ static MEASURE_status_t _MEASURE_compute_accumulated_data(void) {
 errors:
 	return status;
 }
+#endif
 
+#ifdef ANALOG_MEASURE_ENABLE
 /*******************************************************************/
 static MEASURE_status_t _MEASURE_led_single_pulse(void) {
 	// Local variables.
@@ -542,7 +596,7 @@ static MEASURE_status_t _MEASURE_led_single_pulse(void) {
 		// Reset count.
 		measure_ctx.tick_led_seconds_count = 0;
 		// Compute LED color according to state.
-		if (measure_ctx.state == MEASURE_STATE_STOPPED) {
+		if (measure_ctx.state == MEASURE_STATE_OFF) {
 			// Check current number of samples (CH1 RMS voltage as reference).
 			led_color = (measure_data.chx_accumulated_data[0].rms_voltage_mv.number_of_samples == 0) ? LED_COLOR_RED : LED_COLOR_YELLOW;
 		}
@@ -556,14 +610,16 @@ static MEASURE_status_t _MEASURE_led_single_pulse(void) {
 errors:
 	return status;
 }
+#endif
 
+#ifdef ANALOG_MEASURE_ENABLE
 /*******************************************************************/
 static MEASURE_status_t _MEASURE_internal_process(void) {
 	// Local variables.
 	MEASURE_status_t status = MEASURE_SUCCESS;
 	// Perform state machine.
 	switch (measure_ctx.state) {
-	case MEASURE_STATE_STOPPED:
+	case MEASURE_STATE_OFF:
 		// Synchronize on zero cross.
 		if (measure_ctx.zero_cross_count >= MEASURE_ZERO_CROSS_START_THRESHOLD) {
 			// Reset context.
@@ -595,7 +651,7 @@ static MEASURE_status_t _MEASURE_internal_process(void) {
 			// Stop measure.
 			_MEASURE_stop();
 			// Update state.
-			measure_ctx.state = MEASURE_STATE_STOPPED;
+			measure_ctx.state = MEASURE_STATE_OFF;
 		}
 		break;
 	default:
@@ -605,7 +661,9 @@ static MEASURE_status_t _MEASURE_internal_process(void) {
 errors:
 	return status;
 }
+#endif
 
+#ifdef ANALOG_MEASURE_ENABLE
 /*******************************************************************/
 static void _MEASURE_increment_zero_cross_count(void) {
 	// Local variables.
@@ -616,7 +674,9 @@ static void _MEASURE_increment_zero_cross_count(void) {
 	measure_status = _MEASURE_internal_process();
 	MEASURE_stack_error();
 }
+#endif
 
+#ifdef ANALOG_MEASURE_ENABLE
 /*******************************************************************/
 static void _MEASURE_set_dma_transfer_end_flag(void) {
 	// Local variables.
@@ -627,6 +687,7 @@ static void _MEASURE_set_dma_transfer_end_flag(void) {
 	measure_status = _MEASURE_internal_process();
 	MEASURE_stack_error();
 }
+#endif
 
 /*** MEASURE functions ***/
 
@@ -634,51 +695,46 @@ static void _MEASURE_set_dma_transfer_end_flag(void) {
 MEASURE_status_t MEASURE_init(void) {
 	// Local variables.
 	MEASURE_status_t status = MEASURE_SUCCESS;
-	ADC_status_t adc_status = ADC_SUCCESS;
+#ifdef ANALOG_MEASURE_ENABLE
 	POWER_status_t power_status = POWER_SUCCESS;
-	TIM_status_t tim2_status = TIM_SUCCESS;
-	TIM_status_t tim6_status = TIM_SUCCESS;
-	LED_status_t led_status = LED_SUCCESS;
+#endif
 	uint8_t chx_idx = 0;
 	// Init context.
-	measure_ctx.state = MEASURE_STATE_STOPPED;
+	measure_ctx.state = MEASURE_STATE_OFF;
 	measure_ctx.tick_led_seconds_count = 0;
 	// Init energy data.
 	for (chx_idx=0 ; chx_idx<ADC_NUMBER_OF_ACI_CHANNELS ; chx_idx++) {
 		measure_data.active_energy_mws_sum[chx_idx] = 0;
 		measure_data.apparent_energy_mvas_sum[chx_idx] = 0;
 	}
+#ifdef ANALOG_MEASURE_ENABLE
 	// Init detect pins.
 	for (chx_idx=0 ; chx_idx<ADC_NUMBER_OF_ACI_CHANNELS ; chx_idx++) {
 		GPIO_configure(MEASURE_GPIO_ACI_DETECT[chx_idx], GPIO_MODE_INPUT, GPIO_TYPE_PUSH_PULL, GPIO_SPEED_LOW, GPIO_PULL_NONE);
 	}
 	// Turn analog front-end on to have VREF+ for ADC calibration.
-	power_status = POWER_enable(POWER_DOMAIN_ANALOG, LPTIM_DELAY_MODE_ACTIVE);
+	power_status = POWER_enable(POWER_DOMAIN_ANALOG, LPTIM_DELAY_MODE_SLEEP);
 	POWER_exit_error(MEASURE_ERROR_BASE_POWER);
-	// Init ADC.
-	adc_status = ADC_init();
-	ADC_exit_error(MEASURE_ERROR_BASE_ADC);
-	// Init RGB LED.
-	led_status = LED_init();
-	LED_exit_error(MEASURE_ERROR_BASE_LED);
 	// Init zero cross pulse GPIO.
 	GPIO_configure(&GPIO_ZERO_CROSS_PULSE, GPIO_MODE_INPUT, GPIO_TYPE_PUSH_PULL, GPIO_SPEED_LOW, GPIO_PULL_NONE);
 	EXTI_configure_gpio(&GPIO_ZERO_CROSS_PULSE, EXTI_TRIGGER_RISING_EDGE, &_MEASURE_increment_zero_cross_count);
 	NVIC_enable_interrupt(NVIC_INTERRUPT_EXTI2, NVIC_PRIORITY_EXTI2);
-	// Init frequency measurement timer and ADC timer.
-	tim2_status = TIM2_init(MEASURE_ACV_FREQUENCY_SAMPLING_HZ);
-	TIM2_exit_error(MEASURE_ERROR_BASE_TIM2);
-	tim6_status = TIM6_init();
-	TIM6_exit_error(MEASURE_ERROR_BASE_TIM6);
 	// Init ADC DMA.
 	DMA1_adcx_init(&_MEASURE_set_dma_transfer_end_flag);
 	DMA1_adcx_set_destination_address((uint32_t) &(measure_sampling.acv[measure_sampling.acv_write_idx].data), (uint32_t) &(measure_sampling.aci[measure_sampling.aci_write_idx].data), MEASURE_PERIOD_ADCX_DMA_BUFFER_SIZE);
 	// Init timer DMA.
 	DMA1_tim2_init();
 	DMA1_tim2_set_destination_address((uint32_t) &(measure_sampling.tim2_ccr1), MEASURE_PERIOD_TIM2_DMA_BUFFER_SIZE);
+	// Reset data.
 errors:
+#endif
 	_MEASURE_reset();
 	return status;
+}
+
+/*******************************************************************/
+MEASURE_state_t MEASURE_get_state(void) {
+	return (measure_ctx.state);
 }
 
 /*******************************************************************/
@@ -714,6 +770,7 @@ errors:
 	return status;
 }
 
+#ifdef ANALOG_MEASURE_ENABLE
 /*******************************************************************/
 MEASURE_status_t MEASURE_tick_second(void) {
 	// Local variables.
@@ -722,7 +779,7 @@ MEASURE_status_t MEASURE_tick_second(void) {
 	// Increment seconds count.
 	measure_ctx.tick_led_seconds_count++;
 	// Check state.
-	if (measure_ctx.state != MEASURE_STATE_STOPPED) {
+	if (measure_ctx.state != MEASURE_STATE_OFF) {
 		// Compute run data from last second.
 		measure_ctx.processing_enable = 0;
 		_MEASURE_compute_run_data();
@@ -735,6 +792,7 @@ MEASURE_status_t MEASURE_tick_second(void) {
 	status = _MEASURE_led_single_pulse();
 	return status;
 }
+#endif
 
 /*******************************************************************/
 MEASURE_status_t MEASURE_get_probe_detect_flag(uint8_t ac_channel_index, uint8_t* current_sensor_connected) {
@@ -765,7 +823,7 @@ MEASURE_status_t MEASURE_get_mains_detect_flag(uint8_t* mains_voltage_detected) 
 		goto errors;
 	}
 	// Update flag.
-	(*mains_voltage_detected) = (measure_ctx.state == MEASURE_STATE_STOPPED) ? 0 : 1;
+	(*mains_voltage_detected) = (measure_ctx.state == MEASURE_STATE_OFF) ? 0 : 1;
 errors:
 	return status;
 }

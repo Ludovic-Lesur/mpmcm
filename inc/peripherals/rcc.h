@@ -9,6 +9,7 @@
 #define __RCC_H__
 
 #include "flash.h"
+#include "power.h"
 #include "types.h"
 
 /*** RCC macros ***/
@@ -36,8 +37,9 @@ typedef enum {
 	RCC_ERROR_LSI_CALIBRATION,
 	// Low level drivers errors.
 	RCC_ERROR_BASE_FLASH = 0x0100,
+	RCC_ERROR_BASE_POWER = (RCC_ERROR_BASE_FLASH + FLASH_ERROR_BASE_LAST),
 	// Last base value.
-	RCC_ERROR_BASE_LAST = (RCC_ERROR_BASE_FLASH + FLASH_ERROR_BASE_LAST)
+	RCC_ERROR_BASE_LAST = (RCC_ERROR_BASE_POWER + POWER_ERROR_BASE_LAST)
 } RCC_status_t;
 
 /*!******************************************************************
@@ -64,6 +66,15 @@ typedef enum {
  * \retval		none
  *******************************************************************/
 void RCC_init(void);
+
+/*!******************************************************************
+ * \fn RCC_status_t RCC_switch_to_hsi(void)
+ * \brief Switch system clock to 16MHz HSI.
+ * \param[in]  	none
+ * \param[out] 	none
+ * \retval		Function execution status.
+ *******************************************************************/
+RCC_status_t RCC_switch_to_hsi(void);
 
 /*!******************************************************************
  * \fn RCC_status_t RCC_switch_to_pll(void)

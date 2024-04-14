@@ -8,7 +8,9 @@
 #ifndef __TIC_H__
 #define __TIC_H__
 
+#include "led.h"
 #include "math_custom.h"
+#include "mode.h"
 #include "power.h"
 #include "types.h"
 #include "usart.h"
@@ -35,9 +37,20 @@ typedef enum {
 	TIC_ERROR_BASE_USART2 = 0x0100,
 	TIC_ERROR_BASE_MATH = (TIC_ERROR_BASE_USART2 + USART_ERROR_BASE_LAST),
 	TIC_ERROR_BASE_POWER = (TIC_ERROR_BASE_MATH + MATH_ERROR_BASE_LAST),
+	TIC_ERROR_BASE_LED = (TIC_ERROR_BASE_POWER + POWER_ERROR_BASE_LAST),
 	// Last base value.
-	TIC_ERROR_BASE_LAST = 0x0100
+	TIC_ERROR_BASE_LAST = (TIC_ERROR_BASE_LED + LED_ERROR_BASE_LAST)
 } TIC_status_t;
+
+/*!******************************************************************
+ * \enum TIC_state_t
+ * \brief TIC states list.
+ *******************************************************************/
+typedef enum {
+	TIC_STATE_OFF = 0,
+	TIC_STATE_ACTIVE,
+	TIC_STATE_LAST
+} TIC_state_t;
 
 /*!******************************************************************
  * \enum TIC_data_index_t
@@ -76,6 +89,26 @@ typedef struct {
  *******************************************************************/
 TIC_status_t TIC_init(void);
 
+#ifdef LINKY_TIC_ENABLE
+/*!******************************************************************
+ * \fn TIC_status_t TIC_process(void)
+ * \brief Process TIC driver.
+ * \param[in]  	none
+ * \param[out] 	none
+ * \retval		Function execution status.
+ *******************************************************************/
+TIC_status_t TIC_process(void);
+#endif
+
+/*!******************************************************************
+ * \fn TIC_state_t TIC_get_state(void)
+ * \brief Read TIC driver state.
+ * \param[in]  	none
+ * \param[out] 	none
+ * \retval		TIC driver state.
+ *******************************************************************/
+TIC_state_t TIC_get_state(void);
+
 /*!******************************************************************
  * \fn TIC_status_t TIC_set_sampling_period(uint32_t period_seconds)
  * \brief Set TIC data sampling period.
@@ -85,14 +118,16 @@ TIC_status_t TIC_init(void);
  *******************************************************************/
 TIC_status_t TIC_set_sampling_period(uint32_t period_seconds);
 
+#ifdef LINKY_TIC_ENABLE
 /*!******************************************************************
  * \fn TIC_status_t TIC_tick_second(void)
  * \brief Function to call every second.
  * \param[in]  	none
  * \param[out] 	none
- * \retval		Function execution status.
+ * \retval		none
  *******************************************************************/
-TIC_status_t TIC_tick_second(void);
+void TIC_tick_second(void);
+#endif
 
 /*!******************************************************************
  * \fn TIC_status_t TIC_get_detect_flag(uint8_t* linky_tic_connected)

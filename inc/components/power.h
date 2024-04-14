@@ -34,7 +34,8 @@ typedef enum {
  * \brief Board external power domains list.
  *******************************************************************/
 typedef enum {
-	POWER_DOMAIN_ANALOG = 0,
+	POWER_DOMAIN_MCU_TCXO = 0,
+	POWER_DOMAIN_ANALOG,
 	POWER_DOMAIN_TIC,
 	POWER_DOMAIN_LAST
 } POWER_domain_t;

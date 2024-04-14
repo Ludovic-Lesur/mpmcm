@@ -29,6 +29,16 @@ typedef enum {
 } LED_status_t;
 
 /*!******************************************************************
+ * \enum LED_state_t
+ * \brief LED states list.
+ *******************************************************************/
+typedef enum {
+	LED_STATE_OFF = 0,
+	LED_STATE_ACTIVE,
+	LED_STATE_LAST
+} LED_state_t;
+
+/*!******************************************************************
  * \enum LED_color_t
  * \brief LED colors list.
  *******************************************************************/
@@ -54,6 +64,15 @@ typedef enum {
  * \retval		Function execution status.
  *******************************************************************/
 LED_status_t LED_init(void);
+
+/*!******************************************************************
+ * \fn LED_state_t LED_get_state(void)
+ * \brief Read LED driver state.
+ * \param[in]  	none
+ * \param[out] 	none
+ * \retval		LED driver state.
+ *******************************************************************/
+LED_state_t LED_get_state(void);
 
 /*!******************************************************************
  * \fn LED_status_t LED_single_pulse(uint32_t pulse_duration_ms, LED_color_t color)

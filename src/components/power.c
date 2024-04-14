@@ -7,7 +7,6 @@
 
 #include "power.h"
 
-#include "adc.h"
 #include "gpio.h"
 #include "lptim.h"
 #include "mapping.h"
@@ -16,7 +15,6 @@
 /*** POWER local macros ***/
 
 #define POWER_ON_DELAY_MS_ANALOG	2000
-#define POWER_ON_DELAY_MS_TIC		1000
 
 /*** POWER local global variables ***/
 
@@ -29,6 +27,7 @@ void POWER_init(void) {
 	// Local variables.
 	POWER_domain_t domain = 0;
 	// Init power control pins.
+	GPIO_configure(&GPIO_TCXO_POWER_ENABLE, GPIO_MODE_OUTPUT, GPIO_TYPE_PUSH_PULL, GPIO_SPEED_LOW, GPIO_PULL_NONE);
 	GPIO_configure(&GPIO_ANA_POWER_ENABLE, GPIO_MODE_OUTPUT, GPIO_TYPE_PUSH_PULL, GPIO_SPEED_LOW, GPIO_PULL_NONE);
 	GPIO_configure(&GPIO_TIC_POWER_ENABLE, GPIO_MODE_OUTPUT, GPIO_TYPE_PUSH_PULL, GPIO_SPEED_LOW, GPIO_PULL_NONE);
 	// Disable all domains by default.
@@ -45,6 +44,10 @@ POWER_status_t POWER_enable(POWER_domain_t domain, LPTIM_delay_mode_t delay_mode
 	uint32_t delay_ms = 0;
 	// Check domain.
 	switch (domain) {
+	case POWER_DOMAIN_MCU_TCXO:
+		// Turn TCXO on.
+		GPIO_write(&GPIO_TCXO_POWER_ENABLE, 1);
+		break;
 	case POWER_DOMAIN_ANALOG:
 		// Turn analog front-end on.
 		GPIO_write(&GPIO_ANA_POWER_ENABLE, 1);
@@ -53,7 +56,6 @@ POWER_status_t POWER_enable(POWER_domain_t domain, LPTIM_delay_mode_t delay_mode
 	case POWER_DOMAIN_TIC:
 		// Turn TIC interface on.
 		GPIO_write(&GPIO_TIC_POWER_ENABLE, 1);
-		delay_ms = POWER_ON_DELAY_MS_TIC;
 		break;
 	default:
 		status = POWER_ERROR_DOMAIN;
@@ -76,6 +78,10 @@ POWER_status_t POWER_disable(POWER_domain_t domain) {
 	POWER_status_t status = POWER_SUCCESS;
 	// Check domain.
 	switch (domain) {
+	case POWER_DOMAIN_MCU_TCXO:
+		// Turn TCXO off.
+		GPIO_write(&GPIO_TCXO_POWER_ENABLE, 0);
+		break;
 	case POWER_DOMAIN_ANALOG:
 		// Turn analog front-end off and release ADC.
 		GPIO_write(&GPIO_ANA_POWER_ENABLE, 0);

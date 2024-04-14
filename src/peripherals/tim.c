@@ -76,6 +76,15 @@ void __attribute__((optimize("-O0"))) TIM1_TRG_COM_DIR_IDX_TIM17_IRQHandler(void
 	}
 }
 
+/*******************************************************************/
+void __attribute__((optimize("-O0"))) TIM4_IRQHandler(void) {
+	// Check flag.
+	if (((TIM4 -> SR) & (0b1 << 0)) != 0) {
+		// Clear flag.
+		TIM4 -> SR &= ~(0b1 << 0);
+	}
+}
+
 /*** TIM functions ***/
 
 /*******************************************************************/
@@ -102,6 +111,14 @@ TIM_status_t TIM2_init(uint32_t sampling_frequency_hz) {
 	GPIO_configure(&GPIO_ACV_FREQUENCY, GPIO_MODE_ALTERNATE_FUNCTION, GPIO_TYPE_PUSH_PULL, GPIO_SPEED_LOW, GPIO_PULL_NONE);
 errors:
 	return status;
+}
+
+/*******************************************************************/
+void TIM2_de_init(void) {
+	// ReLease GPIO.
+	GPIO_configure(&GPIO_ACV_FREQUENCY, GPIO_MODE_ANALOG, GPIO_TYPE_OPEN_DRAIN, GPIO_SPEED_LOW, GPIO_PULL_NONE);
+	// Disable peripheral clock.
+	RCC -> APB1ENR1 &= ~(0b1 << 0); // TIM2EN='0'.
 }
 
 /*******************************************************************/
@@ -145,6 +162,9 @@ TIM_status_t TIM4_init(void) {
 		TIM4 -> CCER |= (0b1 << ((TIM4_LED_CHANNELS[idx] << 2) + 1));
 		TIM4 -> CCRx[TIM4_LED_CHANNELS[idx]] = 1;
 	}
+	// Enable update interrupt.
+	TIM4 -> DIER |= (0b1 << 0); // UIE='1'.
+	NVIC_enable_interrupt(NVIC_INTERRUPT_TIM4, NVIC_PRIORITY_TIM4);
 	// Generate event to update registers.
 	TIM4 -> EGR |= (0b1 << 0); // UG='1'.
 errors:
@@ -155,9 +175,8 @@ errors:
 void TIM4_single_pulse(uint32_t pulse_duration_ms, TIM4_channel_mask_t led_color) {
 	// Local variables.
 	uint8_t idx = 0;
-	// Stop counter.
-	TIM4 -> CR1 &= ~(0b1 << 0);
 	// Reset counter.
+	TIM4 -> CR1 &= ~(0b1 << 0);
 	TIM4 -> CNT = 0;
 	// Check parameter.
 	if (pulse_duration_ms == 0) return;
@@ -177,6 +196,13 @@ void TIM4_single_pulse(uint32_t pulse_duration_ms, TIM4_channel_mask_t led_color
 	TIM4 -> EGR |= (0b1 << 0); // UG='1'.
 	// Start counter.
 	TIM4 -> CR1 |= (0b1 << 0); // CEN='1'.
+}
+
+/*******************************************************************/
+uint8_t TIM4_is_single_pulse_done(void) {
+	// Local variables.
+	uint8_t pulse_done = (((TIM4 -> CR1) & (0b1 << 0)) == 0) ? 1 : 0;
+	return pulse_done;
 }
 
 /*******************************************************************/
@@ -205,6 +231,12 @@ TIM_status_t TIM6_init(void) {
 	TIM6 -> CR2 |= (0b010 << 4);
 errors:
 	return status;
+}
+
+/*******************************************************************/
+void TIM6_de_init(void) {
+	// Disable peripheral clock.
+	RCC -> APB1ENR1 &= ~(0b1 << 4); // TIM6EN='0'.
 }
 
 /*******************************************************************/

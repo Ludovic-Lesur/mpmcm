@@ -74,16 +74,6 @@ void USART2_enable_rx(void);
  *******************************************************************/
 void USART2_disable_rx(void);
 
-/*!******************************************************************
- * \fn USART_status_t USART2_write(uint8_t* data, uint32_t data_size_bytes)
- * \brief Send data over USART2.
- * \param[in]	data: Byte array to send.
- * \param[in]	data_size_bytes: Number of bytes to send.
- * \param[out] 	none
- * \retval		Function execution status.
- *******************************************************************/
-USART_status_t USART2_write(uint8_t* data, uint32_t data_size_bytes);
-
 /*******************************************************************/
 #define USART2_exit_error(error_base) { if (usart2_status != USART_SUCCESS) { status = (error_base + usart2_status); goto errors; } }
 
