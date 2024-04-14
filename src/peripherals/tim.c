@@ -135,14 +135,15 @@ TIM_status_t TIM4_init(void) {
 	// Set prescaler.
 	TIM4 -> PSC = ((tim4_clock_hz / TIM4_CLOCK_HZ) - 1);
 	// One pulse mode.
-	TIM4 -> ARR = 0xFFFF;
+	TIM4 -> ARR = 0;
 	TIM4 -> CR1 |= (0b1 << 3) | (0b1 << 7);
 	// Configure channels 1-4 in PWM mode 2 (OCxM='0111', OCxFE='1' and OCxPE='1').
 	TIM4 -> CCMR1 |= (0b111 << 12) | (0b11 << 10) | (0b111 << 4) | (0b11 << 2);
 	TIM4 -> CCMR2 |= (0b111 << 12) | (0b11 << 10) | (0b111 << 4) | (0b11 << 2);
-	// Enable required channels.
+	// Polarity inverted.
 	for (idx=0 ; idx<TIM4_NUMBER_OF_USED_CHANNELS ; idx++) {
-		TIM4 -> CCER |= (0b1 << (TIM4_LED_CHANNELS[idx] << 2));
+		TIM4 -> CCER |= (0b1 << ((TIM4_LED_CHANNELS[idx] << 2) + 1));
+		TIM4 -> CCRx[TIM4_LED_CHANNELS[idx]] = 1;
 	}
 	// Generate event to update registers.
 	TIM4 -> EGR |= (0b1 << 0); // UG='1'.
@@ -160,10 +161,17 @@ void TIM4_single_pulse(uint32_t pulse_duration_ms, TIM4_channel_mask_t led_color
 	TIM4 -> CNT = 0;
 	// Check parameter.
 	if (pulse_duration_ms == 0) return;
-	// Configure channels.
+	// Set pulse length.
+	TIM4 -> ARR = ((pulse_duration_ms * TIM4_CLOCK_HZ) / (1000));
+	// Enable required channels.
 	for (idx=0 ; idx<TIM4_NUMBER_OF_CHANNELS ; idx++) {
-		// Set pulse length.
-		TIM4 -> CCRx[idx] = ((led_color & (0b1 << idx)) != 0) ? ((pulse_duration_ms * TIM4_CLOCK_HZ) / (1000)) : 0;
+		// Check channel bit.
+		if ((led_color & (0b1 << idx)) != 0) {
+			TIM4 -> CCER |= 0b1 << (idx << 2);
+		}
+		else {
+			TIM4 -> CCER &= ~(0b1 << (idx << 2));
+		}
 	}
 	// Generate event to update registers.
 	TIM4 -> EGR |= (0b1 << 0); // UG='1'.

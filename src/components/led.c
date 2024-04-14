@@ -46,6 +46,7 @@ errors:
 LED_status_t LED_single_pulse(uint32_t pulse_duration_ms, LED_color_t color) {
 	// Local variables.
 	LED_status_t status = LED_SUCCESS;
+	GPIO_mode_t gpio_mode = GPIO_MODE_OUTPUT;
 	// Check parameters.
 	if (pulse_duration_ms == 0) {
 		status = LED_ERROR_NULL_DURATION;
@@ -55,13 +56,15 @@ LED_status_t LED_single_pulse(uint32_t pulse_duration_ms, LED_color_t color) {
 		status = LED_ERROR_COLOR;
 		goto errors;
 	}
-	// Link GPIOs to timer.
-	GPIO_configure(&GPIO_LED_RED, GPIO_MODE_ALTERNATE_FUNCTION, GPIO_TYPE_PUSH_PULL, GPIO_SPEED_LOW, GPIO_PULL_NONE);
-	GPIO_configure(&GPIO_LED_GREEN, GPIO_MODE_ALTERNATE_FUNCTION, GPIO_TYPE_PUSH_PULL, GPIO_SPEED_LOW, GPIO_PULL_NONE);
-	GPIO_configure(&GPIO_LED_BLUE, GPIO_MODE_ALTERNATE_FUNCTION, GPIO_TYPE_PUSH_PULL, GPIO_SPEED_LOW, GPIO_PULL_NONE);
+	// Link required GPIOs to timer.
+	gpio_mode = (color & TIM4_CHANNEL_MASK_RED) ? GPIO_MODE_ALTERNATE_FUNCTION : GPIO_MODE_OUTPUT;
+	GPIO_configure(&GPIO_LED_RED, gpio_mode, GPIO_TYPE_PUSH_PULL, GPIO_SPEED_LOW, GPIO_PULL_NONE);
+	gpio_mode = (color & TIM4_CHANNEL_MASK_GREEN) ? GPIO_MODE_ALTERNATE_FUNCTION : GPIO_MODE_OUTPUT;
+	GPIO_configure(&GPIO_LED_GREEN, gpio_mode, GPIO_TYPE_PUSH_PULL, GPIO_SPEED_LOW, GPIO_PULL_NONE);
+	gpio_mode = (color & TIM4_CHANNEL_MASK_BLUE) ? GPIO_MODE_ALTERNATE_FUNCTION : GPIO_MODE_OUTPUT;
+	GPIO_configure(&GPIO_LED_BLUE, gpio_mode, GPIO_TYPE_PUSH_PULL, GPIO_SPEED_LOW, GPIO_PULL_NONE);
 	// Make pulse.
 	TIM4_single_pulse(pulse_duration_ms, color);
 errors:
 	return status;
 }
-
