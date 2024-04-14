@@ -224,7 +224,7 @@ static TIC_status_t _TIC_decode_sample(uint8_t sample_index) {
 		parser_status = PARSER_get_parameter(&tic_ctx.parser, STRING_FORMAT_DECIMAL, TIC_FRAME_SEPARATOR_CHAR, &sample);
 		if (parser_status == PARSER_SUCCESS) {
 			// Update data.
-			tic_ctx.run_data[sample_index] = (sample / 1000);
+			tic_ctx.run_data[sample_index] = (sample * 1000);
 			_TIC_add_accumulated_sample(tic_ctx.accumulated_data[sample_index], (sample * 1000));
 			// Set flag.
 			tic_ctx.flags.decode_success = 1;
