@@ -344,6 +344,36 @@ NODE_status_t MPMCM_check_register(uint8_t reg_addr, uint32_t reg_mask) {
 			if (DINFOX_read_field(reg_value, MPMCM_REG_CONTROL_1_MASK_TICS) != 0) {
 				// Clear request.
 				DINFOX_write_field(&new_reg_value, &new_reg_mask, 0b0, MPMCM_REG_CONTROL_1_MASK_TICS);
+				// Active power.
+				data_reg_value = 0;
+				data_reg_mask = 0;
+				DINFOX_write_field(&data_reg_value, &data_reg_mask, DINFOX_ELECTRICAL_POWER_ERROR_VALUE, MPMCM_REG_MASK_MEAN);
+				NODE_write_register(NODE_REQUEST_SOURCE_INTERNAL, MPMCM_REG_ADDR_TIC_ACTIVE_POWER_0, data_reg_mask, data_reg_value);
+				data_reg_value = 0;
+				data_reg_mask = 0;
+				DINFOX_write_field(&data_reg_value, &data_reg_mask, DINFOX_ELECTRICAL_POWER_ERROR_VALUE, MPMCM_REG_MASK_MIN);
+				DINFOX_write_field(&data_reg_value, &data_reg_mask, DINFOX_ELECTRICAL_POWER_ERROR_VALUE, MPMCM_REG_MASK_MAX);
+				NODE_write_register(NODE_REQUEST_SOURCE_INTERNAL, MPMCM_REG_ADDR_TIC_ACTIVE_POWER_1, data_reg_mask, data_reg_value);
+				// RMS voltage
+				data_reg_value = 0;
+				data_reg_mask = 0;
+				DINFOX_write_field(&data_reg_value, &data_reg_mask, DINFOX_VOLTAGE_ERROR_VALUE, MPMCM_REG_MASK_MEAN);
+				NODE_write_register(NODE_REQUEST_SOURCE_INTERNAL, MPMCM_REG_ADDR_TIC_RMS_VOLTAGE_0, data_reg_mask, data_reg_value);
+				data_reg_value = 0;
+				data_reg_mask = 0;
+				DINFOX_write_field(&data_reg_value, &data_reg_mask, DINFOX_VOLTAGE_ERROR_VALUE, MPMCM_REG_MASK_MIN);
+				DINFOX_write_field(&data_reg_value, &data_reg_mask, DINFOX_VOLTAGE_ERROR_VALUE, MPMCM_REG_MASK_MAX);
+				NODE_write_register(NODE_REQUEST_SOURCE_INTERNAL, MPMCM_REG_ADDR_TIC_RMS_VOLTAGE_1, data_reg_mask, data_reg_value);
+				// RMS current.
+				data_reg_value = 0;
+				data_reg_mask = 0;
+				DINFOX_write_field(&data_reg_value, &data_reg_mask, DINFOX_CURRENT_ERROR_VALUE, MPMCM_REG_MASK_MEAN);
+				NODE_write_register(NODE_REQUEST_SOURCE_INTERNAL, MPMCM_REG_ADDR_TIC_RMS_CURRENT_0, data_reg_mask, data_reg_value);
+				data_reg_value = 0;
+				data_reg_mask = 0;
+				DINFOX_write_field(&data_reg_value, &data_reg_mask, DINFOX_CURRENT_ERROR_VALUE, MPMCM_REG_MASK_MIN);
+				DINFOX_write_field(&data_reg_value, &data_reg_mask, DINFOX_CURRENT_ERROR_VALUE, MPMCM_REG_MASK_MAX);
+				NODE_write_register(NODE_REQUEST_SOURCE_INTERNAL, MPMCM_REG_ADDR_TIC_RMS_CURRENT_1, data_reg_mask, data_reg_value);
 				// Apparent power.
 				tic_status = TIC_get_accumulated_data(TIC_DATA_INDEX_APPARENT_POWER_MVA, &tic_data);
 				TIC_exit_error(NODE_ERROR_BASE_TIC);
@@ -359,6 +389,22 @@ NODE_status_t MPMCM_check_register(uint8_t reg_addr, uint32_t reg_mask) {
 				field_value = (tic_data.number_of_samples > 0) ? DINFOX_convert_mw_mva(tic_data.max) : DINFOX_ELECTRICAL_POWER_ERROR_VALUE;
 				DINFOX_write_field(&data_reg_value, &data_reg_mask, field_value, MPMCM_REG_MASK_MAX);
 				NODE_write_register(NODE_REQUEST_SOURCE_INTERNAL, MPMCM_REG_ADDR_TIC_APPARENT_POWER_1, data_reg_mask, data_reg_value);
+				// Power factor.
+				data_reg_value = 0;
+				data_reg_mask = 0;
+				DINFOX_write_field(&data_reg_value, &data_reg_mask, DINFOX_POWER_FACTOR_ERROR_VALUE, MPMCM_REG_MASK_MEAN);
+				NODE_write_register(NODE_REQUEST_SOURCE_INTERNAL, MPMCM_REG_ADDR_TIC_POWER_FACTOR_0, data_reg_mask, data_reg_value);
+				data_reg_value = 0;
+				data_reg_mask = 0;
+				DINFOX_write_field(&data_reg_value, &data_reg_mask, DINFOX_POWER_FACTOR_ERROR_VALUE, MPMCM_REG_MASK_MIN);
+				DINFOX_write_field(&data_reg_value, &data_reg_mask, DINFOX_POWER_FACTOR_ERROR_VALUE, MPMCM_REG_MASK_MAX);
+				NODE_write_register(NODE_REQUEST_SOURCE_INTERNAL, MPMCM_REG_ADDR_TIC_POWER_FACTOR_1, data_reg_mask, data_reg_value);
+				// Active and apparent energy.
+				data_reg_value = 0;
+				data_reg_mask = 0;
+				DINFOX_write_field(&data_reg_value, &data_reg_mask, DINFOX_ELECTRICAL_ENERGY_ERROR_VALUE, MPMCM_REG_MASK_ACTIVE_ENERGY);
+				DINFOX_write_field(&data_reg_value, &data_reg_mask, DINFOX_ELECTRICAL_ENERGY_ERROR_VALUE, MPMCM_REG_MASK_APPARENT_ENERGY);
+				NODE_write_register(NODE_REQUEST_SOURCE_INTERNAL, MPMCM_REG_ADDR_TIC_ENERGY, data_reg_mask, data_reg_value);
 			}
 		}
 		break;
