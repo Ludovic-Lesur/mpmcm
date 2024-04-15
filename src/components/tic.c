@@ -453,7 +453,10 @@ TIC_status_t TIC_get_accumulated_data(TIC_data_index_t data_index, TIC_accumulat
 		status = TIC_ERROR_NULL_PARAMETER;
 		goto errors;
 	}
+	// Copy data.
 	_TIC_copy_accumulated_data(tic_ctx.accumulated_data[data_index], (*accumulated_data));
+	// Reset data.
+	_TIC_reset_accumulated_data(tic_ctx.accumulated_data[data_index]);
 errors:
 	return status;
 }

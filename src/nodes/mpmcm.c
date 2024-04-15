@@ -254,7 +254,7 @@ NODE_status_t MPMCM_check_register(uint8_t reg_addr, uint32_t reg_mask) {
 		// CHxS.
 		for (channel_idx=0 ; channel_idx<ADC_NUMBER_OF_ACI_CHANNELS ; channel_idx++) {
 			//  Check mask.
-			if ((reg_mask & MPMCM_REG_CONTROL_1_MASK_FRQS) != 0) {
+			if ((reg_mask & (0b1 << channel_idx)) != 0) {
 				// Check bit.
 				if (DINFOX_read_field(reg_value, (0b1 << channel_idx)) != 0) {
 					// Clear request.
