@@ -436,6 +436,10 @@ void AT_BUS_init(void) {
 	FLASH_status_t flash_status = FLASH_SUCCESS;
 	LBUS_status_t lbus_status = LBUS_SUCCESS;
 	uint32_t self_address = 0;
+#ifdef NVM_FACTORY_RESET
+	flash_status = FLASH_write_word(FLASH_ADDRESS_SELF_ADDRESS, NODE_ADDRESS);
+	FLASH_stack_error();
+#endif
 	// Read self address in NVM.
 	flash_status = FLASH_read_word(FLASH_ADDRESS_SELF_ADDRESS, &self_address);
 	FLASH_stack_error();

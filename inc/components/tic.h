@@ -8,6 +8,7 @@
 #ifndef __TIC_H__
 #define __TIC_H__
 
+#include "data.h"
 #include "led.h"
 #include "math_custom.h"
 #include "mode.h"
@@ -51,32 +52,6 @@ typedef enum {
 	TIC_STATE_ACTIVE,
 	TIC_STATE_LAST
 } TIC_state_t;
-
-/*!******************************************************************
- * \enum TIC_data_index_t
- * \brief TIC single data list.
- *******************************************************************/
-typedef enum {
-	TIC_DATA_INDEX_APPARENT_POWER_MVA = 0,
-	TIC_DATA_INDEX_LAST
-} TIC_data_index_t;
-
-/*!******************************************************************
- * \struct TIC_data_t
- * \brief Single run data structure.
- *******************************************************************/
-typedef int32_t TIC_data_t;
-
-/*!******************************************************************
- * \struct TIC_accumulated_data_t
- * \brief Single data result structure.
- *******************************************************************/
-typedef struct {
-	int32_t min;
-	int32_t max;
-	int32_t rolling_mean;
-	uint32_t number_of_samples;
-} TIC_accumulated_data_t;
 
 /*** TIC functions ***/
 
@@ -139,22 +114,22 @@ void TIC_tick_second(void);
 TIC_status_t TIC_get_detect_flag(uint8_t* linky_tic_connected);
 
 /*!******************************************************************
- * \fn TIC_status_t TIC_get_run_data(TIC_data_index_t data_index, TIC_data_t* run_data)
+ * \fn TIC_status_t TIC_get_channel_run_data(DATA_run_channel_t* channel_run_data)
  * \brief Get run data.
- * \param[in]  	data_index: Data to read.
- * \param[out] 	run_data: Pointer to the run data.
+ * \param[in]  	none
+ * \param[out] 	channel_run_data: Pointer to the TIC channel run data.
  * \retval		Function execution status.
  *******************************************************************/
-TIC_status_t TIC_get_run_data(TIC_data_index_t data_index, TIC_data_t* run_data);
+TIC_status_t TIC_get_channel_run_data(DATA_run_channel_t* channel_run_data);
 
 /*!******************************************************************
- * \fn TIC_status_t TIC_get_accumulated_data(TIC_data_index_t data_index, TIC_accumulated_data_t* accumulated_data)
+ * \fn TIC_status_t TIC_get_channel_accumulated_data(TIC_accumulated_data_t* channel_accumulated_data)
  * \brief Get accumulated data.
- * \param[in]  	data_index: Data to read.
- * \param[out] 	accumulated_data: Pointer to the accumulated data.
+ * \param[in]  	none
+ * \param[out] 	channel_accumulated_data: Pointer to the TIC channel accumulated data.
  * \retval		Function execution status.
  *******************************************************************/
-TIC_status_t TIC_get_accumulated_data(TIC_data_index_t data_index, TIC_accumulated_data_t* accumulated_data);
+TIC_status_t TIC_get_channel_accumulated_data(DATA_accumulated_channel_t* channel_accumulated_data);
 
 /*******************************************************************/
 #define TIC_exit_error(error_base) { if (tic_status != TIC_SUCCESS) { status = error_base + tic_status; goto errors; } }

@@ -20,6 +20,10 @@
 
 /*** Board options ***/
 
+#ifdef NVM_FACTORY_RESET
+#define NODE_ADDRESS				0x7F
+#endif
+
 #define ANALOG_MEASURE_ENABLE
 //#define LINKY_TIC_ENABLE
 
