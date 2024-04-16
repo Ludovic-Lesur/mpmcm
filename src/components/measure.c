@@ -127,11 +127,11 @@ typedef struct {
 
 /*** MEASURE local global variables ***/
 
+#ifdef ANALOG_MEASURE_ENABLE
 static const GPIO_pin_t* MEASURE_GPIO_ACI_DETECT[ADC_NUMBER_OF_ACI_CHANNELS] = {&GPIO_ACI1_DETECT, &GPIO_ACI2_DETECT, &GPIO_ACI3_DETECT, &GPIO_ACI4_DETECT};
-
+#endif
 static volatile MEASURE_sampling_t measure_sampling;
 static volatile MEASURE_internal_data_t measure_data __attribute__((section(".bss_ccmsram")));
-
 static volatile MEASURE_context_t measure_ctx;
 
 /*** MEASURE local functions ***/
@@ -692,7 +692,11 @@ MEASURE_status_t MEASURE_get_probe_detect_flag(uint8_t channel_index, uint8_t* c
 		goto errors;
 	}
 	// Update flag.
+#ifdef ANALOG_MEASURE_ENABLE
 	(*current_sensor_connected) = GPIO_read(MEASURE_GPIO_ACI_DETECT[channel_index]);
+#else
+	(*current_sensor_connected) = 0;
+#endif
 errors:
 	return status;
 }

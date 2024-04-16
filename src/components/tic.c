@@ -397,7 +397,11 @@ TIC_status_t TIC_get_detect_flag(uint8_t* linky_tic_connected) {
 		status = TIC_ERROR_NULL_PARAMETER;
 		goto errors;
 	}
+#ifdef LINKY_TIC_ENABLE
 	(*linky_tic_connected) = (tic_ctx.second_count_inactivity > TIC_INACTIVITY_TIMER_SECONDS) ? 0 : 1;
+#else
+	(*linky_tic_connected) = 0;
+#endif
 errors:
 	return status;
 }
