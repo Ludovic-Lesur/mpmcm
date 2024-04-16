@@ -64,6 +64,13 @@ typedef union {
 	uint8_t all;
 } TIC_flags_t;
 
+typedef struct {
+	DATA_run_channel_t run;
+	DATA_accumulated_channel_t accumulated;
+	int64_t active_energy_mws_sum;
+	int64_t apparent_energy_mvas_sum;
+} TIC_data_t;
+
 /*******************************************************************/
 typedef struct {
 	// State machine.
@@ -81,9 +88,6 @@ typedef struct {
 	uint8_t frame_size;
 	PARSER_context_t parser;
 	uint8_t decoding_count;
-	// Data.
-	DATA_run_channel_t run_data;
-	DATA_accumulated_channel_t accumulated_data;
 } TIC_context_t;
 
 /*** TIC local global variables ***/
@@ -95,6 +99,7 @@ static const TIC_sample_t TIC_SAMPLE[TIC_SAMPLE_INDEX_LAST] = {
 };
 #endif
 #endif
+static TIC_data_t tic_data;
 static TIC_context_t tic_ctx;
 
 /*** TIC local functions ***/
@@ -199,10 +204,12 @@ static TIC_status_t _TIC_decode_sample(TIC_sample_index_t sample_index) {
 		parser_status = PARSER_get_parameter(&tic_ctx.parser, STRING_FORMAT_DECIMAL, TIC_FRAME_SEPARATOR_CHAR, &sample);
 		if (parser_status == PARSER_SUCCESS) {
 			// Update run data.
-			tic_ctx.run_data.apparent_power_mva.value = (sample * 1000);
-			tic_ctx.run_data.apparent_power_mva.number_of_samples = 1;
+			tic_data.run.apparent_power_mva.value = (sample * 1000);
+			tic_data.run.apparent_power_mva.number_of_samples = 1;
 			// Update accumulated.
-			DATA_add_accumulated_channel_sample(tic_ctx.accumulated_data, apparent_power_mva, (sample * 1000));
+			DATA_add_accumulated_channel_sample(tic_data.accumulated, apparent_power_mva, (sample * 1000));
+			// Increment energy.
+			tic_data.apparent_energy_mvas_sum += (int64_t) (tic_data.run.apparent_power_mva.value);
 			// Set flag.
 			tic_ctx.flags.decode_success = 1;
 		}
@@ -273,8 +280,10 @@ TIC_status_t TIC_init(void) {
 	for (idx=0 ; idx<TIC_RX_BUFFER_SIZE ; idx++) tic_ctx.dma_buffer1[idx] = 0;
 	_TIC_reset_parser();
 	// Reset data.
-	DATA_reset_run_channel(tic_ctx.run_data);
-	DATA_reset_accumulated_channel(tic_ctx.accumulated_data);
+	DATA_reset_run_channel(tic_data.run);
+	DATA_reset_accumulated_channel(tic_data.accumulated);
+	tic_data.active_energy_mws_sum = 0;
+	tic_data.apparent_energy_mvas_sum = 0;
 #ifdef LINKY_TIC_ENABLE
 	// Init USART interface.
 	usart2_status = USART2_init(TIC_BAUD_RATE, TIC_FRAME_END_CHAR, &_TIC_usart_cm_irq_callback);
@@ -415,7 +424,7 @@ TIC_status_t TIC_get_channel_run_data(DATA_run_channel_t* channel_run_data) {
 		status = TIC_ERROR_NULL_PARAMETER;
 		goto errors;
 	}
-	DATA_copy_run_channel(tic_ctx.run_data, (*channel_run_data));
+	DATA_copy_run_channel(tic_data.run, (*channel_run_data));
 errors:
 	return status;
 }
@@ -430,8 +439,14 @@ TIC_status_t TIC_get_channel_accumulated_data(DATA_accumulated_channel_t* channe
 		goto errors;
 	}
 	// Copy and reset data.
-	DATA_copy_accumulated_channel(tic_ctx.accumulated_data, (*channel_accumulated_data));
-	DATA_reset_accumulated_channel(tic_ctx.accumulated_data);
+	DATA_copy_accumulated_channel(tic_data.accumulated, (*channel_accumulated_data));
+	// Compute energy.
+	(channel_accumulated_data -> active_energy_mwh) = (int32_t) ((tic_data.active_energy_mws_sum) / ((int64_t) DATA_SECONDS_PER_HOUR));
+	(channel_accumulated_data -> apparent_energy_mvah) = (int32_t) ((tic_data.apparent_energy_mvas_sum) / ((int64_t) DATA_SECONDS_PER_HOUR));
+	// Reset data.
+	DATA_reset_accumulated_channel(tic_data.accumulated);
+	tic_data.active_energy_mws_sum = 0;
+	tic_data.apparent_energy_mvas_sum = 0;
 errors:
 	return status;
 }

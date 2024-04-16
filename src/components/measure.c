@@ -58,8 +58,6 @@
 #define MEASURE_LED_PULSE_DURATION_MS					50
 #define MEASURE_LED_PULSE_PERIOD_SECONDS				5
 
-#define MEASURE_SECONDS_PER_HOUR						3600
-
 #define MEASURE_TIMEOUT_COUNT							10000000
 
 /*** MEASURE local structures ***/
@@ -114,7 +112,7 @@ typedef struct {
 	DATA_run_t acv_frequency_rolling_mean;
 	DATA_run_t acv_frequency_run_data;
 	DATA_accumulated_t acv_frequency_accumulated_data;
-} MEASURE_internal_data_t;
+} MEASURE_data_t;
 
 /*******************************************************************/
 typedef struct {
@@ -131,7 +129,7 @@ typedef struct {
 static const GPIO_pin_t* MEASURE_GPIO_ACI_DETECT[ADC_NUMBER_OF_ACI_CHANNELS] = {&GPIO_ACI1_DETECT, &GPIO_ACI2_DETECT, &GPIO_ACI3_DETECT, &GPIO_ACI4_DETECT};
 #endif
 static volatile MEASURE_sampling_t measure_sampling;
-static volatile MEASURE_internal_data_t measure_data __attribute__((section(".bss_ccmsram")));
+static volatile MEASURE_data_t measure_data __attribute__((section(".bss_ccmsram")));
 static volatile MEASURE_context_t measure_ctx;
 
 /*** MEASURE local functions ***/
@@ -798,8 +796,8 @@ MEASURE_status_t MEASURE_get_channel_accumulated_data(uint8_t channel, DATA_accu
 	// Copy data.
 	DATA_copy_accumulated_channel(measure_data.chx_accumulated_data[channel], (*channel_accumulated_data));
 	// Compute energy.
-	(channel_accumulated_data -> active_energy_mwh) = (int32_t) ((measure_data.active_energy_mws_sum[channel]) / ((int64_t) MEASURE_SECONDS_PER_HOUR));
-	(channel_accumulated_data -> apparent_energy_mvah) = (int32_t) ((measure_data.apparent_energy_mvas_sum[channel]) / ((int64_t) MEASURE_SECONDS_PER_HOUR));
+	(channel_accumulated_data -> active_energy_mwh) = (int32_t) ((measure_data.active_energy_mws_sum[channel]) / ((int64_t) DATA_SECONDS_PER_HOUR));
+	(channel_accumulated_data -> apparent_energy_mvah) = (int32_t) ((measure_data.apparent_energy_mvas_sum[channel]) / ((int64_t) DATA_SECONDS_PER_HOUR));
 	// Reset data.
 	DATA_reset_accumulated_channel(measure_data.chx_accumulated_data[channel]);
 	measure_data.active_energy_mws_sum[channel] = 0;

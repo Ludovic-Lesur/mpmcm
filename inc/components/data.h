@@ -10,6 +10,10 @@
 
 #include "types.h"
 
+/*** DATA macros ***/
+
+#define DATA_SECONDS_PER_HOUR	3600
+
 /*** DATA structures ***/
 
 /*!******************************************************************
