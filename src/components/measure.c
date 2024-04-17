@@ -106,8 +106,8 @@ typedef struct {
 	DATA_run_channel_t chx_rolling_mean[ADC_NUMBER_OF_ACI_CHANNELS];
 	DATA_run_channel_t chx_run_data[ADC_NUMBER_OF_ACI_CHANNELS];
 	DATA_accumulated_channel_t chx_accumulated_data[ADC_NUMBER_OF_ACI_CHANNELS];
-	int64_t active_energy_mws_sum[ADC_NUMBER_OF_ACI_CHANNELS];
-	int64_t apparent_energy_mvas_sum[ADC_NUMBER_OF_ACI_CHANNELS];
+	DATA_run_64_t active_energy_mws_sum[ADC_NUMBER_OF_ACI_CHANNELS];
+	DATA_run_64_t apparent_energy_mvas_sum[ADC_NUMBER_OF_ACI_CHANNELS];
 	// Mains frequency.
 	DATA_run_t acv_frequency_rolling_mean;
 	DATA_run_t acv_frequency_run_data;
@@ -161,6 +161,8 @@ static void _MEASURE_reset(void) {
 		DATA_reset_run_channel(measure_data.chx_rolling_mean[chx_idx]);
 		DATA_reset_run_channel(measure_data.chx_run_data[chx_idx]);
 		DATA_reset_accumulated_channel(measure_data.chx_accumulated_data[chx_idx]);
+		DATA_reset_run(measure_data.active_energy_mws_sum[chx_idx]);
+		DATA_reset_run(measure_data.apparent_energy_mvas_sum[chx_idx]);
 	}
 	// Reset frequency data.
 	DATA_reset_run(measure_data.acv_frequency_rolling_mean);
@@ -453,9 +455,12 @@ static MEASURE_status_t _MEASURE_compute_accumulated_data(void) {
 		DATA_add_accumulated_channel_sample(measure_data.chx_accumulated_data[chx_idx], rms_current_ma, measure_data.chx_run_data[chx_idx].rms_current_ma.value);
 		DATA_add_accumulated_channel_sample(measure_data.chx_accumulated_data[chx_idx], apparent_power_mva, measure_data.chx_run_data[chx_idx].apparent_power_mva.value);
 		DATA_add_accumulated_channel_sample(measure_data.chx_accumulated_data[chx_idx], power_factor, measure_data.chx_run_data[chx_idx].power_factor.value);
-		// Increment energy.
-		measure_data.active_energy_mws_sum[chx_idx] += (int64_t) (measure_data.chx_run_data[chx_idx].active_power_mw.value);
-		measure_data.apparent_energy_mvas_sum[chx_idx] += (int64_t) (measure_data.chx_run_data[chx_idx].apparent_power_mva.value);
+		// Increase active energy.
+		measure_data.active_energy_mws_sum[chx_idx].value += (int64_t) (measure_data.chx_run_data[chx_idx].active_power_mw.value);
+		measure_data.active_energy_mws_sum[chx_idx].number_of_samples++;
+		// Increase apparent energy.
+		measure_data.apparent_energy_mvas_sum[chx_idx].value += (int64_t) (measure_data.chx_run_data[chx_idx].apparent_power_mva.value);
+		measure_data.apparent_energy_mvas_sum[chx_idx].number_of_samples++;
 		// Reset results.
 		DATA_reset_run_channel(measure_data.chx_rolling_mean[chx_idx]);
 	}
@@ -579,16 +584,11 @@ MEASURE_status_t MEASURE_init(void) {
 	MEASURE_status_t status = MEASURE_SUCCESS;
 #ifdef ANALOG_MEASURE_ENABLE
 	POWER_status_t power_status = POWER_SUCCESS;
-#endif
 	uint8_t chx_idx = 0;
+#endif
 	// Init context.
 	measure_ctx.state = MEASURE_STATE_OFF;
 	measure_ctx.tick_led_seconds_count = 0;
-	// Init energy data.
-	for (chx_idx=0 ; chx_idx<ADC_NUMBER_OF_ACI_CHANNELS ; chx_idx++) {
-		measure_data.active_energy_mws_sum[chx_idx] = 0;
-		measure_data.apparent_energy_mvas_sum[chx_idx] = 0;
-	}
 #ifdef ANALOG_MEASURE_ENABLE
 	// Init detect pins.
 	for (chx_idx=0 ; chx_idx<ADC_NUMBER_OF_ACI_CHANNELS ; chx_idx++) {
@@ -793,15 +793,18 @@ MEASURE_status_t MEASURE_get_channel_accumulated_data(uint8_t channel, DATA_accu
 		status = MEASURE_ERROR_AC_CHANNEL;
 		goto errors;
 	}
+	// Compute active energy.
+	measure_data.chx_accumulated_data[channel].active_energy_mwh.value = (int32_t) ((measure_data.active_energy_mws_sum[channel].value) / ((int64_t) DATA_SECONDS_PER_HOUR));
+	measure_data.chx_accumulated_data[channel].active_energy_mwh.number_of_samples = measure_data.active_energy_mws_sum[channel].number_of_samples;
+	// Compute apparent energy.
+	measure_data.chx_accumulated_data[channel].apparent_energy_mvah.value = (int32_t) ((measure_data.apparent_energy_mvas_sum[channel].value) / ((int64_t) DATA_SECONDS_PER_HOUR));
+	measure_data.chx_accumulated_data[channel].apparent_energy_mvah.number_of_samples = measure_data.apparent_energy_mvas_sum[channel].number_of_samples;
 	// Copy data.
 	DATA_copy_accumulated_channel(measure_data.chx_accumulated_data[channel], (*channel_accumulated_data));
-	// Compute energy.
-	(channel_accumulated_data -> active_energy_mwh) = (int32_t) ((measure_data.active_energy_mws_sum[channel]) / ((int64_t) DATA_SECONDS_PER_HOUR));
-	(channel_accumulated_data -> apparent_energy_mvah) = (int32_t) ((measure_data.apparent_energy_mvas_sum[channel]) / ((int64_t) DATA_SECONDS_PER_HOUR));
 	// Reset data.
 	DATA_reset_accumulated_channel(measure_data.chx_accumulated_data[channel]);
-	measure_data.active_energy_mws_sum[channel] = 0;
-	measure_data.apparent_energy_mvas_sum[channel] = 0;
+	DATA_reset_run(measure_data.active_energy_mws_sum[channel]);
+	DATA_reset_run(measure_data.apparent_energy_mvas_sum[channel]);
 errors:
 	return status;
 }

@@ -17,13 +17,22 @@
 /*** DATA structures ***/
 
 /*!******************************************************************
- * \struct MEASURE_data_t
+ * \struct DATA_run_t
  * \brief Single run data structure.
  *******************************************************************/
 typedef struct {
 	int32_t value;
 	uint32_t number_of_samples;
 } DATA_run_t;
+
+/*!******************************************************************
+ * \struct DATA_run_64_t
+ * \brief Single run data structure.
+ *******************************************************************/
+typedef struct {
+	int64_t value;
+	uint32_t number_of_samples;
+} DATA_run_64_t;
 
 /*!******************************************************************
  * \struct DATA_accumulated_t
@@ -58,8 +67,8 @@ typedef struct {
 	DATA_accumulated_t rms_current_ma;
 	DATA_accumulated_t apparent_power_mva;
 	DATA_accumulated_t power_factor;
-	int32_t active_energy_mwh;
-	int32_t apparent_energy_mvah;
+	DATA_run_t active_energy_mwh;
+	DATA_run_t apparent_energy_mvah;
 } DATA_accumulated_channel_t;
 
 /*** DATA functions ***/
@@ -94,8 +103,8 @@ typedef struct {
 	DATA_reset_accumulated(channel.rms_current_ma); \
 	DATA_reset_accumulated(channel.apparent_power_mva); \
 	DATA_reset_accumulated(channel.power_factor); \
-	channel.active_energy_mwh = 0; \
-	channel.apparent_energy_mvah = 0; \
+	DATA_reset_run(channel.active_energy_mwh); \
+	DATA_reset_run(channel.apparent_energy_mvah); \
 }
 
 /*******************************************************************/
@@ -128,6 +137,8 @@ typedef struct {
 	DATA_copy_accumulated(source.rms_current_ma, destination.rms_current_ma); \
 	DATA_copy_accumulated(source.apparent_power_mva, destination.apparent_power_mva); \
 	DATA_copy_accumulated(source.power_factor, destination.power_factor); \
+	DATA_copy_run(source.active_energy_mwh, destination.active_energy_mwh); \
+	DATA_copy_run(source.apparent_energy_mvah, destination.apparent_energy_mvah); \
 }
 
 /*******************************************************************/

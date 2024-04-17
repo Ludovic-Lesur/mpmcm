@@ -64,11 +64,12 @@ typedef union {
 	uint8_t all;
 } TIC_flags_t;
 
+/*******************************************************************/
 typedef struct {
 	DATA_run_channel_t run;
 	DATA_accumulated_channel_t accumulated;
-	int64_t active_energy_mws_sum;
-	int64_t apparent_energy_mvas_sum;
+	DATA_run_64_t active_energy_mws_sum;
+	DATA_run_64_t apparent_energy_mvas_sum;
 } TIC_data_t;
 
 /*******************************************************************/
@@ -208,8 +209,9 @@ static TIC_status_t _TIC_decode_sample(TIC_sample_index_t sample_index) {
 			tic_data.run.apparent_power_mva.number_of_samples = 1;
 			// Update accumulated.
 			DATA_add_accumulated_channel_sample(tic_data.accumulated, apparent_power_mva, (sample * 1000));
-			// Increment energy.
-			tic_data.apparent_energy_mvas_sum += (int64_t) (tic_data.run.apparent_power_mva.value);
+			// Increase apparent energy.
+			tic_data.apparent_energy_mvas_sum.value += (int64_t) (tic_data.run.apparent_power_mva.value);
+			tic_data.apparent_energy_mvas_sum.number_of_samples++;
 			// Set flag.
 			tic_ctx.flags.decode_success = 1;
 		}
@@ -282,8 +284,8 @@ TIC_status_t TIC_init(void) {
 	// Reset data.
 	DATA_reset_run_channel(tic_data.run);
 	DATA_reset_accumulated_channel(tic_data.accumulated);
-	tic_data.active_energy_mws_sum = 0;
-	tic_data.apparent_energy_mvas_sum = 0;
+	DATA_reset_run(tic_data.active_energy_mws_sum);
+	DATA_reset_run(tic_data.apparent_energy_mvas_sum);
 #ifdef LINKY_TIC_ENABLE
 	// Init USART interface.
 	usart2_status = USART2_init(TIC_BAUD_RATE, TIC_FRAME_END_CHAR, &_TIC_usart_cm_irq_callback);
@@ -438,15 +440,18 @@ TIC_status_t TIC_get_channel_accumulated_data(DATA_accumulated_channel_t* channe
 		status = TIC_ERROR_NULL_PARAMETER;
 		goto errors;
 	}
-	// Copy and reset data.
+	// Compute active energy.
+	tic_data.accumulated.active_energy_mwh.value = (int32_t) ((tic_data.active_energy_mws_sum.value) / ((int64_t) DATA_SECONDS_PER_HOUR));
+	tic_data.accumulated.active_energy_mwh.number_of_samples = tic_data.active_energy_mws_sum.number_of_samples;
+	// Compute apparent energy.
+	tic_data.accumulated.apparent_energy_mvah.value = (int32_t) ((tic_data.apparent_energy_mvas_sum.value) / ((int64_t) DATA_SECONDS_PER_HOUR));
+	tic_data.accumulated.apparent_energy_mvah.number_of_samples = tic_data.apparent_energy_mvas_sum.number_of_samples;
+	// Copy data.
 	DATA_copy_accumulated_channel(tic_data.accumulated, (*channel_accumulated_data));
-	// Compute energy.
-	(channel_accumulated_data -> active_energy_mwh) = (int32_t) ((tic_data.active_energy_mws_sum) / ((int64_t) DATA_SECONDS_PER_HOUR));
-	(channel_accumulated_data -> apparent_energy_mvah) = (int32_t) ((tic_data.apparent_energy_mvas_sum) / ((int64_t) DATA_SECONDS_PER_HOUR));
 	// Reset data.
 	DATA_reset_accumulated_channel(tic_data.accumulated);
-	tic_data.active_energy_mws_sum = 0;
-	tic_data.apparent_energy_mvas_sum = 0;
+	DATA_reset_run(tic_data.active_energy_mws_sum);
+	DATA_reset_run(tic_data.apparent_energy_mvas_sum);
 errors:
 	return status;
 }

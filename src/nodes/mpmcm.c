@@ -340,8 +340,10 @@ NODE_status_t MPMCM_check_register(uint8_t reg_addr, uint32_t reg_mask) {
 					// Active and apparent energy.
 					data_reg_value = 0;
 					data_reg_mask = 0;
-					DINFOX_write_field(&data_reg_value, &data_reg_mask, DINFOX_convert_mwh_mvah(channel_data.active_energy_mwh), MPMCM_REG_MASK_ACTIVE_ENERGY);
-					DINFOX_write_field(&data_reg_value, &data_reg_mask, DINFOX_convert_mwh_mvah(channel_data.apparent_energy_mvah), MPMCM_REG_MASK_APPARENT_ENERGY);
+					field_value = (channel_data.active_energy_mwh.number_of_samples > 0) ? DINFOX_convert_mwh_mvah(channel_data.active_energy_mwh.value) : DINFOX_ELECTRICAL_ENERGY_ERROR_VALUE;
+					DINFOX_write_field(&data_reg_value, &data_reg_mask, field_value, MPMCM_REG_MASK_ACTIVE_ENERGY);
+					field_value = (channel_data.apparent_energy_mvah.number_of_samples > 0) ? DINFOX_convert_mwh_mvah(channel_data.apparent_energy_mvah.value) : DINFOX_ELECTRICAL_ENERGY_ERROR_VALUE;
+					DINFOX_write_field(&data_reg_value, &data_reg_mask, field_value, MPMCM_REG_MASK_APPARENT_ENERGY);
 					NODE_write_register(NODE_REQUEST_SOURCE_INTERNAL, (MPMCM_REG_ADDR_CH1_ENERGY + reg_offset), data_reg_mask, data_reg_value);
 				}
 			}
