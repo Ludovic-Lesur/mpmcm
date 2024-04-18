@@ -123,6 +123,10 @@ typedef struct {
 	uint32_t tick_led_seconds_count;
 } MEASURE_context_t;
 
+/*** MEASURE global variables ***/
+
+const uint8_t MEASURE_SCT013_ATTEN[ADC_NUMBER_OF_ACI_CHANNELS] = MPMCM_SCT013_ATTEN;
+
 /*** MEASURE local global variables ***/
 
 #ifdef ANALOG_MEASURE_ENABLE
@@ -634,7 +638,7 @@ MEASURE_status_t MEASURE_set_gains(uint16_t transformer_gain, uint16_t current_s
 	measure_data.acv_factor_den = ((int64_t) MEASURE_TRANSFORMER_GAIN_FACTOR * (int64_t) ADC_FULL_SCALE);
 	// ACI.
 	for (chx_idx=0 ; chx_idx<ADC_NUMBER_OF_ACI_CHANNELS ; chx_idx++) {
-		measure_data.aci_factor_num[chx_idx] = ((int64_t) current_sensors_gain[chx_idx] * (int64_t) MPMCM_SCT013_ATTEN[chx_idx] * (int64_t) ADC_VREF_MV);
+		measure_data.aci_factor_num[chx_idx] = ((int64_t) current_sensors_gain[chx_idx] * (int64_t) MEASURE_SCT013_ATTEN[chx_idx] * (int64_t) ADC_VREF_MV);
 	}
 	measure_data.aci_factor_den = ((int64_t) MEASURE_CURRENT_SENSOR_GAIN_FACTOR * (int64_t) ADC_FULL_SCALE);
 	// ACP.

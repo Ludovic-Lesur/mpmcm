@@ -19,6 +19,10 @@
 #include "tim.h"
 #include "types.h"
 
+/*** MEASURE global variables ***/
+
+extern const uint8_t MEASURE_SCT013_ATTEN[ADC_NUMBER_OF_ACI_CHANNELS];
+
 /*** MEASURE structures ***/
 
 /*!******************************************************************

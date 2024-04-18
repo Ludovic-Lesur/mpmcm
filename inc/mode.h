@@ -8,9 +8,6 @@
 #ifndef __MODE_H__
 #define __MODE_H__
 
-#include "adc.h"
-#include "types.h"
-
 /*** Board modes ***/
 
 //#define ATM
@@ -50,9 +47,9 @@
 #endif
 
 // Current sensors settings.
-static const uint8_t MPMCM_SCT013_ATTEN[ADC_NUMBER_OF_ACI_CHANNELS] = {1, 1, 1, 1};			// Unit V/V.
+#define MPMCM_SCT013_ATTEN			{1, 1, 1, 1}			// Unit V/V.
 #ifdef NVM_FACTORY_RESET
-static const uint16_t MPMCM_SCT013_GAIN[ADC_NUMBER_OF_ACI_CHANNELS] = {50, 50, 100, 200};	// Unit (10 * A/V).
+#define MPMCM_SCT013_GAIN			{50, 50, 100, 200}		// Unit (10 * A/V).
 #endif
 
 #endif /* __MODE_H__ */

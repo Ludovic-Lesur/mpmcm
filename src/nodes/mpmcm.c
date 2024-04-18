@@ -16,6 +16,40 @@
 #include "mpmcm_reg.h"
 #include "node.h"
 
+/*** MPMCM local macros ***/
+
+#define MPMCM_DATA_REG_ACCESS    \
+	DINFOX_REG_ACCESS_READ_ONLY, \
+	DINFOX_REG_ACCESS_READ_ONLY,
+
+#define MPMCM_CHANNEL_REG_ACCESS  \
+	MPMCM_DATA_REG_ACCESS         \
+	MPMCM_DATA_REG_ACCESS         \
+	MPMCM_DATA_REG_ACCESS         \
+	MPMCM_DATA_REG_ACCESS         \
+	MPMCM_DATA_REG_ACCESS		  \
+	DINFOX_REG_ACCESS_READ_ONLY,  \
+
+/*** MPMCM global variables ***/
+
+const DINFOX_register_access_t NODE_REG_ACCESS[MPMCM_REG_ADDR_LAST] = {
+	COMMON_REG_ACCESS
+	DINFOX_REG_ACCESS_READ_ONLY,
+	DINFOX_REG_ACCESS_READ_ONLY,
+	DINFOX_REG_ACCESS_READ_WRITE,
+	DINFOX_REG_ACCESS_READ_WRITE,
+	DINFOX_REG_ACCESS_READ_WRITE,
+	DINFOX_REG_ACCESS_READ_WRITE,
+	DINFOX_REG_ACCESS_READ_ONLY,
+	DINFOX_REG_ACCESS_READ_WRITE,
+	MPMCM_DATA_REG_ACCESS
+	MPMCM_CHANNEL_REG_ACCESS
+	MPMCM_CHANNEL_REG_ACCESS
+	MPMCM_CHANNEL_REG_ACCESS
+	MPMCM_CHANNEL_REG_ACCESS
+	MPMCM_CHANNEL_REG_ACCESS
+};
+
 /*** MPMCM local functions ***/
 
 /*******************************************************************/
@@ -48,10 +82,10 @@ static void _MPMCM_load_fixed_configuration(void) {
 	// Current sensors attenuation ratio.
 	reg_value = 0;
 	reg_mask = 0;
-	DINFOX_write_field(&reg_value, &reg_mask, (uint32_t) MPMCM_SCT013_ATTEN[0], MPMCM_REG_CONFIGURATION_1_MASK_CH1_CURRENT_SENSOR_ATTEN);
-	DINFOX_write_field(&reg_value, &reg_mask, (uint32_t) MPMCM_SCT013_ATTEN[1], MPMCM_REG_CONFIGURATION_1_MASK_CH2_CURRENT_SENSOR_ATTEN);
-	DINFOX_write_field(&reg_value, &reg_mask, (uint32_t) MPMCM_SCT013_ATTEN[2], MPMCM_REG_CONFIGURATION_1_MASK_CH3_CURRENT_SENSOR_ATTEN);
-	DINFOX_write_field(&reg_value, &reg_mask, (uint32_t) MPMCM_SCT013_ATTEN[3], MPMCM_REG_CONFIGURATION_1_MASK_CH4_CURRENT_SENSOR_ATTEN);
+	DINFOX_write_field(&reg_value, &reg_mask, (uint32_t) MEASURE_SCT013_ATTEN[0], MPMCM_REG_CONFIGURATION_1_MASK_CH1_CURRENT_SENSOR_ATTEN);
+	DINFOX_write_field(&reg_value, &reg_mask, (uint32_t) MEASURE_SCT013_ATTEN[1], MPMCM_REG_CONFIGURATION_1_MASK_CH2_CURRENT_SENSOR_ATTEN);
+	DINFOX_write_field(&reg_value, &reg_mask, (uint32_t) MEASURE_SCT013_ATTEN[2], MPMCM_REG_CONFIGURATION_1_MASK_CH3_CURRENT_SENSOR_ATTEN);
+	DINFOX_write_field(&reg_value, &reg_mask, (uint32_t) MEASURE_SCT013_ATTEN[3], MPMCM_REG_CONFIGURATION_1_MASK_CH4_CURRENT_SENSOR_ATTEN);
 	NODE_write_register(NODE_REQUEST_SOURCE_INTERNAL, MPMCM_REG_ADDR_CONFIGURATION_1, reg_mask, reg_value);
 }
 
@@ -116,19 +150,20 @@ void MPMCM_init_registers(void) {
 	// Local variables.
 	uint32_t reg_value = 0;
 	uint32_t reg_mask = 0;
+	uint16_t mpmcm_sct013_gain[ADC_NUMBER_OF_ACI_CHANNELS] = MPMCM_SCT013_GAIN;
 	// Transformer gain.
 	DINFOX_write_field(&reg_value, &reg_mask, (uint32_t) MPMCM_TRANSFORMER_GAIN, MPMCM_REG_CONFIGURATION_2_MASK_TRANSFORMER_GAIN);
 	NODE_write_register(NODE_REQUEST_SOURCE_EXTERNAL, MPMCM_REG_ADDR_CONFIGURATION_2, reg_mask, reg_value);
 	// Current sensors gain.
 	reg_value = 0;
 	reg_mask = 0;
-	DINFOX_write_field(&reg_value, &reg_mask, (uint32_t) MPMCM_SCT013_GAIN[0], MPMCM_REG_CONFIGURATION_3_MASK_CH1_CURRENT_SENSOR_GAIN);
-	DINFOX_write_field(&reg_value, &reg_mask, (uint32_t) MPMCM_SCT013_GAIN[1], MPMCM_REG_CONFIGURATION_3_MASK_CH2_CURRENT_SENSOR_GAIN);
+	DINFOX_write_field(&reg_value, &reg_mask, (uint32_t) mpmcm_sct013_gain[0], MPMCM_REG_CONFIGURATION_3_MASK_CH1_CURRENT_SENSOR_GAIN);
+	DINFOX_write_field(&reg_value, &reg_mask, (uint32_t) mpmcm_sct013_gain[1], MPMCM_REG_CONFIGURATION_3_MASK_CH2_CURRENT_SENSOR_GAIN);
 	NODE_write_register(NODE_REQUEST_SOURCE_EXTERNAL, MPMCM_REG_ADDR_CONFIGURATION_3, reg_mask, reg_value);
 	reg_value = 0;
 	reg_mask = 0;
-	DINFOX_write_field(&reg_value, &reg_mask, (uint32_t) MPMCM_SCT013_GAIN[2], MPMCM_REG_CONFIGURATION_4_MASK_CH3_CURRENT_SENSOR_GAIN);
-	DINFOX_write_field(&reg_value, &reg_mask, (uint32_t) MPMCM_SCT013_GAIN[3], MPMCM_REG_CONFIGURATION_4_MASK_CH4_CURRENT_SENSOR_GAIN);
+	DINFOX_write_field(&reg_value, &reg_mask, (uint32_t) mpmcm_sct013_gain[2], MPMCM_REG_CONFIGURATION_4_MASK_CH3_CURRENT_SENSOR_GAIN);
+	DINFOX_write_field(&reg_value, &reg_mask, (uint32_t) mpmcm_sct013_gain[3], MPMCM_REG_CONFIGURATION_4_MASK_CH4_CURRENT_SENSOR_GAIN);
 	NODE_write_register(NODE_REQUEST_SOURCE_EXTERNAL, MPMCM_REG_ADDR_CONFIGURATION_4, reg_mask, reg_value);
 	// Linky TIC period.
 	reg_value = 0;
