@@ -138,9 +138,7 @@ errors:
 
 /*******************************************************************/
 void LPUART1_enable_rx(void) {
-	// Mute mode request.
-	LPUART1 -> RQR |= (0b1 << 2); // MMRQ='1'.
-	// Clear RXNE flag is needed.
+	// Clear RXNE flag if needed.
 	if (((LPUART1 -> ISR) & (0b1 << 5)) != 0) {
 		LPUART1 -> RQR |= (0b1 << 3);
 	}
@@ -151,6 +149,8 @@ void LPUART1_enable_rx(void) {
 #ifdef LPUART_USE_NRE
 	GPIO_write(&GPIO_LPUART1_NRE, 0);
 #endif
+	// Mute mode request.
+	LPUART1 -> RQR |= (0b1 << 2); // MMRQ='1'.
 }
 
 /*******************************************************************/
