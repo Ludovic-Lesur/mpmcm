@@ -14,6 +14,7 @@
 //#define HIGH_SPEED_LOG
 //#define DEBUG
 //#define NVM_FACTORY_RESET
+//#define ANALOG_SIMULATION
 
 /*** Board options ***/
 

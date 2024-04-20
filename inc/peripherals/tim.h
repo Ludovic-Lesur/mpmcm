@@ -8,6 +8,7 @@
 #ifndef __TIM_H__
 #define __TIM_H__
 
+#include "mode.h"
 #include "rcc.h"
 #include "types.h"
 
@@ -52,6 +53,14 @@ typedef enum {
 	TIM4_CHANNEL_MASK_CYAN = (0b1 << TIM4_CHANNEL_LED_GREEN) | (0b1 << TIM4_CHANNEL_LED_BLUE),
 	TIM4_CHANNEL_MASK_WHITE	= (0b1 << TIM4_CHANNEL_LED_RED) | (0b1 << TIM4_CHANNEL_LED_GREEN) | (0b1 << TIM4_CHANNEL_LED_BLUE)
 } TIM4_channel_mask_t;
+
+#ifdef ANALOG_SIMULATION
+/*!******************************************************************
+ * \fn TIM_completion_irq_cb_t
+ * \brief TIM completion callback.
+ *******************************************************************/
+typedef void (*TIM_completion_irq_cb_t)(void);
+#endif
 
 /*** TIM functions ***/
 
@@ -130,7 +139,7 @@ TIM_status_t TIM6_init(void);
 
 /*!******************************************************************
  * \fn void TIM6_de_init(void)
- * \brief Release TIM2 driver.
+ * \brief Release TIM6 driver.
  * \param[in]  	none
  * \param[out] 	none
  * \retval		none
@@ -154,6 +163,51 @@ void TIM6_start(void);
  * \retval		none
  *******************************************************************/
 void TIM6_stop(void);
+
+#ifdef ANALOG_SIMULATION
+/*!******************************************************************
+ * \fn TIM_status_t TIM15_init(uint32_t frequency_hz, TIM_completion_irq_cb_t irq_callback)
+ * \brief Init TIM15 peripheral for zero cross IRQ simulation.
+ * \param[in]	frequency_hz: Timer frequency in Hz.
+ * \param[in]  	irq_callback: Function to call on timer completion.
+ * \param[out] 	none
+ * \retval		none
+ *******************************************************************/
+void TIM15_init(uint32_t frequency_hz, TIM_completion_irq_cb_t irq_callback);
+#endif
+
+#ifdef ANALOG_SIMULATION
+/*!******************************************************************
+ * \fn void TIM15_de_init(void)
+ * \brief Release TIM15 driver.
+ * \param[in]  	none
+ * \param[out] 	none
+ * \retval		none
+ *******************************************************************/
+void TIM15_de_init(void);
+#endif
+
+#ifdef ANALOG_SIMULATION
+/*!******************************************************************
+ * \fn void TIM15_start(void)
+ * \brief Start TIM15 operation.
+ * \param[in]  	none
+ * \param[out] 	none
+ * \retval		none
+ *******************************************************************/
+void TIM15_start(void);
+#endif
+
+#ifdef ANALOG_SIMULATION
+/*!******************************************************************
+ * \fn void TIM15_stop(void)
+ * \brief Stop TIM15 operation.
+ * \param[in]  	none
+ * \param[out] 	none
+ * \retval		none
+ *******************************************************************/
+void TIM15_stop(void);
+#endif
 
 /*!******************************************************************
  * \fn void TIM17_init(void)

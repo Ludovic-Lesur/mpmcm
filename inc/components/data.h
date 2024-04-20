@@ -89,11 +89,11 @@ typedef struct {
 }
 
 /*******************************************************************/
-#define DATA_reset_accumulated(result) { \
-	result.min = 2147483647; \
-	result.max = 0; \
-	result.rolling_mean = 0; \
-	result.number_of_samples = 0; \
+#define DATA_reset_accumulated(data) { \
+	data.min = 2147483647; \
+	data.max = 0; \
+	data.rolling_mean = 0; \
+	data.number_of_samples = 0; \
 }
 
 /*******************************************************************/
@@ -142,65 +142,71 @@ typedef struct {
 }
 
 /*******************************************************************/
-#define DATA_add_run_sample(result, new_sample) { \
+#define DATA_add_run_sample(data, new_sample) { \
 	/* Compute rolling mean */ \
-	temp_s64 = ((int64_t) result.value * (int64_t) result.number_of_samples) + (int64_t) new_sample; \
-	result.value = (int32_t) ((temp_s64) / ((int64_t) (result.number_of_samples + 1))); \
-	result.number_of_samples++; \
+	temp_s64 = ((int64_t) data.value * (int64_t) data.number_of_samples) + (int64_t) new_sample; \
+	data.value = (int32_t) ((temp_s64) / ((int64_t) (data.number_of_samples + 1))); \
+	data.number_of_samples++; \
 }
 
 /*******************************************************************/
-#define DATA_add_run_channel_sample(channel, result, new_sample) { \
+#define DATA_add_run_channel_sample(channel, data, new_sample) { \
 	/* Compute rolling mean */ \
-	temp_s64 = ((int64_t) channel.result.value * (int64_t) channel.result.number_of_samples) + (int64_t) new_sample; \
-	channel.result.value = (int32_t) ((temp_s64) / ((int64_t) (channel.result.number_of_samples + 1))); \
-	channel.result.number_of_samples++; \
+	temp_s64 = ((int64_t) channel.data.value * (int64_t) channel.data.number_of_samples) + (int64_t) new_sample; \
+	channel.data.value = (int32_t) ((temp_s64) / ((int64_t) (channel.data.number_of_samples + 1))); \
+	channel.data.number_of_samples++; \
 }
 
 /*******************************************************************/
-#define DATA_add_accumulated_sample(result, new_sample) { \
-	/* Compute absolute value of new sample */ \
-	math_status = MATH_abs(new_sample, &new_sample_abs); \
-	MATH_exit_error(MEASURE_ERROR_BASE_MATH); \
-	/* Min */ \
-	math_status = MATH_abs(result.min, &ref_abs); \
-	MATH_exit_error(MEASURE_ERROR_BASE_MATH); \
-	if (new_sample_abs < ref_abs) { \
-		result.min = new_sample; \
+#define DATA_add_accumulated_sample(data, source) { \
+	/* Check source data */ \
+	if (source.number_of_samples > 0) { \
+		/* Compute absolute value of new sample */ \
+		math_status = MATH_abs(source.value, &new_sample_abs); \
+		MATH_exit_error(MEASURE_ERROR_BASE_MATH); \
+		/* Min */ \
+		math_status = MATH_abs(data.min, &ref_abs); \
+		MATH_exit_error(MEASURE_ERROR_BASE_MATH); \
+		if (new_sample_abs < ref_abs) { \
+			data.min = source.value; \
+		} \
+		/* Max */ \
+		math_status = MATH_abs(data.max, &ref_abs); \
+		MATH_exit_error(MEASURE_ERROR_BASE_MATH); \
+		if (new_sample_abs > ref_abs) { \
+			data.max = source.value; \
+		} \
+		/* Compute rolling mean */ \
+		temp_s64 = ((int64_t) data.rolling_mean * (int64_t) data.number_of_samples) + (int64_t) source.value; \
+		data.rolling_mean = (int32_t) ((temp_s64) / ((int64_t) (data.number_of_samples + 1))); \
+		data.number_of_samples++; \
 	} \
-	/* Max */ \
-	math_status = MATH_abs(result.max, &ref_abs); \
-	MATH_exit_error(MEASURE_ERROR_BASE_MATH); \
-	if (new_sample_abs > ref_abs) { \
-		result.max = new_sample; \
-	} \
-	/* Compute rolling mean */ \
-	temp_s64 = ((int64_t) result.rolling_mean * (int64_t) result.number_of_samples) + (int64_t) new_sample; \
-	result.rolling_mean = (int32_t) ((temp_s64) / ((int64_t) (result.number_of_samples + 1))); \
-	result.number_of_samples++; \
 }
 
 /*******************************************************************/
-#define DATA_add_accumulated_channel_sample(channel, result, new_sample) { \
-	/* Compute absolute value of new sample */ \
-	math_status = MATH_abs(new_sample, &new_sample_abs); \
-	MATH_exit_error(MEASURE_ERROR_BASE_MATH); \
-	/* Min */ \
-	math_status = MATH_abs(channel.result.min, &ref_abs); \
-	MATH_exit_error(MEASURE_ERROR_BASE_MATH); \
-	if (new_sample_abs < ref_abs) { \
-		channel.result.min = new_sample; \
+#define DATA_add_accumulated_channel_sample(channel, data, source) { \
+	/* Check source data */ \
+	if (source.number_of_samples > 0) { \
+		/* Compute absolute value of new sample */ \
+		math_status = MATH_abs(source.value, &new_sample_abs); \
+		MATH_exit_error(MEASURE_ERROR_BASE_MATH); \
+		/* Min */ \
+		math_status = MATH_abs(channel.data.min, &ref_abs); \
+		MATH_exit_error(MEASURE_ERROR_BASE_MATH); \
+		if (new_sample_abs < ref_abs) { \
+			channel.data.min = source.value; \
+		} \
+		/* Max */ \
+		math_status = MATH_abs(channel.data.max, &ref_abs); \
+		MATH_exit_error(MEASURE_ERROR_BASE_MATH); \
+		if (new_sample_abs > ref_abs) { \
+			channel.data.max = source.value; \
+		} \
+		/* Compute rolling mean */ \
+		temp_s64 = ((int64_t) channel.data.rolling_mean * (int64_t) channel.data.number_of_samples) + (int64_t) source.value; \
+		channel.data.rolling_mean = (int32_t) ((temp_s64) / ((int64_t) (channel.data.number_of_samples + 1))); \
+		channel.data.number_of_samples++; \
 	} \
-	/* Max */ \
-	math_status = MATH_abs(channel.result.max, &ref_abs); \
-	MATH_exit_error(MEASURE_ERROR_BASE_MATH); \
-	if (new_sample_abs > ref_abs) { \
-		channel.result.max = new_sample; \
-	} \
-	/* Compute rolling mean */ \
-	temp_s64 = ((int64_t) channel.result.rolling_mean * (int64_t) channel.result.number_of_samples) + (int64_t) new_sample; \
-	channel.result.rolling_mean = (int32_t) ((temp_s64) / ((int64_t) (channel.result.number_of_samples + 1))); \
-	channel.result.number_of_samples++; \
 }
 
 #endif /* __DATA_H__ */

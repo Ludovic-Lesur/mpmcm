@@ -22,6 +22,7 @@
 #include "nvic.h"
 #include "power.h"
 #include "rcc.h"
+#include "simulation.h"
 #include "tim.h"
 #include "types.h"
 
@@ -29,6 +30,7 @@
 
 #define MEASURE_MAINS_PERIOD_US							20000
 #define MEASURE_ZERO_CROSS_PER_PERIOD					2
+#define MEASURE_ZERO_CROSS_FREQUENCY_HZ					((MEASURE_ZERO_CROSS_PER_PERIOD * 1000000) / (MEASURE_MAINS_PERIOD_US))
 #define MEASURE_ZERO_CROSS_START_THRESHOLD				((1000000 * MEASURE_ZERO_CROSS_PER_PERIOD) / (MEASURE_MAINS_PERIOD_US)) // Wait for 1 second of mains voltage presence.
 
 #define MEASURE_TRANSFORMER_GAIN_FACTOR					10	// For (10 * V/V) input unit.
@@ -176,8 +178,6 @@ static void _MEASURE_reset(void) {
 	for (idx1=0 ; idx1<MEASURE_PERIOD_TIM2_DMA_BUFFER_SIZE ; idx1++) {
 		measure_sampling.tim2_ccr1[idx1] = 0;
 	}
-	// Set DMA address.
-	DMA1_adcx_set_destination_address((uint32_t) &(measure_sampling.acv[measure_sampling.acv_write_idx].data), (uint32_t) &(measure_sampling.aci[measure_sampling.aci_write_idx].data), MEASURE_PERIOD_ADCX_DMA_BUFFER_SIZE);
 }
 
 #ifdef ANALOG_MEASURE_ENABLE
@@ -334,8 +334,13 @@ static void _MEASURE_compute_period_data(void) {
 	// Check enable flag.
 	if (measure_ctx.processing_enable == 0) goto errors;
 	// Get size.
+#ifdef ANALOG_SIMULATION
+	acv_buffer_size = (SIMULATION_BUFFER_SIZE / ADC_NUMBER_OF_ACI_CHANNELS);
+	aci_buffer_size = (SIMULATION_BUFFER_SIZE / ADC_NUMBER_OF_ACI_CHANNELS);
+#else
 	acv_buffer_size = (uint32_t) ((measure_sampling.acv[measure_sampling.acv_read_idx].size) / (ADC_NUMBER_OF_ACI_CHANNELS));
 	aci_buffer_size = (uint32_t) ((measure_sampling.aci[measure_sampling.acv_read_idx].size) / (ADC_NUMBER_OF_ACI_CHANNELS));
+#endif
 	// Take the minimum size between voltage and current.
 	measure_data.period_acxx_buffer_size = (acv_buffer_size < aci_buffer_size) ? acv_buffer_size : aci_buffer_size;
 	// Check size.
@@ -348,12 +353,17 @@ static void _MEASURE_compute_period_data(void) {
 		// Compute channel buffer.
 		for (idx=0 ; idx<(measure_data.period_acxx_buffer_size) ; idx++) {
 			// Copy samples by channel and convert to Q31 type.
+#ifdef ANALOG_SIMULATION
+			measure_data.period_acvx_buffer_q31[idx] = (SIMULATION_ACV_BUFFER[(ADC_NUMBER_OF_ACI_CHANNELS * idx) + chx_idx]) << MEASURE_Q31_SHIFT_ADC;
+			measure_data.period_acix_buffer_q31[idx] = (SIMULATION_ACI_BUFFER[(ADC_NUMBER_OF_ACI_CHANNELS * idx) + chx_idx]) << MEASURE_Q31_SHIFT_ADC;
+#else
 			measure_data.period_acvx_buffer_q31[idx] = (measure_sampling.acv[measure_sampling.acv_read_idx].data[(ADC_NUMBER_OF_ACI_CHANNELS * idx) + chx_idx]) << MEASURE_Q31_SHIFT_ADC;
 			measure_data.period_acix_buffer_q31[idx] = (measure_sampling.aci[measure_sampling.aci_read_idx].data[(ADC_NUMBER_OF_ACI_CHANNELS * idx) + chx_idx]) << MEASURE_Q31_SHIFT_ADC;
 			// Force current to 0 if sensor is not connected.
 			if (GPIO_read(MEASURE_GPIO_ACI_DETECT[chx_idx]) == 0) {
 				measure_data.period_acix_buffer_q31[idx] = 0;
 			}
+#endif
 		}
 		// Mean voltage and current.
 		arm_mean_q31((q31_t*) measure_data.period_acvx_buffer_q31, measure_data.period_acxx_buffer_size, &mean_voltage_q31);
@@ -454,11 +464,11 @@ static MEASURE_status_t _MEASURE_compute_accumulated_data(void) {
 	// Compute AC channels accumulated data.
 	for (chx_idx=0 ; chx_idx<ADC_NUMBER_OF_ACI_CHANNELS ; chx_idx++) {
 		// Copy all rolling means.
-		DATA_add_accumulated_channel_sample(measure_data.chx_accumulated_data[chx_idx], active_power_mw, measure_data.chx_run_data[chx_idx].active_power_mw.value);
-		DATA_add_accumulated_channel_sample(measure_data.chx_accumulated_data[chx_idx], rms_voltage_mv, measure_data.chx_run_data[chx_idx].rms_voltage_mv.value);
-		DATA_add_accumulated_channel_sample(measure_data.chx_accumulated_data[chx_idx], rms_current_ma, measure_data.chx_run_data[chx_idx].rms_current_ma.value);
-		DATA_add_accumulated_channel_sample(measure_data.chx_accumulated_data[chx_idx], apparent_power_mva, measure_data.chx_run_data[chx_idx].apparent_power_mva.value);
-		DATA_add_accumulated_channel_sample(measure_data.chx_accumulated_data[chx_idx], power_factor, measure_data.chx_run_data[chx_idx].power_factor.value);
+		DATA_add_accumulated_channel_sample(measure_data.chx_accumulated_data[chx_idx], active_power_mw, measure_data.chx_run_data[chx_idx].active_power_mw);
+		DATA_add_accumulated_channel_sample(measure_data.chx_accumulated_data[chx_idx], rms_voltage_mv, measure_data.chx_run_data[chx_idx].rms_voltage_mv);
+		DATA_add_accumulated_channel_sample(measure_data.chx_accumulated_data[chx_idx], rms_current_ma, measure_data.chx_run_data[chx_idx].rms_current_ma);
+		DATA_add_accumulated_channel_sample(measure_data.chx_accumulated_data[chx_idx], apparent_power_mva, measure_data.chx_run_data[chx_idx].apparent_power_mva);
+		DATA_add_accumulated_channel_sample(measure_data.chx_accumulated_data[chx_idx], power_factor, measure_data.chx_run_data[chx_idx].power_factor);
 		// Increase active energy.
 		measure_data.active_energy_mws_sum[chx_idx].value += (int64_t) (measure_data.chx_run_data[chx_idx].active_power_mw.value);
 		measure_data.active_energy_mws_sum[chx_idx].number_of_samples++;
@@ -469,7 +479,7 @@ static MEASURE_status_t _MEASURE_compute_accumulated_data(void) {
 		DATA_reset_run_channel(measure_data.chx_rolling_mean[chx_idx]);
 	}
 	// Compute frequency accumulated data.
-	DATA_add_accumulated_sample(measure_data.acv_frequency_accumulated_data, measure_data.acv_frequency_run_data.value);
+	DATA_add_accumulated_sample(measure_data.acv_frequency_accumulated_data, measure_data.acv_frequency_run_data);
 errors:
 	return status;
 }
@@ -593,34 +603,45 @@ MEASURE_status_t MEASURE_init(void) {
 	// Init context.
 	measure_ctx.state = MEASURE_STATE_OFF;
 	measure_ctx.tick_led_seconds_count = 0;
+	// Reset data.
+	_MEASURE_reset();
 #ifdef ANALOG_MEASURE_ENABLE
 	// Init detect pins.
 	for (chx_idx=0 ; chx_idx<ADC_NUMBER_OF_ACI_CHANNELS ; chx_idx++) {
 		GPIO_configure(MEASURE_GPIO_ACI_DETECT[chx_idx], GPIO_MODE_INPUT, GPIO_TYPE_PUSH_PULL, GPIO_SPEED_LOW, GPIO_PULL_NONE);
 	}
-	// Turn analog front-end on to have VREF+ for ADC calibration.
-	power_status = POWER_enable(POWER_DOMAIN_ANALOG, LPTIM_DELAY_MODE_SLEEP);
-	POWER_exit_error(MEASURE_ERROR_BASE_POWER);
-	// Init zero cross pulse GPIO.
-	GPIO_configure(&GPIO_ZERO_CROSS_PULSE, GPIO_MODE_INPUT, GPIO_TYPE_PUSH_PULL, GPIO_SPEED_LOW, GPIO_PULL_NONE);
-	EXTI_configure_gpio(&GPIO_ZERO_CROSS_PULSE, EXTI_TRIGGER_RISING_EDGE, &_MEASURE_increment_zero_cross_count);
-	NVIC_enable_interrupt(NVIC_INTERRUPT_EXTI2, NVIC_PRIORITY_EXTI2);
 	// Init ADC DMA.
 	DMA1_adcx_init(&_MEASURE_set_dma_transfer_end_flag);
 	DMA1_adcx_set_destination_address((uint32_t) &(measure_sampling.acv[measure_sampling.acv_write_idx].data), (uint32_t) &(measure_sampling.aci[measure_sampling.aci_write_idx].data), MEASURE_PERIOD_ADCX_DMA_BUFFER_SIZE);
 	// Init timer DMA.
 	DMA1_tim2_init();
 	DMA1_tim2_set_destination_address((uint32_t) &(measure_sampling.tim2_ccr1), MEASURE_PERIOD_TIM2_DMA_BUFFER_SIZE);
-	// Reset data.
+	// Turn analog front-end on to have VREF+ for ADC calibration.
+	power_status = POWER_enable(POWER_DOMAIN_ANALOG, LPTIM_DELAY_MODE_SLEEP);
+	POWER_exit_error(MEASURE_ERROR_BASE_POWER);
+	// Init zero cross pulse GPIO.
+	GPIO_configure(&GPIO_ZERO_CROSS_PULSE, GPIO_MODE_INPUT, GPIO_TYPE_PUSH_PULL, GPIO_SPEED_LOW, GPIO_PULL_DOWN);
+#ifdef ANALOG_SIMULATION
+	// Init zero cross emulation timer.
+	TIM15_init(MEASURE_ZERO_CROSS_FREQUENCY_HZ, &_MEASURE_increment_zero_cross_count);
+	TIM15_start();
+#else
+	// Init zero cross interrupt from external circuit.
+	EXTI_configure_gpio(&GPIO_ZERO_CROSS_PULSE, EXTI_TRIGGER_RISING_EDGE, &_MEASURE_increment_zero_cross_count);
+	NVIC_enable_interrupt(NVIC_INTERRUPT_EXTI2, NVIC_PRIORITY_EXTI2);
+#endif
 errors:
 #endif
-	_MEASURE_reset();
 	return status;
 }
 
 /*******************************************************************/
 MEASURE_state_t MEASURE_get_state(void) {
+#ifdef ANALOG_SIMULATION
+	return (MEASURE_STATE_ACTIVE);
+#else
 	return (measure_ctx.state);
+#endif
 }
 
 /*******************************************************************/
@@ -695,7 +716,11 @@ MEASURE_status_t MEASURE_get_probe_detect_flag(uint8_t channel_index, uint8_t* c
 	}
 	// Update flag.
 #ifdef ANALOG_MEASURE_ENABLE
+#ifdef ANALOG_SIMULATION
+	(*current_sensor_connected) = SIMULATION_GPIO_ACI_DETECT[channel_index];
+#else
 	(*current_sensor_connected) = GPIO_read(MEASURE_GPIO_ACI_DETECT[channel_index]);
+#endif
 #else
 	(*current_sensor_connected) = 0;
 #endif

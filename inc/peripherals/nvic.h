@@ -127,6 +127,7 @@ typedef enum {
  *******************************************************************/
 typedef enum {
 	NVIC_PRIORITY_EXTI2 = 0,
+	NVIC_PRIORITY_TIM15,
 	NVIC_PRIORITY_DMA1_CH1,
 	NVIC_PRIORITY_DMA1_CH2,
 	NVIC_PRIORITY_LPUART1,

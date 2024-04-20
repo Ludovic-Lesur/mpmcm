@@ -208,7 +208,7 @@ static TIC_status_t _TIC_decode_sample(TIC_sample_index_t sample_index) {
 			tic_data.run.apparent_power_mva.value = (sample * 1000);
 			tic_data.run.apparent_power_mva.number_of_samples = 1;
 			// Update accumulated.
-			DATA_add_accumulated_channel_sample(tic_data.accumulated, apparent_power_mva, (sample * 1000));
+			DATA_add_accumulated_channel_sample(tic_data.accumulated, apparent_power_mva, tic_data.run.apparent_power_mva);
 			// Increase apparent energy.
 			tic_data.apparent_energy_mvas_sum.value += (int64_t) (tic_data.run.apparent_power_mva.value);
 			tic_data.apparent_energy_mvas_sum.number_of_samples++;

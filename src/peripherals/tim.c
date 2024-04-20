@@ -43,6 +43,9 @@ static const uint8_t TIM4_LED_CHANNELS[TIM4_NUMBER_OF_USED_CHANNELS] = {
 	TIM4_CHANNEL_LED_GREEN,
 	TIM4_CHANNEL_LED_BLUE
 };
+#ifdef ANALOG_SIMULATION
+static TIM_completion_irq_cb_t tim15_irq_callback = NULL;
+#endif
 static TIM17_context_t tim17_ctx;
 
 /*** TIM local functions ***/
@@ -84,6 +87,21 @@ void __attribute__((optimize("-O0"))) TIM4_IRQHandler(void) {
 		TIM4 -> SR &= ~(0b1 << 0);
 	}
 }
+
+#ifdef ANALOG_SIMULATION
+/*******************************************************************/
+void __attribute__((optimize("-O0"))) TIM1_BRK_TIM15_IRQHandler(void) {
+	// Check flag.
+	if (((TIM15 -> SR) & (0b1 << 0)) != 0) {
+		// Call callback.
+		if (tim15_irq_callback != NULL) {
+			tim15_irq_callback();
+		}
+		// Clear flag.
+		TIM15 -> SR &= ~(0b1 << 0);
+	}
+}
+#endif
 
 /*** TIM functions ***/
 
@@ -254,6 +272,62 @@ void TIM6_stop(void) {
 	// Reset counter.
 	TIM6 -> CNT = 0;
 }
+
+#ifdef ANALOG_SIMULATION
+/*******************************************************************/
+void TIM15_init(uint32_t frequency_hz, TIM_completion_irq_cb_t irq_callback) {
+	// Enable peripheral clock.
+	RCC -> APB2ENR |= (0b1 << 16); // TIM15EN='1'.
+	RCC -> APB2SMENR |= (0b1 << 16); // TIM15SMEN='1'.
+	// Configure timer on external clock mode 1.
+	// Channel input on TI1.
+	// Capture done every edge.
+	// CH1 mapped on LSE.
+	TIM15 -> CCMR1 |= (0b01 << 0);
+	TIM15 -> TISEL |= (0b0001 << 0);
+	TIM15 -> SMCR |= (0b00 << 20) | (0b100 << 4) | (0b0 << 16) | (0b111 << 0);
+	// Set period to 100Hz.
+	TIM15 -> ARR = ((RCC_LSE_FREQUENCY_HZ << 1) / frequency_hz);
+	// Enable update interrupt.
+	TIM15 -> DIER |= (0b1 << 0); // UIE='1'.
+	// Generate event to update registers.
+	TIM15 -> EGR |= (0b1 << 0); // UG='1'.
+	// Register callback.
+	tim15_irq_callback = irq_callback;
+}
+#endif
+
+#ifdef ANALOG_SIMULATION
+/*******************************************************************/
+void TIM15_de_init(void) {
+	// Disable peripheral clock.
+	RCC -> APB2ENR &= ~(0b1 << 16); // TIM15EN='0'.
+}
+#endif
+
+#ifdef ANALOG_SIMULATION
+/*******************************************************************/
+void TIM15_start(void) {
+	// Reset counter.
+	TIM15 -> CNT = 0;
+	// Enable interrupt.
+	NVIC_enable_interrupt(NVIC_INTERRUPT_TIM1_BRK_TIM15, NVIC_PRIORITY_TIM15);
+	// Start timer.
+	TIM15 -> CR1 |= (0b1 << 0); // CEN='1'.
+}
+#endif
+
+#ifdef ANALOG_SIMULATION
+/*******************************************************************/
+void TIM15_stop(void) {
+	// Stop timer.
+	TIM15 -> CR1 &= ~(0b1 << 0); // CEN='0'.
+	// Enable interrupt.
+	NVIC_disable_interrupt(NVIC_INTERRUPT_TIM1_BRK_TIM15);
+	// Reset counter.
+	TIM15 -> CNT = 0;
+}
+#endif
 
 /*******************************************************************/
 void TIM17_init(void) {
