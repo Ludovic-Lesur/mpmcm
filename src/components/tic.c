@@ -189,11 +189,9 @@ static TIC_status_t _TIC_decode_sample(TIC_sample_index_t sample_index) {
 	// Local variables.
 	TIC_status_t status = TIC_SUCCESS;
 	PARSER_status_t parser_status = PARSER_SUCCESS;
-	MATH_status_t math_status = MATH_SUCCESS;
 	int32_t sample = 0;
-	uint32_t new_sample_abs = 0;
+	uint32_t sample_abs = 0;
 	uint32_t ref_abs = 0;
-	int64_t temp_s64 = 0;
 	// Check index.
 	if (sample_index >= TIC_SAMPLE_INDEX_LAST) {
 		status = TIC_ERROR_DATA_INDEX;

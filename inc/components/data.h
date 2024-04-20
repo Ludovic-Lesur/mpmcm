@@ -142,19 +142,15 @@ typedef struct {
 }
 
 /*******************************************************************/
-#define DATA_add_run_sample(data, new_sample) { \
+#define DATA_add_run_sample(data, sample) { \
 	/* Compute rolling mean */ \
-	temp_s64 = ((int64_t) data.value * (int64_t) data.number_of_samples) + (int64_t) new_sample; \
-	data.value = (int32_t) ((temp_s64) / ((int64_t) (data.number_of_samples + 1))); \
-	data.number_of_samples++; \
+	MATH_rolling_mean(data.value, data.number_of_samples, sample, int32_t); \
 }
 
 /*******************************************************************/
-#define DATA_add_run_channel_sample(channel, data, new_sample) { \
+#define DATA_add_run_channel_sample(channel, data, sample) { \
 	/* Compute rolling mean */ \
-	temp_s64 = ((int64_t) channel.data.value * (int64_t) channel.data.number_of_samples) + (int64_t) new_sample; \
-	channel.data.value = (int32_t) ((temp_s64) / ((int64_t) (channel.data.number_of_samples + 1))); \
-	channel.data.number_of_samples++; \
+	MATH_rolling_mean(channel.data.value, channel.data.number_of_samples, sample, int32_t); \
 }
 
 /*******************************************************************/
@@ -162,24 +158,19 @@ typedef struct {
 	/* Check source data */ \
 	if (source.number_of_samples > 0) { \
 		/* Compute absolute value of new sample */ \
-		math_status = MATH_abs(source.value, &new_sample_abs); \
-		MATH_exit_error(MEASURE_ERROR_BASE_MATH); \
+		MATH_abs(source.value, sample_abs); \
 		/* Min */ \
-		math_status = MATH_abs(data.min, &ref_abs); \
-		MATH_exit_error(MEASURE_ERROR_BASE_MATH); \
-		if (new_sample_abs < ref_abs) { \
+		MATH_abs(data.min, ref_abs); \
+		if (sample_abs < ref_abs) { \
 			data.min = source.value; \
 		} \
 		/* Max */ \
-		math_status = MATH_abs(data.max, &ref_abs); \
-		MATH_exit_error(MEASURE_ERROR_BASE_MATH); \
-		if (new_sample_abs > ref_abs) { \
+		MATH_abs(data.max, ref_abs); \
+		if (sample_abs > ref_abs) { \
 			data.max = source.value; \
 		} \
 		/* Compute rolling mean */ \
-		temp_s64 = ((int64_t) data.rolling_mean * (int64_t) data.number_of_samples) + (int64_t) source.value; \
-		data.rolling_mean = (int32_t) ((temp_s64) / ((int64_t) (data.number_of_samples + 1))); \
-		data.number_of_samples++; \
+		MATH_rolling_mean(data.rolling_mean, data.number_of_samples, source.value, int32_t); \
 	} \
 }
 
@@ -188,24 +179,19 @@ typedef struct {
 	/* Check source data */ \
 	if (source.number_of_samples > 0) { \
 		/* Compute absolute value of new sample */ \
-		math_status = MATH_abs(source.value, &new_sample_abs); \
-		MATH_exit_error(MEASURE_ERROR_BASE_MATH); \
+		MATH_abs(source.value, sample_abs); \
 		/* Min */ \
-		math_status = MATH_abs(channel.data.min, &ref_abs); \
-		MATH_exit_error(MEASURE_ERROR_BASE_MATH); \
-		if (new_sample_abs < ref_abs) { \
+		MATH_abs(channel.data.min, ref_abs); \
+		if (sample_abs < ref_abs) { \
 			channel.data.min = source.value; \
 		} \
 		/* Max */ \
-		math_status = MATH_abs(channel.data.max, &ref_abs); \
-		MATH_exit_error(MEASURE_ERROR_BASE_MATH); \
-		if (new_sample_abs > ref_abs) { \
+		MATH_abs(channel.data.max, ref_abs); \
+		if (sample_abs > ref_abs) { \
 			channel.data.max = source.value; \
 		} \
 		/* Compute rolling mean */ \
-		temp_s64 = ((int64_t) channel.data.rolling_mean * (int64_t) channel.data.number_of_samples) + (int64_t) source.value; \
-		channel.data.rolling_mean = (int32_t) ((temp_s64) / ((int64_t) (channel.data.number_of_samples + 1))); \
-		channel.data.number_of_samples++; \
+		MATH_rolling_mean(channel.data.rolling_mean, channel.data.number_of_samples, source.value, int32_t); \
 	} \
 }
 

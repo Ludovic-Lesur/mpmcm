@@ -453,14 +453,11 @@ static void _MEASURE_compute_run_data(void) {
 
 #ifdef ANALOG_MEASURE_ENABLE
 /*******************************************************************/
-static MEASURE_status_t _MEASURE_compute_accumulated_data(void) {
+static void _MEASURE_compute_accumulated_data(void) {
 	// Local variables.
-	MEASURE_status_t status = MEASURE_SUCCESS;
-	MATH_status_t math_status = MATH_SUCCESS;
-	uint32_t new_sample_abs = 0;
+	uint32_t sample_abs = 0;
 	uint32_t ref_abs = 0;
 	uint8_t chx_idx = 0;
-	int64_t temp_s64 = 0;
 	// Compute AC channels accumulated data.
 	for (chx_idx=0 ; chx_idx<ADC_NUMBER_OF_ACI_CHANNELS ; chx_idx++) {
 		// Copy all rolling means.
@@ -480,8 +477,6 @@ static MEASURE_status_t _MEASURE_compute_accumulated_data(void) {
 	}
 	// Compute frequency accumulated data.
 	DATA_add_accumulated_sample(measure_data.acv_frequency_accumulated_data, measure_data.acv_frequency_run_data);
-errors:
-	return status;
 }
 #endif
 
@@ -682,7 +677,6 @@ errors:
 MEASURE_status_t MEASURE_tick_second(void) {
 	// Local variables.
 	MEASURE_status_t status = MEASURE_SUCCESS;
-	MEASURE_status_t measure_status = MEASURE_SUCCESS;
 	// Increment seconds count.
 	measure_ctx.tick_led_seconds_count++;
 	// Check state.
@@ -692,8 +686,7 @@ MEASURE_status_t MEASURE_tick_second(void) {
 		_MEASURE_compute_run_data();
 		measure_ctx.processing_enable = 1;
 		// Compute accumulated data.
-		measure_status = _MEASURE_compute_accumulated_data();
-		MEASURE_stack_error();
+		_MEASURE_compute_accumulated_data();
 	}
 	// Manage LED.
 	status = _MEASURE_led_single_pulse();
