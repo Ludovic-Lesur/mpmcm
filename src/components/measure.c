@@ -123,6 +123,9 @@ typedef struct {
 	uint8_t zero_cross_count;
 	uint8_t dma_transfer_end_flag;
 	uint32_t tick_led_seconds_count;
+#ifdef ANALOG_SIMULATION
+	uint8_t random_divider;
+#endif
 } MEASURE_context_t;
 
 /*** MEASURE global variables ***/
@@ -154,6 +157,9 @@ static void _MEASURE_reset(void) {
 	// Reset flags.
 	measure_ctx.zero_cross_count = 0;
 	measure_ctx.dma_transfer_end_flag = 0;
+#ifdef ANALOG_SIMULATION
+	measure_ctx.random_divider = 1;
+#endif
 	// Reset sampling buffers.
 	for (idx0=0 ; idx0<MEASURE_PERIOD_ADCX_DMA_BUFFER_DEPTH ; idx0++) {
 		for (idx1=0 ; idx1<MEASURE_PERIOD_ADCX_DMA_BUFFER_SIZE ; idx1++) {
@@ -319,7 +325,6 @@ static void _MEASURE_compute_period_data(void) {
 	// Local variables.
 	uint32_t acv_buffer_size = 0;
 	uint32_t aci_buffer_size = 0;
-	uint8_t chx_idx = 0;
 	int32_t active_power_mw = 0;
 	q31_t mean_voltage_q31 = 0;
 	int32_t rms_voltage_mv = 0;
@@ -330,6 +335,8 @@ static void _MEASURE_compute_period_data(void) {
 	uint32_t tim2_ccr1_delta = 0;
 	int32_t frequency_mhz = 0;
 	int64_t temp_s64 = 0;
+	uint8_t chx_idx = 0;
+	uint32_t sample_idx = 0;
 	uint32_t idx = 0;
 	// Check enable flag.
 	if (measure_ctx.processing_enable == 0) goto errors;
@@ -353,12 +360,13 @@ static void _MEASURE_compute_period_data(void) {
 		// Compute channel buffer.
 		for (idx=0 ; idx<(measure_data.period_acxx_buffer_size) ; idx++) {
 			// Copy samples by channel and convert to Q31 type.
+			sample_idx = (ADC_NUMBER_OF_ACI_CHANNELS * idx) + chx_idx;
 #ifdef ANALOG_SIMULATION
-			measure_data.period_acvx_buffer_q31[idx] = (SIMULATION_ACV_BUFFER[(ADC_NUMBER_OF_ACI_CHANNELS * idx) + chx_idx]) << MEASURE_Q31_SHIFT_ADC;
-			measure_data.period_acix_buffer_q31[idx] = (SIMULATION_ACI_BUFFER[(ADC_NUMBER_OF_ACI_CHANNELS * idx) + chx_idx]) << MEASURE_Q31_SHIFT_ADC;
+			measure_data.period_acvx_buffer_q31[idx] = ((SIMULATION_ACV_BUFFER[sample_idx]) << MEASURE_Q31_SHIFT_ADC);
+			measure_data.period_acix_buffer_q31[idx] = (((SIMULATION_ACI_BUFFER[sample_idx]) / (measure_ctx.random_divider)) << MEASURE_Q31_SHIFT_ADC);
 #else
-			measure_data.period_acvx_buffer_q31[idx] = (measure_sampling.acv[measure_sampling.acv_read_idx].data[(ADC_NUMBER_OF_ACI_CHANNELS * idx) + chx_idx]) << MEASURE_Q31_SHIFT_ADC;
-			measure_data.period_acix_buffer_q31[idx] = (measure_sampling.aci[measure_sampling.aci_read_idx].data[(ADC_NUMBER_OF_ACI_CHANNELS * idx) + chx_idx]) << MEASURE_Q31_SHIFT_ADC;
+			measure_data.period_acvx_buffer_q31[idx] = (measure_sampling.acv[measure_sampling.acv_read_idx].data[sample_idx]) << MEASURE_Q31_SHIFT_ADC;
+			measure_data.period_acix_buffer_q31[idx] = (measure_sampling.aci[measure_sampling.aci_read_idx].data[sample_idx]) << MEASURE_Q31_SHIFT_ADC;
 			// Force current to 0 if sensor is not connected.
 			if (GPIO_read(MEASURE_GPIO_ACI_DETECT[chx_idx]) == 0) {
 				measure_data.period_acix_buffer_q31[idx] = 0;
@@ -679,6 +687,9 @@ MEASURE_status_t MEASURE_tick_second(void) {
 	MEASURE_status_t status = MEASURE_SUCCESS;
 	// Increment seconds count.
 	measure_ctx.tick_led_seconds_count++;
+#ifdef ANALOG_SIMULATION
+	measure_ctx.random_divider = 1 + ((measure_ctx.random_divider + 1) % 100);
+#endif
 	// Check state.
 	if (measure_ctx.state != MEASURE_STATE_OFF) {
 		// Compute run data from last second.
@@ -827,6 +838,9 @@ MEASURE_status_t MEASURE_get_channel_accumulated_data(uint8_t channel, DATA_accu
 	DATA_reset_accumulated_channel(measure_data.chx_accumulated_data[channel]);
 	DATA_reset_run(measure_data.active_energy_mws_sum[channel]);
 	DATA_reset_run(measure_data.apparent_energy_mvas_sum[channel]);
+#ifdef ANALOG_SIMULATION
+	measure_ctx.random_divider = 1;
+#endif
 errors:
 	return status;
 }
