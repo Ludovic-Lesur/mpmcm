@@ -21,27 +21,18 @@
  * \brief Single run data structure.
  *******************************************************************/
 typedef struct {
-	int32_t value;
+	float64_t value;
 	uint32_t number_of_samples;
 } DATA_run_t;
-
-/*!******************************************************************
- * \struct DATA_run_64_t
- * \brief Single run data structure.
- *******************************************************************/
-typedef struct {
-	int64_t value;
-	uint32_t number_of_samples;
-} DATA_run_64_t;
 
 /*!******************************************************************
  * \struct DATA_accumulated_t
  * \brief Single accumulated data structure.
  *******************************************************************/
 typedef struct {
-	int32_t min;
-	int32_t max;
-	int32_t rolling_mean;
+	float64_t min;
+	float64_t max;
+	float64_t rolling_mean;
 	uint32_t number_of_samples;
 } DATA_accumulated_t;
 
@@ -75,7 +66,7 @@ typedef struct {
 
 /*******************************************************************/
 #define DATA_reset_run(source) { \
-	source.value = 0; \
+	source.value = 0.0; \
 	source.number_of_samples = 0; \
 }
 
@@ -90,9 +81,9 @@ typedef struct {
 
 /*******************************************************************/
 #define DATA_reset_accumulated(data) { \
-	data.min = 2147483647; \
-	data.max = 0; \
-	data.rolling_mean = 0; \
+	data.min = 1.7976931348623157e308L; \
+	data.max = 0.0; \
+	data.rolling_mean = 0.0; \
 	data.number_of_samples = 0; \
 }
 
@@ -144,13 +135,13 @@ typedef struct {
 /*******************************************************************/
 #define DATA_add_run_sample(data, sample) { \
 	/* Compute rolling mean */ \
-	MATH_rolling_mean(data.value, data.number_of_samples, sample, int32_t); \
+	MATH_rolling_mean(data.value, data.number_of_samples, sample, float64_t); \
 }
 
 /*******************************************************************/
 #define DATA_add_run_channel_sample(channel, data, sample) { \
 	/* Compute rolling mean */ \
-	MATH_rolling_mean(channel.data.value, channel.data.number_of_samples, sample, int32_t); \
+	MATH_rolling_mean(channel.data.value, channel.data.number_of_samples, sample, float64_t); \
 }
 
 /*******************************************************************/
@@ -170,7 +161,7 @@ typedef struct {
 			data.max = source.value; \
 		} \
 		/* Compute rolling mean */ \
-		MATH_rolling_mean(data.rolling_mean, data.number_of_samples, source.value, int32_t); \
+		MATH_rolling_mean(data.rolling_mean, data.number_of_samples, source.value, float64_t); \
 	} \
 }
 
@@ -191,7 +182,7 @@ typedef struct {
 			channel.data.max = source.value; \
 		} \
 		/* Compute rolling mean */ \
-		MATH_rolling_mean(channel.data.rolling_mean, channel.data.number_of_samples, source.value, int32_t); \
+		MATH_rolling_mean(channel.data.rolling_mean, channel.data.number_of_samples, source.value, float64_t); \
 	} \
 }
 

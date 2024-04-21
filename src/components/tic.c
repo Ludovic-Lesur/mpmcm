@@ -68,8 +68,8 @@ typedef union {
 typedef struct {
 	DATA_run_channel_t run;
 	DATA_accumulated_channel_t accumulated;
-	DATA_run_64_t active_energy_mws_sum;
-	DATA_run_64_t apparent_energy_mvas_sum;
+	DATA_run_t active_energy_mws_sum;
+	DATA_run_t apparent_energy_mvas_sum;
 } TIC_data_t;
 
 /*******************************************************************/
@@ -190,8 +190,8 @@ static TIC_status_t _TIC_decode_sample(TIC_sample_index_t sample_index) {
 	TIC_status_t status = TIC_SUCCESS;
 	PARSER_status_t parser_status = PARSER_SUCCESS;
 	int32_t sample = 0;
-	uint32_t sample_abs = 0;
-	uint32_t ref_abs = 0;
+	float64_t sample_abs = 0.0;
+	float64_t ref_abs = 0.0;
 	// Check index.
 	if (sample_index >= TIC_SAMPLE_INDEX_LAST) {
 		status = TIC_ERROR_DATA_INDEX;
@@ -203,12 +203,12 @@ static TIC_status_t _TIC_decode_sample(TIC_sample_index_t sample_index) {
 		parser_status = PARSER_get_parameter(&tic_ctx.parser, STRING_FORMAT_DECIMAL, TIC_FRAME_SEPARATOR_CHAR, &sample);
 		if (parser_status == PARSER_SUCCESS) {
 			// Update run data.
-			tic_data.run.apparent_power_mva.value = (sample * 1000);
+			tic_data.run.apparent_power_mva.value = ((float64_t) (sample * 1000));
 			tic_data.run.apparent_power_mva.number_of_samples = 1;
 			// Update accumulated.
 			DATA_add_accumulated_channel_sample(tic_data.accumulated, apparent_power_mva, tic_data.run.apparent_power_mva);
 			// Increase apparent energy.
-			tic_data.apparent_energy_mvas_sum.value += (int64_t) (tic_data.run.apparent_power_mva.value);
+			tic_data.apparent_energy_mvas_sum.value += (tic_data.run.apparent_power_mva.value);
 			tic_data.apparent_energy_mvas_sum.number_of_samples++;
 			// Set flag.
 			tic_ctx.flags.decode_success = 1;
@@ -439,10 +439,10 @@ TIC_status_t TIC_get_channel_accumulated_data(DATA_accumulated_channel_t* channe
 		goto errors;
 	}
 	// Compute active energy.
-	tic_data.accumulated.active_energy_mwh.value = (int32_t) ((tic_data.active_energy_mws_sum.value) / ((int64_t) DATA_SECONDS_PER_HOUR));
+	tic_data.accumulated.active_energy_mwh.value = ((tic_data.active_energy_mws_sum.value) / ((float64_t) DATA_SECONDS_PER_HOUR));
 	tic_data.accumulated.active_energy_mwh.number_of_samples = tic_data.active_energy_mws_sum.number_of_samples;
 	// Compute apparent energy.
-	tic_data.accumulated.apparent_energy_mvah.value = (int32_t) ((tic_data.apparent_energy_mvas_sum.value) / ((int64_t) DATA_SECONDS_PER_HOUR));
+	tic_data.accumulated.apparent_energy_mvah.value = ((tic_data.apparent_energy_mvas_sum.value) / ((float64_t) DATA_SECONDS_PER_HOUR));
 	tic_data.accumulated.apparent_energy_mvah.number_of_samples = tic_data.apparent_energy_mvas_sum.number_of_samples;
 	// Copy data.
 	DATA_copy_accumulated_channel(tic_data.accumulated, (*channel_accumulated_data));

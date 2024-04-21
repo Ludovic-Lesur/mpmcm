@@ -86,12 +86,12 @@ typedef struct {
 /*******************************************************************/
 typedef struct {
 	// Factors.
-	int64_t acv_factor_num;
-	int64_t acv_factor_den;
-	int64_t aci_factor_num[ADC_NUMBER_OF_ACI_CHANNELS];
-	int64_t aci_factor_den;
-	int64_t acp_factor_num[ADC_NUMBER_OF_ACI_CHANNELS];
-	int64_t acp_factor_den;
+	float64_t acv_factor_num;
+	float64_t acv_factor_den;
+	float64_t aci_factor_num[ADC_NUMBER_OF_ACI_CHANNELS];
+	float64_t aci_factor_den;
+	float64_t acp_factor_num[ADC_NUMBER_OF_ACI_CHANNELS];
+	float64_t acp_factor_den;
 	// Temporary variables for individual channel processing on 1 period.
 	q31_t period_acvx_buffer_q31[MEASURE_PERIOD_ADCX_BUFFER_SIZE];
 	q31_t period_acix_buffer_q31[MEASURE_PERIOD_ADCX_BUFFER_SIZE];
@@ -108,8 +108,8 @@ typedef struct {
 	DATA_run_channel_t chx_rolling_mean[ADC_NUMBER_OF_ACI_CHANNELS];
 	DATA_run_channel_t chx_run_data[ADC_NUMBER_OF_ACI_CHANNELS];
 	DATA_accumulated_channel_t chx_accumulated_data[ADC_NUMBER_OF_ACI_CHANNELS];
-	DATA_run_64_t active_energy_mws_sum[ADC_NUMBER_OF_ACI_CHANNELS];
-	DATA_run_64_t apparent_energy_mvas_sum[ADC_NUMBER_OF_ACI_CHANNELS];
+	DATA_run_t active_energy_mws_sum[ADC_NUMBER_OF_ACI_CHANNELS];
+	DATA_run_t apparent_energy_mvas_sum[ADC_NUMBER_OF_ACI_CHANNELS];
 	// Mains frequency.
 	DATA_run_t acv_frequency_rolling_mean;
 	DATA_run_t acv_frequency_run_data;
@@ -325,16 +325,16 @@ static void _MEASURE_compute_period_data(void) {
 	// Local variables.
 	uint32_t acv_buffer_size = 0;
 	uint32_t aci_buffer_size = 0;
-	int32_t active_power_mw = 0;
 	q31_t mean_voltage_q31 = 0;
-	int32_t rms_voltage_mv = 0;
 	q31_t mean_current_q31 = 0;
-	int32_t rms_current_ma = 0;
-	int32_t apparent_power_mva = 0;
-	int32_t power_factor = 0;
+	float64_t active_power_mw = 0.0;
+	float64_t rms_voltage_mv = 0.0;
+	float64_t rms_current_ma = 0.0;
+	float64_t apparent_power_mva = 0.0;
+	float64_t power_factor = 0.0;
 	uint32_t tim2_ccr1_delta = 0;
-	int32_t frequency_mhz = 0;
-	int64_t temp_s64 = 0;
+	float64_t frequency_mhz = 0.0;
+	float64_t temp_f64 = 0.0;
 	uint8_t chx_idx = 0;
 	uint32_t sample_idx = 0;
 	uint32_t idx = 0;
@@ -385,28 +385,28 @@ static void _MEASURE_compute_period_data(void) {
 		arm_mult_q31((q31_t*) measure_data.period_acvx_buffer_q31, (q31_t*) measure_data.period_acix_buffer_q31, (q31_t*) measure_data.period_acpx_buffer_q31, measure_data.period_acxx_buffer_size);
 		// Active power.
 		arm_mean_q31((q31_t*) measure_data.period_acpx_buffer_q31, measure_data.period_acxx_buffer_size, (q31_t*) &(measure_data.period_active_power_q31));
-		temp_s64 = (int64_t) (measure_data.period_active_power_q31 >> MEASURE_Q31_SHIFT_MULT);
-		temp_s64 *= measure_data.acp_factor_num[chx_idx];
-		active_power_mw = (int32_t) (temp_s64 / measure_data.acp_factor_den);
+		temp_f64 = (float64_t) (measure_data.period_active_power_q31 >> MEASURE_Q31_SHIFT_MULT);
+		temp_f64 *= measure_data.acp_factor_num[chx_idx];
+		active_power_mw = (temp_f64 / measure_data.acp_factor_den);
 		// RMS voltage.
 		arm_rms_q31((q31_t*) measure_data.period_acvx_buffer_q31, measure_data.period_acxx_buffer_size, (q31_t*) &(measure_data.period_rms_voltage_q31));
-		temp_s64 = measure_data.acv_factor_num * (int64_t) (measure_data.period_rms_voltage_q31 >> MEASURE_Q31_SHIFT_ADC);
-		rms_voltage_mv = (int32_t) (temp_s64 / measure_data.acv_factor_den);
+		temp_f64 = measure_data.acv_factor_num * (float64_t) (measure_data.period_rms_voltage_q31 >> MEASURE_Q31_SHIFT_ADC);
+		rms_voltage_mv = (temp_f64 / measure_data.acv_factor_den);
 		// RMS current.
 		arm_rms_q31((q31_t*) measure_data.period_acix_buffer_q31, measure_data.period_acxx_buffer_size, (q31_t*) &(measure_data.period_rms_current_q31));
-		temp_s64 = measure_data.aci_factor_num[chx_idx] * (int64_t) (measure_data.period_rms_current_q31 >> MEASURE_Q31_SHIFT_ADC);
-		rms_current_ma = (int32_t) (temp_s64 / measure_data.aci_factor_den);
+		temp_f64 = measure_data.aci_factor_num[chx_idx] * (float64_t) (measure_data.period_rms_current_q31 >> MEASURE_Q31_SHIFT_ADC);
+		rms_current_ma = (temp_f64 / measure_data.aci_factor_den);
 		// Apparent power.
-		temp_s64 = ((int64_t) rms_voltage_mv) * ((int64_t) rms_current_ma);
-		apparent_power_mva = (int32_t) ((temp_s64) / ((int64_t) 1000));
-		if (((active_power_mw > 0) && (apparent_power_mva < 0)) || ((active_power_mw < 0) && (apparent_power_mva > 0))) {
-			apparent_power_mva *= (-1);
+		temp_f64 = (rms_voltage_mv * rms_current_ma);
+		apparent_power_mva = ((temp_f64) / ((float64_t) 1000.0));
+		if (((active_power_mw > 0.0) && (apparent_power_mva < 0.0)) || ((active_power_mw < 0.0) && (apparent_power_mva > 0.0))) {
+			apparent_power_mva *= (-1.0);
 		}
 		// Power factor.
-		temp_s64 = (int64_t) MEASURE_POWER_FACTOR_MULTIPLIER * ((int64_t) active_power_mw);
-		power_factor = (apparent_power_mva != 0) ? (int32_t) ((temp_s64) / ((int64_t) apparent_power_mva)) : 0;
-		if (((active_power_mw > 0) && (power_factor < 0)) || ((active_power_mw < 0) && (power_factor > 0))) {
-			power_factor *= (-1);
+		temp_f64 = (active_power_mw * ((float64_t) MEASURE_POWER_FACTOR_MULTIPLIER));
+		power_factor = (apparent_power_mva != 0.0) ? (temp_f64 / apparent_power_mva) : 0;
+		if (((active_power_mw > 0.0) && (power_factor < 0.0)) || ((active_power_mw < 0.0) && (power_factor > 0.0))) {
+			power_factor *= (-1.0);
 		}
 		// Update accumulated data.
 		DATA_add_run_channel_sample(measure_data.chx_rolling_mean[chx_idx], active_power_mw, active_power_mw);
@@ -430,8 +430,7 @@ static void _MEASURE_compute_period_data(void) {
 	// Check index.
 	if (idx < MEASURE_PERIOD_TIM2_DMA_BUFFER_SIZE) {
 		// Compute mains frequency.
-		temp_s64 = (((int64_t) MEASURE_ACV_FREQUENCY_SAMPLING_HZ * 1000) / ((int64_t) tim2_ccr1_delta));
-		frequency_mhz = (int32_t) temp_s64;
+		frequency_mhz = (((float64_t) (MEASURE_ACV_FREQUENCY_SAMPLING_HZ * 1000)) / ((float64_t) tim2_ccr1_delta));
 		// Update accumulated data.
 		DATA_add_run_sample(measure_data.acv_frequency_rolling_mean, frequency_mhz);
 	}
@@ -463,8 +462,8 @@ static void _MEASURE_compute_run_data(void) {
 /*******************************************************************/
 static void _MEASURE_compute_accumulated_data(void) {
 	// Local variables.
-	uint32_t sample_abs = 0;
-	uint32_t ref_abs = 0;
+	float64_t sample_abs = 0.0;
+	float64_t ref_abs = 0.0;
 	uint8_t chx_idx = 0;
 	// Compute AC channels accumulated data.
 	for (chx_idx=0 ; chx_idx<ADC_NUMBER_OF_ACI_CHANNELS ; chx_idx++) {
@@ -475,10 +474,10 @@ static void _MEASURE_compute_accumulated_data(void) {
 		DATA_add_accumulated_channel_sample(measure_data.chx_accumulated_data[chx_idx], apparent_power_mva, measure_data.chx_run_data[chx_idx].apparent_power_mva);
 		DATA_add_accumulated_channel_sample(measure_data.chx_accumulated_data[chx_idx], power_factor, measure_data.chx_run_data[chx_idx].power_factor);
 		// Increase active energy.
-		measure_data.active_energy_mws_sum[chx_idx].value += (int64_t) (measure_data.chx_run_data[chx_idx].active_power_mw.value);
+		measure_data.active_energy_mws_sum[chx_idx].value += (measure_data.chx_run_data[chx_idx].active_power_mw.value);
 		measure_data.active_energy_mws_sum[chx_idx].number_of_samples++;
 		// Increase apparent energy.
-		measure_data.apparent_energy_mvas_sum[chx_idx].value += (int64_t) (measure_data.chx_run_data[chx_idx].apparent_power_mva.value);
+		measure_data.apparent_energy_mvas_sum[chx_idx].value += (measure_data.chx_run_data[chx_idx].apparent_power_mva.value);
 		measure_data.apparent_energy_mvas_sum[chx_idx].number_of_samples++;
 		// Reset results.
 		DATA_reset_run_channel(measure_data.chx_rolling_mean[chx_idx]);
@@ -658,19 +657,19 @@ MEASURE_status_t MEASURE_set_gains(uint16_t transformer_gain, uint16_t current_s
 		goto errors;
 	}
 	// ACV.
-	measure_data.acv_factor_num = ((int64_t) transformer_gain * (int64_t) MPMCM_TRANSFORMER_ATTEN * (int64_t) ADC_VREF_MV);
-	measure_data.acv_factor_den = ((int64_t) MEASURE_TRANSFORMER_GAIN_FACTOR * (int64_t) ADC_FULL_SCALE);
+	measure_data.acv_factor_num = ((float64_t) transformer_gain * (float64_t) MPMCM_TRANSFORMER_ATTEN * (float64_t) ADC_VREF_MV);
+	measure_data.acv_factor_den = ((float64_t) MEASURE_TRANSFORMER_GAIN_FACTOR * (float64_t) ADC_FULL_SCALE);
 	// ACI.
 	for (chx_idx=0 ; chx_idx<ADC_NUMBER_OF_ACI_CHANNELS ; chx_idx++) {
-		measure_data.aci_factor_num[chx_idx] = ((int64_t) current_sensors_gain[chx_idx] * (int64_t) MEASURE_SCT013_ATTEN[chx_idx] * (int64_t) ADC_VREF_MV);
+		measure_data.aci_factor_num[chx_idx] = ((float64_t) current_sensors_gain[chx_idx] * (float64_t) MEASURE_SCT013_ATTEN[chx_idx] * (float64_t) ADC_VREF_MV);
 	}
-	measure_data.aci_factor_den = ((int64_t) MEASURE_CURRENT_SENSOR_GAIN_FACTOR * (int64_t) ADC_FULL_SCALE);
+	measure_data.aci_factor_den = ((float64_t) MEASURE_CURRENT_SENSOR_GAIN_FACTOR * (float64_t) ADC_FULL_SCALE);
 	// ACP.
 	for (chx_idx=0 ; chx_idx<ADC_NUMBER_OF_ACI_CHANNELS ; chx_idx++) {
 		// Note: 1000 factor is used to get mW from mV and mA.
 		// Conversion is done here to limit numerator value and avoid overflow during power computation.
 		// There is no precision loss since ACV and ACI factors multiplication is necessarily a multiple of 1000 thanks to ADC_VREF_MV.
-		measure_data.acp_factor_num[chx_idx] = (measure_data.acv_factor_num * measure_data.aci_factor_num[chx_idx]) / ((int64_t) 1000);
+		measure_data.acp_factor_num[chx_idx] = (measure_data.acv_factor_num * measure_data.aci_factor_num[chx_idx]) / ((float64_t) 1000);
 	}
 	measure_data.acp_factor_den = (measure_data.acv_factor_den * measure_data.aci_factor_den);
 	// Buffer size limits.
@@ -827,10 +826,10 @@ MEASURE_status_t MEASURE_get_channel_accumulated_data(uint8_t channel, DATA_accu
 		goto errors;
 	}
 	// Compute active energy.
-	measure_data.chx_accumulated_data[channel].active_energy_mwh.value = (int32_t) ((measure_data.active_energy_mws_sum[channel].value) / ((int64_t) DATA_SECONDS_PER_HOUR));
+	measure_data.chx_accumulated_data[channel].active_energy_mwh.value = ((measure_data.active_energy_mws_sum[channel].value) / ((float64_t) DATA_SECONDS_PER_HOUR));
 	measure_data.chx_accumulated_data[channel].active_energy_mwh.number_of_samples = measure_data.active_energy_mws_sum[channel].number_of_samples;
 	// Compute apparent energy.
-	measure_data.chx_accumulated_data[channel].apparent_energy_mvah.value = (int32_t) ((measure_data.apparent_energy_mvas_sum[channel].value) / ((int64_t) DATA_SECONDS_PER_HOUR));
+	measure_data.chx_accumulated_data[channel].apparent_energy_mvah.value = ((measure_data.apparent_energy_mvas_sum[channel].value) / ((float64_t) DATA_SECONDS_PER_HOUR));
 	measure_data.chx_accumulated_data[channel].apparent_energy_mvah.number_of_samples = measure_data.apparent_energy_mvas_sum[channel].number_of_samples;
 	// Copy data.
 	DATA_copy_accumulated_channel(measure_data.chx_accumulated_data[channel], (*channel_accumulated_data));
