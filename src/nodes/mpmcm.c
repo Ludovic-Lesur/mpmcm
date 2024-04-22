@@ -169,6 +169,7 @@ void MPMCM_init_registers(void) {
 	reg_value = 0;
 	reg_mask = 0;
 	DINFOX_write_field(&reg_value, &reg_mask, (uint32_t) DINFOX_convert_seconds(TIC_SAMPLING_PERIOD_DEFAULT_SECONDS), MPMCM_REG_CONFIGURATION_5_MASK_TIC_SAMPLING_PERIOD);
+	NODE_write_register(NODE_REQUEST_SOURCE_EXTERNAL, MPMCM_REG_ADDR_CONFIGURATION_5, reg_mask, reg_value);
 #endif
 	// Read init state.
 	MPMCM_update_register(MPMCM_REG_ADDR_STATUS_1);
