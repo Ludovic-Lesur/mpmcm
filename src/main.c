@@ -9,6 +9,7 @@
 #include "adc.h"
 #include "error.h"
 #include "exti.h"
+#include "fpu.h"
 #include "gpio.h"
 #include "iwdg.h"
 #include "lptim.h"
@@ -44,6 +45,8 @@ static void _MPMCM_init_hw(void) {
 	ERROR_stack_init();
 	// Init memory.
 	NVIC_init();
+	// Enable FPU.
+	FPU_init();
 	// Init power module and clock tree.
 	PWR_init();
 	RCC_init();

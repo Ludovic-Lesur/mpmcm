@@ -10,6 +10,8 @@
 #include "gpio.h"
 #include "gpio_reg.h"
 
+/*** MAPPING global variables ***/
+
 // TCXO.
 const GPIO_pin_t GPIO_TCXO_POWER_ENABLE =	(GPIO_pin_t) {GPIOC, 2, 13, 0};
 // Analog inputs.

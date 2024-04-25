@@ -51,9 +51,6 @@
 
 #define MEASURE_POWER_FACTOR_MULTIPLIER					100
 
-#define MEASURE_Q31_SHIFT_ADC							16
-#define MEASURE_Q31_SHIFT_MULT							1
-
 #define MEASURE_ACV_FREQUENCY_SAMPLING_HZ				1000000
 #define MEASURE_PERIOD_TIM2_DMA_BUFFER_SIZE				3
 
@@ -93,17 +90,17 @@ typedef struct {
 	float64_t acp_factor_num[ADC_NUMBER_OF_ACI_CHANNELS];
 	float64_t acp_factor_den;
 	// Temporary variables for individual channel processing on 1 period.
-	q31_t period_acvx_buffer_q31[MEASURE_PERIOD_ADCX_BUFFER_SIZE];
-	q31_t period_acix_buffer_q31[MEASURE_PERIOD_ADCX_BUFFER_SIZE];
-	q31_t period_acpx_buffer_q31[MEASURE_PERIOD_ADCX_BUFFER_SIZE];
+	float32_t period_acvx_buffer_f32[MEASURE_PERIOD_ADCX_BUFFER_SIZE];
+	float32_t period_acix_buffer_f32[MEASURE_PERIOD_ADCX_BUFFER_SIZE];
+	float32_t period_acpx_buffer_f32[MEASURE_PERIOD_ADCX_BUFFER_SIZE];
 	uint32_t period_acxx_buffer_size;
 	uint32_t period_acxx_buffer_size_low_limit;
 	uint32_t period_acxx_buffer_size_high_limit;
-	q31_t period_active_power_q31;
-	q31_t period_rms_voltage_q31;
-	q31_t period_rms_current_q31;
-	q31_t period_apparent_power_q31;
-	q31_t period_power_factor_q31;
+	float32_t period_active_power_f32;
+	float32_t period_rms_voltage_f32;
+	float32_t period_rms_current_f32;
+	float32_t period_apparent_power_f32;
+	float32_t period_power_factor_f32;
 	// AC channels results.
 	DATA_run_channel_t chx_rolling_mean[ADC_NUMBER_OF_ACI_CHANNELS];
 	DATA_run_channel_t chx_run_data[ADC_NUMBER_OF_ACI_CHANNELS];
@@ -325,8 +322,8 @@ static void _MEASURE_compute_period_data(void) {
 	// Local variables.
 	uint32_t acv_buffer_size = 0;
 	uint32_t aci_buffer_size = 0;
-	q31_t mean_voltage_q31 = 0;
-	q31_t mean_current_q31 = 0;
+	float32_t mean_voltage_f32 = 0.0;
+	float32_t mean_current_f32 = 0.0;
 	float64_t active_power_mw = 0.0;
 	float64_t rms_voltage_mv = 0.0;
 	float64_t rms_current_ma = 0.0;
@@ -362,39 +359,39 @@ static void _MEASURE_compute_period_data(void) {
 			// Copy samples by channel and convert to Q31 type.
 			sample_idx = (ADC_NUMBER_OF_ACI_CHANNELS * idx) + chx_idx;
 #ifdef ANALOG_SIMULATION
-			measure_data.period_acvx_buffer_q31[idx] = ((SIMULATION_ACV_BUFFER[sample_idx]) << MEASURE_Q31_SHIFT_ADC);
-			measure_data.period_acix_buffer_q31[idx] = (((SIMULATION_ACI_BUFFER[sample_idx]) / (measure_ctx.random_divider)) << MEASURE_Q31_SHIFT_ADC);
+			measure_data.period_acvx_buffer_f32[idx] = (float32_t) (SIMULATION_ACV_BUFFER[sample_idx]);
+			measure_data.period_acix_buffer_f32[idx] = (float32_t) (SIMULATION_ACI_BUFFER[sample_idx] / measure_ctx.random_divider);
 #else
-			measure_data.period_acvx_buffer_q31[idx] = (measure_sampling.acv[measure_sampling.acv_read_idx].data[sample_idx]) << MEASURE_Q31_SHIFT_ADC;
-			measure_data.period_acix_buffer_q31[idx] = (measure_sampling.aci[measure_sampling.aci_read_idx].data[sample_idx]) << MEASURE_Q31_SHIFT_ADC;
+			measure_data.period_acvx_buffer_f32[idx] = (float32_t) (measure_sampling.acv[measure_sampling.acv_read_idx].data[sample_idx]);
+			measure_data.period_acix_buffer_f32[idx] = (float32_t) (measure_sampling.aci[measure_sampling.aci_read_idx].data[sample_idx]);
 			// Force current to 0 if sensor is not connected.
 			if (GPIO_read(MEASURE_GPIO_ACI_DETECT[chx_idx]) == 0) {
-				measure_data.period_acix_buffer_q31[idx] = 0;
+				measure_data.period_acix_buffer_f32[idx] = 0.0;
 			}
 #endif
 		}
 		// Mean voltage and current.
-		arm_mean_q31((q31_t*) measure_data.period_acvx_buffer_q31, measure_data.period_acxx_buffer_size, &mean_voltage_q31);
-		arm_mean_q31((q31_t*) measure_data.period_acix_buffer_q31, measure_data.period_acxx_buffer_size, &mean_current_q31);
+		arm_mean_f32((float32_t*) measure_data.period_acvx_buffer_f32, measure_data.period_acxx_buffer_size, &mean_voltage_f32);
+		arm_mean_f32((float32_t*) measure_data.period_acix_buffer_f32, measure_data.period_acxx_buffer_size, &mean_current_f32);
 		// DC removal.
 		for (idx=0 ; idx<(measure_data.period_acxx_buffer_size) ; idx++) {
-			measure_data.period_acvx_buffer_q31[idx] -= mean_voltage_q31;
-			measure_data.period_acix_buffer_q31[idx] -= mean_current_q31;
+			measure_data.period_acvx_buffer_f32[idx] -= mean_voltage_f32;
+			measure_data.period_acix_buffer_f32[idx] -= mean_current_f32;
 		}
 		// Instantaneous power.
-		arm_mult_q31((q31_t*) measure_data.period_acvx_buffer_q31, (q31_t*) measure_data.period_acix_buffer_q31, (q31_t*) measure_data.period_acpx_buffer_q31, measure_data.period_acxx_buffer_size);
+		arm_mult_f32((float32_t*) measure_data.period_acvx_buffer_f32, (float32_t*) measure_data.period_acix_buffer_f32, (float32_t*) measure_data.period_acpx_buffer_f32, measure_data.period_acxx_buffer_size);
 		// Active power.
-		arm_mean_q31((q31_t*) measure_data.period_acpx_buffer_q31, measure_data.period_acxx_buffer_size, (q31_t*) &(measure_data.period_active_power_q31));
-		temp_f64 = (float64_t) (measure_data.period_active_power_q31 >> MEASURE_Q31_SHIFT_MULT);
+		arm_mean_f32((float32_t*) measure_data.period_acpx_buffer_f32, measure_data.period_acxx_buffer_size, (float32_t*) &(measure_data.period_active_power_f32));
+		temp_f64 = (float64_t) measure_data.period_active_power_f32;
 		temp_f64 *= measure_data.acp_factor_num[chx_idx];
 		active_power_mw = (temp_f64 / measure_data.acp_factor_den);
 		// RMS voltage.
-		arm_rms_q31((q31_t*) measure_data.period_acvx_buffer_q31, measure_data.period_acxx_buffer_size, (q31_t*) &(measure_data.period_rms_voltage_q31));
-		temp_f64 = measure_data.acv_factor_num * (float64_t) (measure_data.period_rms_voltage_q31 >> MEASURE_Q31_SHIFT_ADC);
+		arm_rms_f32((float32_t*) measure_data.period_acvx_buffer_f32, measure_data.period_acxx_buffer_size, (float32_t*) &(measure_data.period_rms_voltage_f32));
+		temp_f64 = measure_data.acv_factor_num * ((float64_t) measure_data.period_rms_voltage_f32);
 		rms_voltage_mv = (temp_f64 / measure_data.acv_factor_den);
 		// RMS current.
-		arm_rms_q31((q31_t*) measure_data.period_acix_buffer_q31, measure_data.period_acxx_buffer_size, (q31_t*) &(measure_data.period_rms_current_q31));
-		temp_f64 = measure_data.aci_factor_num[chx_idx] * (float64_t) (measure_data.period_rms_current_q31 >> MEASURE_Q31_SHIFT_ADC);
+		arm_rms_f32((float32_t*) measure_data.period_acix_buffer_f32, measure_data.period_acxx_buffer_size, (float32_t*) &(measure_data.period_rms_current_f32));
+		temp_f64 = measure_data.aci_factor_num[chx_idx] * ((float64_t) measure_data.period_rms_current_f32);
 		rms_current_ma = (temp_f64 / measure_data.aci_factor_den);
 		// Apparent power.
 		temp_f64 = (rms_voltage_mv * rms_current_ma);
