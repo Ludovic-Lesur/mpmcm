@@ -45,7 +45,11 @@
 							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.extrawarn.1825642243" name="Enable extra warnings (-Wextra)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.extrawarn" value="true" valueType="boolean"/>
 							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.arm.target.fpu.abi.677990734" name="Float ABI" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.arm.target.fpu.abi" value="ilg.gnuarmeclipse.managedbuild.cross.option.arm.target.fpu.abi.hard" valueType="enumerated"/>
 							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.arm.target.fpu.unit.716626138" name="FPU Type" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.arm.target.fpu.unit" value="ilg.gnuarmeclipse.managedbuild.cross.option.arm.target.fpu.unit.fpv4spd16" valueType="enumerated"/>
-							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.other.193760598" name="Other warning flags" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.other" value="-Wdouble-promotion" valueType="string"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.other.193760598" name="Other warning flags" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.other" value="-Wdouble-promotion -Wno-scalar-storage-order" valueType="string"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.unused.540801960" name="Warn on various unused elements (-Wunused)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.unused" value="true" valueType="boolean"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.uninitialized.258337570" name="Warn on uninitialized variables (-Wuninitialised)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.uninitialized" value="true" valueType="boolean"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.missingdeclaration.1604811930" name="Warn on undeclared global function (-Wmissing-declaration)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.missingdeclaration" value="false" valueType="boolean"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.conversion.814035477" name="Warn on implicit conversions (-Wconversion)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.conversion" value="false" valueType="boolean"/>
 							<targetPlatform archList="all" binaryParser="org.eclipse.cdt.core.ELF" id="ilg.gnuarmeclipse.managedbuild.cross.targetPlatform.1261823657" isAbstract="false" osList="all" superClass="ilg.gnuarmeclipse.managedbuild.cross.targetPlatform"/>
 							<builder buildPath="${workspace_loc:/MPMCM}/Release" id="ilg.gnuarmeclipse.managedbuild.cross.builder.218368455" keepEnvironmentInBuildfile="false" managedBuildOn="true" name="Gnu Make Builder" superClass="ilg.gnuarmeclipse.managedbuild.cross.builder"/>
 							<tool id="ilg.gnuarmeclipse.managedbuild.cross.tool.assembler.1657764644" name="GNU Arm Cross Assembler" superClass="ilg.gnuarmeclipse.managedbuild.cross.tool.assembler">
@@ -61,17 +65,15 @@
 									<listOptionValue builtIn="false" value="__ARM_FEATURE_DSP=1"/>
 								</option>
 								<option IS_BUILTIN_EMPTY="false" IS_VALUE_EMPTY="false" id="ilg.gnuarmeclipse.managedbuild.cross.option.assembler.include.paths.953551726" name="Include paths (-I)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.assembler.include.paths" useByScannerDiscovery="true" valueType="includePath">
-									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/inc&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/inc/registers&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/inc/peripherals&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/lib/inc&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/lib/CMSIS-DSP/PrivateInclude&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/lib/CMSIS-DSP/Include&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/inc/components&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/inc/applicative&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/inc/utils&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/../xm/inc/dinfox&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/inc/nodes&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/drivers/registers/inc&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/drivers/peripherals/inc&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/drivers/utils/inc&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/drivers/utils/CMSIS-DSP/Include&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/drivers/components/inc&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/middleware/analog/inc&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/middleware/node/inc&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/middleware/power/inc&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/application/inc&quot;"/>
 								</option>
 								<inputType id="ilg.gnuarmeclipse.managedbuild.cross.tool.assembler.input.2026372331" superClass="ilg.gnuarmeclipse.managedbuild.cross.tool.assembler.input"/>
 							</tool>
@@ -87,17 +89,15 @@
 									<listOptionValue builtIn="false" value="__ARM_FEATURE_DSP=1"/>
 								</option>
 								<option IS_BUILTIN_EMPTY="false" IS_VALUE_EMPTY="false" id="ilg.gnuarmeclipse.managedbuild.cross.option.c.compiler.include.paths.954853377" name="Include paths (-I)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.c.compiler.include.paths" useByScannerDiscovery="true" valueType="includePath">
-									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/inc&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/inc/registers&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/inc/peripherals&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/lib/inc&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/lib/CMSIS-DSP/PrivateInclude&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/lib/CMSIS-DSP/Include&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/inc/components&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/inc/applicative&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/inc/utils&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/../xm/inc/dinfox&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/inc/nodes&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/drivers/registers/inc&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/drivers/peripherals/inc&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/drivers/utils/inc&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/drivers/utils/CMSIS-DSP/Include&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/drivers/components/inc&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/middleware/analog/inc&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/middleware/node/inc&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/middleware/power/inc&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/application/inc&quot;"/>
 								</option>
 								<inputType id="ilg.gnuarmeclipse.managedbuild.cross.tool.c.compiler.input.2068312002" superClass="ilg.gnuarmeclipse.managedbuild.cross.tool.c.compiler.input"/>
 							</tool>
@@ -137,8 +137,7 @@
 						</toolChain>
 					</folderInfo>
 					<sourceEntries>
-						<entry excluding="lib/CMSIS-DSP/Source/TransformFunctions|lib/CMSIS-DSP/Source/ControllerFunctions|lib/CMSIS-DSP/Source/WindowFunctions|lib/CMSIS-DSP/Source/SVMFunctions|lib/CMSIS-DSP/Source/SupportFunctions|lib/CMSIS-DSP/Source/QuaternionMathFunctions|lib/CMSIS-DSP/Source/MatrixFunctions|lib/CMSIS-DSP/Source/InterpolationFunctions|lib/CMSIS-DSP/Source/FilteringFunctions|lib/CMSIS-DSP/Source/DistanceFunctions|lib/CMSIS-DSP/Source/ComplexMathFunctions|lib/CMSIS-DSP/Source/BayesFunctions|lib/CMSIS-DSP/Source/WindowFunctions/WindowFunctions.c|lib/CMSIS-DSP/Source/TransformFunctions/TransformFunctionsF16.c|lib/CMSIS-DSP/Source/TransformFunctions/TransformFunctions.c|lib/CMSIS-DSP/Source/SVMFunctions/SVMFunctionsF16.c|lib/CMSIS-DSP/Source/SVMFunctions/SVMFunctions.c|lib/CMSIS-DSP/Source/SupportFunctions/SupportFunctionsF16.c|lib/CMSIS-DSP/Source/SupportFunctions/SupportFunctions.c|lib/CMSIS-DSP/Source/StatisticsFunctions/StatisticsFunctionsF16.c|lib/CMSIS-DSP/Source/StatisticsFunctions/StatisticsFunctions.c|lib/CMSIS-DSP/Source/QuaternionMathFunctions/QuaternionMathFunctions.c|lib/CMSIS-DSP/Source/MatrixFunctions/MatrixFunctionsF16.c|lib/CMSIS-DSP/Source/MatrixFunctions/MatrixFunctions.c|lib/CMSIS-DSP/Source/InterpolationFunctions/InterpolationFunctionsF16.c|lib/CMSIS-DSP/Source/InterpolationFunctions/InterpolationFunctions.c|lib/CMSIS-DSP/Source/FilteringFunctions/FilteringFunctionsF16.c|lib/CMSIS-DSP/Source/FilteringFunctions/FilteringFunctions.c|lib/CMSIS-DSP/Source/FastMathFunctions/FastMathFunctionsF16.c|lib/CMSIS-DSP/Source/FastMathFunctions/FastMathFunctions.c|lib/CMSIS-DSP/Source/DistanceFunctions/DistanceFunctionsF16.c|lib/CMSIS-DSP/Source/DistanceFunctions/DistanceFunctions.c|lib/CMSIS-DSP/Source/ControllerFunctions/ControllerFunctions.c|lib/CMSIS-DSP/Source/ComplexMathFunctions/ComplexMathFunctionsF16.c|lib/CMSIS-DSP/Source/ComplexMathFunctions/ComplexMathFunctions.c|lib/CMSIS-DSP/Source/CommonTables/CommonTablesF16.c|lib/CMSIS-DSP/Source/CommonTables/CommonTables.c|lib/CMSIS-DSP/Source/BayesFunctions/BayesFunctionsF16.c|lib/CMSIS-DSP/Source/BayesFunctions/BayesFunctions.c|lib/CMSIS-DSP/Source/BasicMathFunctions/BasicMathFunctionsF16.c|lib/CMSIS-DSP/Source/BasicMathFunctions/BasicMathFunctions.c|lib/CMSIS-DSP/Documentation|lib/CMSIS-DSP/ComputeLibrary|lib/CMSIS-DSP/Examples|lib/CMSIS-DSP/PythonWrapper|lib/CMSIS-DSP/Scripts|lib/CMSIS-DSP/Testing|lib/CMSIS-DSP/dsppp|dinfox" flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name=""/>
-						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="dinfox"/>
+						<entry excluding="drivers/utils/CMSIS-DSP/Source/CommonTables/CommonTablesF16.c|drivers/utils/CMSIS-DSP/Source/CommonTables/CommonTables.c|drivers/utils/CMSIS-DSP/Source/StatisticsFunctions/StatisticsFunctions.c|drivers/utils/CMSIS-DSP/Source/BasicMathFunctions/BasicMathFunctions.c|drivers/utils/CMSIS-DSP/Source/BasicMathFunctions/BasicMathFunctionsF16.c|drivers/utils/CMSIS-DSP/Source/StatisticsFunctions/StatisticsFunctionsF16.c|drivers/utils/CMSIS-DSP/PrivateInclude|drivers/utils/CMSIS-DSP/Source/WindowFunctions|drivers/utils/CMSIS-DSP/Source/TransformFunctions|drivers/utils/CMSIS-DSP/Source/SVMFunctions|drivers/utils/CMSIS-DSP/Source/SupportFunctions|drivers/utils/CMSIS-DSP/Source/QuaternionMathFunctions|drivers/utils/CMSIS-DSP/Source/MatrixFunctions|drivers/utils/CMSIS-DSP/Source/InterpolationFunctions|drivers/utils/CMSIS-DSP/Source/FilteringFunctions|drivers/utils/CMSIS-DSP/Source/ComplexMathFunctions|drivers/utils/CMSIS-DSP/Source/FastMathFunctions|drivers/utils/CMSIS-DSP/Source/DistanceFunctions|drivers/utils/CMSIS-DSP/Source/ControllerFunctions|drivers/utils/CMSIS-DSP/Source/BayesFunctions|drivers/utils/CMSIS-DSP/Testing|drivers/utils/CMSIS-DSP/Scripts|drivers/utils/CMSIS-DSP/PythonWrapper|drivers/utils/CMSIS-DSP/Examples|drivers/utils/CMSIS-DSP/dsppp|drivers/utils/CMSIS-DSP/Documentation|drivers/utils/CMSIS-DSP/ComputeLibrary|drivers/utils/CMSIS-DSP/cmsisdsp" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
 					</sourceEntries>
 				</configuration>
 			</storageModule>

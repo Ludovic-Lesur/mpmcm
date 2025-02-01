@@ -31,19 +31,19 @@ SECTIONS
     KEEP(*(.eh_frame*))
   } > FLASH
 
-  .ARM.extab :
+  .ARM.extab (READONLY) :
   {
     *(.ARM.extab* .gnu.linkonce.armextab.*)
   } > FLASH
 
   __exidx_start = .;
-  .ARM.exidx :
+  .ARM.exidx (READONLY) :
   {
     *(.ARM.exidx* .gnu.linkonce.armexidx.*)
   } > FLASH
   __exidx_end = .;
 
-  .copy.table :
+  .copy.table (READONLY) :
   {
     . = ALIGN(4);
     __copy_table_start__ = .;
@@ -59,7 +59,7 @@ SECTIONS
     __copy_table_end__ = .;
   } > FLASH
 
-  .zero.table :
+  .zero.table (READONLY) :
   {
     . = ALIGN(4);
     __zero_table_start__ = .;

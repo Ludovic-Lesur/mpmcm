@@ -32,7 +32,7 @@ static void _COMMON_reset_analog_data(void) {
 }
 
 /*******************************************************************/
-NODE_status_t _COMMON_mtrg_callback(void) {
+static NODE_status_t _COMMON_mtrg_callback(void) {
 	// Local variables.
 	NODE_status_t status = NODE_SUCCESS;
 	status = MPMCM_mtrg_callback();

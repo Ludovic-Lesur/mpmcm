@@ -64,7 +64,7 @@ LED_status_t LED_single_pulse(uint32_t pulse_duration_ms, LED_color_t color) {
 	gpio_mode = (color & TIM4_CHANNEL_MASK_BLUE) ? GPIO_MODE_ALTERNATE_FUNCTION : GPIO_MODE_OUTPUT;
 	GPIO_configure(&GPIO_LED_BLUE, gpio_mode, GPIO_TYPE_PUSH_PULL, GPIO_SPEED_LOW, GPIO_PULL_NONE);
 	// Make pulse.
-	TIM4_single_pulse(pulse_duration_ms, color);
+	TIM4_single_pulse(pulse_duration_ms, (TIM4_channel_mask_t) color);
 errors:
 	return status;
 }

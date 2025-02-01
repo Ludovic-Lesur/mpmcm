@@ -116,7 +116,7 @@ static void _AT_BUS_fill_rx_buffer(uint8_t rx_byte) {
 		}
 		else {
 			// Store new byte.
-			at_bus_ctx.command[at_bus_ctx.command_size] = rx_byte;
+			at_bus_ctx.command[at_bus_ctx.command_size] = (char_t) rx_byte;
 			// Manage index.
 			at_bus_ctx.command_size = (at_bus_ctx.command_size + 1) % AT_BUS_COMMAND_BUFFER_SIZE;
 		}
@@ -208,7 +208,7 @@ static void _AT_BUS_read_callback(void) {
 	parser_status = DINFOX_parse_register(&at_bus_ctx.parser, STRING_CHAR_NULL, &reg_addr);
 	PARSER_stack_exit_error(ERROR_BASE_PARSER + parser_status);
 	// Read register.
-	node_status = NODE_read_register(NODE_REQUEST_SOURCE_EXTERNAL, reg_addr, &reg_value);
+	node_status = NODE_read_register(NODE_REQUEST_SOURCE_EXTERNAL, (uint8_t) reg_addr, &reg_value);
 	NODE_stack_exit_error(ERROR_BASE_NODE + node_status);
 	// Send reply.
 	_AT_BUS_reply_add_register(reg_value);
@@ -246,7 +246,7 @@ static void _AT_BUS_write_callback(void) {
 		reg_mask = DINFOX_REG_MASK_ALL;
 	}
 	// Write register.
-	node_status = NODE_write_register(NODE_REQUEST_SOURCE_EXTERNAL, reg_addr, reg_mask, reg_value);
+	node_status = NODE_write_register(NODE_REQUEST_SOURCE_EXTERNAL, (uint8_t) reg_addr, reg_mask, reg_value);
 	NODE_stack_exit_error(ERROR_BASE_NODE + node_status);
 	// Operation completed.
 	_AT_BUS_print_ok();

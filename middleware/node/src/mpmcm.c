@@ -130,7 +130,7 @@ static void _MPMCM_set_analog_gains(void) {
 /*******************************************************************/
 static void _MPMCM_set_tic_sampling_period(void) {
 	// Local variables.
-	TIC_status_t tic_status = MEASURE_SUCCESS;
+	TIC_status_t tic_status = TIC_SUCCESS;
 	uint32_t reg_config_5 = 0;
 	uint32_t period_seconds = 0;
 	// Read register.
