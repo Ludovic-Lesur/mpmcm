@@ -29,11 +29,11 @@ static void _MPMCM_load_fixed_configuration(void) {
 #ifdef ANALOG_MEASURE_ENABLE
     SWREG_write_field(&reg_value, &reg_mask, 0b1, MPMCM_REGISTER_CONFIGURATION_0_MASK_AME);
 #else
-	SWREG_write_field(&reg_value, &reg_mask, 0b0, MPMCM_REGISTER_CONFIGURATION_0_MASK_AME);
+    SWREG_write_field(&reg_value, &reg_mask, 0b0, MPMCM_REGISTER_CONFIGURATION_0_MASK_AME);
 #endif
     // Linky TIC enable flag.
 #ifdef LINKY_TIC_ENABLE
-	SWREG_write_field(&reg_value, &reg_mask, 0b1, MPMCM_REGISTER_CONFIGURATION_0_MASK_LTE);
+    SWREG_write_field(&reg_value, &reg_mask, 0b1, MPMCM_REGISTER_CONFIGURATION_0_MASK_LTE);
 #else
     SWREG_write_field(&reg_value, &reg_mask, 0b0, MPMCM_REGISTER_CONFIGURATION_0_MASK_LTE);
 #endif
@@ -42,7 +42,7 @@ static void _MPMCM_load_fixed_configuration(void) {
     SWREG_write_field(&reg_value, &reg_mask, 0b0, MPMCM_REGISTER_CONFIGURATION_0_MASK_LTM);
 #endif
 #ifdef LINKY_TIC_MODE_STANDARD
-	SWREG_write_field(&reg_value, &reg_mask, 0b1, MPMCM_REGISTER_CONFIGURATION_0_MASK_LTM);
+    SWREG_write_field(&reg_value, &reg_mask, 0b1, MPMCM_REGISTER_CONFIGURATION_0_MASK_LTM);
 #endif
     // Transformer attenuation ratio.
     SWREG_write_field(&reg_value, &reg_mask, (uint32_t) MPMCM_TRANSFORMER_ATTEN, MPMCM_REGISTER_CONFIGURATION_0_MASK_TRANSFORMER_ATTEN);
@@ -117,28 +117,28 @@ NODE_status_t MPMCM_init_registers(void) {
     // Local variables.
     NODE_status_t status = NODE_SUCCESS;
 #ifdef NVM_FACTORY_RESET
-	uint32_t reg_value = 0;
-	uint32_t reg_mask = 0;
-	uint16_t mpmcm_sct013_gain[MEASURE_NUMBER_OF_ACI_CHANNELS] = MPMCM_SCT013_GAIN;
-	// Transformer gain.
-	SWREG_write_field(&reg_value, &reg_mask, (uint32_t) MPMCM_TRANSFORMER_GAIN, MPMCM_REGISTER_CONFIGURATION_2_MASK_TRANSFORMER_GAIN);
-	NODE_write_register(NODE_REQUEST_SOURCE_EXTERNAL, MPMCM_REGISTER_ADDRESS_CONFIGURATION_2, reg_value, reg_mask);
-	// Current sensors gain.
-	reg_value = 0;
-	reg_mask = 0;
-	SWREG_write_field(&reg_value, &reg_mask, (uint32_t) mpmcm_sct013_gain[0], MPMCM_REGISTER_CONFIGURATION_3_MASK_CH1_CURRENT_SENSOR_GAIN);
-	SWREG_write_field(&reg_value, &reg_mask, (uint32_t) mpmcm_sct013_gain[1], MPMCM_REGISTER_CONFIGURATION_3_MASK_CH2_CURRENT_SENSOR_GAIN);
-	NODE_write_register(NODE_REQUEST_SOURCE_EXTERNAL, MPMCM_REGISTER_ADDRESS_CONFIGURATION_3, reg_value, reg_mask);
-	reg_value = 0;
-	reg_mask = 0;
-	SWREG_write_field(&reg_value, &reg_mask, (uint32_t) mpmcm_sct013_gain[2], MPMCM_REGISTER_CONFIGURATION_4_MASK_CH3_CURRENT_SENSOR_GAIN);
-	SWREG_write_field(&reg_value, &reg_mask, (uint32_t) mpmcm_sct013_gain[3], MPMCM_REGISTER_CONFIGURATION_4_MASK_CH4_CURRENT_SENSOR_GAIN);
-	NODE_write_register(NODE_REQUEST_SOURCE_EXTERNAL, MPMCM_REGISTER_ADDRESS_CONFIGURATION_4, reg_value, reg_mask);
-	// Linky TIC period.
-	reg_value = 0;
-	reg_mask = 0;
-	SWREG_write_field(&reg_value, &reg_mask, (uint32_t) UNA_convert_seconds(TIC_SAMPLING_PERIOD_DEFAULT_SECONDS), MPMCM_REGISTER_CONFIGURATION_5_MASK_TIC_SAMPLING_PERIOD);
-	NODE_write_register(NODE_REQUEST_SOURCE_EXTERNAL, MPMCM_REGISTER_ADDRESS_CONFIGURATION_5, reg_value, reg_mask);
+    uint32_t reg_value = 0;
+    uint32_t reg_mask = 0;
+    uint16_t mpmcm_sct013_gain[MEASURE_NUMBER_OF_ACI_CHANNELS] = MPMCM_SCT013_GAIN;
+    // Transformer gain.
+    SWREG_write_field(&reg_value, &reg_mask, (uint32_t) MPMCM_TRANSFORMER_GAIN, MPMCM_REGISTER_CONFIGURATION_2_MASK_TRANSFORMER_GAIN);
+    NODE_write_register(NODE_REQUEST_SOURCE_EXTERNAL, MPMCM_REGISTER_ADDRESS_CONFIGURATION_2, reg_value, reg_mask);
+    // Current sensors gain.
+    reg_value = 0;
+    reg_mask = 0;
+    SWREG_write_field(&reg_value, &reg_mask, (uint32_t) mpmcm_sct013_gain[0], MPMCM_REGISTER_CONFIGURATION_3_MASK_CH1_CURRENT_SENSOR_GAIN);
+    SWREG_write_field(&reg_value, &reg_mask, (uint32_t) mpmcm_sct013_gain[1], MPMCM_REGISTER_CONFIGURATION_3_MASK_CH2_CURRENT_SENSOR_GAIN);
+    NODE_write_register(NODE_REQUEST_SOURCE_EXTERNAL, MPMCM_REGISTER_ADDRESS_CONFIGURATION_3, reg_value, reg_mask);
+    reg_value = 0;
+    reg_mask = 0;
+    SWREG_write_field(&reg_value, &reg_mask, (uint32_t) mpmcm_sct013_gain[2], MPMCM_REGISTER_CONFIGURATION_4_MASK_CH3_CURRENT_SENSOR_GAIN);
+    SWREG_write_field(&reg_value, &reg_mask, (uint32_t) mpmcm_sct013_gain[3], MPMCM_REGISTER_CONFIGURATION_4_MASK_CH4_CURRENT_SENSOR_GAIN);
+    NODE_write_register(NODE_REQUEST_SOURCE_EXTERNAL, MPMCM_REGISTER_ADDRESS_CONFIGURATION_4, reg_value, reg_mask);
+    // Linky TIC period.
+    reg_value = 0;
+    reg_mask = 0;
+    SWREG_write_field(&reg_value, &reg_mask, (uint32_t) UNA_convert_seconds(TIC_SAMPLING_PERIOD_DEFAULT_SECONDS), MPMCM_REGISTER_CONFIGURATION_5_MASK_TIC_SAMPLING_PERIOD);
+    NODE_write_register(NODE_REQUEST_SOURCE_EXTERNAL, MPMCM_REGISTER_ADDRESS_CONFIGURATION_5, reg_value, reg_mask);
 #endif
     // Load default values.
     _MPMCM_load_fixed_configuration();
