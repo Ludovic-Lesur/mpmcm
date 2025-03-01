@@ -10,7 +10,7 @@
 #include "adc.h"
 #include "error.h"
 #include "gpio_mapping.h"
-#include "mode.h"
+#include "mpmcm_flags.h"
 #include "types.h"
 
 /*** ANALOG local macros ***/
@@ -24,7 +24,7 @@
 
 /*** ANALOG local structures ***/
 
-#ifndef ANALOG_MEASURE_ENABLE
+#ifndef MPMCM_ANALOG_MEASURE_ENABLE
 /*******************************************************************/
 typedef struct {
     int32_t vmcu_mv;
@@ -33,7 +33,7 @@ typedef struct {
 
 /*** ANALOG local global variables ***/
 
-#ifndef ANALOG_MEASURE_ENABLE
+#ifndef MPMCM_ANALOG_MEASURE_ENABLE
 static ANALOG_context_t analog_ctx = { .vmcu_mv = ANALOG_VMCU_MV_DEFAULT };
 #endif
 
@@ -43,7 +43,7 @@ static ANALOG_context_t analog_ctx = { .vmcu_mv = ANALOG_VMCU_MV_DEFAULT };
 ANALOG_status_t ANALOG_init(void) {
     // Local variables.
     ANALOG_status_t status = ANALOG_SUCCESS;
-#ifndef ANALOG_MEASURE_ENABLE
+#ifndef MPMCM_ANALOG_MEASURE_ENABLE
     ADC_status_t adc_status = ADC_SUCCESS;
     ADC_SGL_configuration_t adc_config;
     // Init context.
@@ -62,7 +62,7 @@ errors:
 ANALOG_status_t ANALOG_de_init(void) {
     // Local variables.
     ANALOG_status_t status = ANALOG_SUCCESS;
-#ifndef ANALOG_MEASURE_ENABLE
+#ifndef MPMCM_ANALOG_MEASURE_ENABLE
     ADC_status_t adc_status = ADC_SUCCESS;
     // Release internal ADC.
     adc_status = ADC_SGL_de_init(ANALOG_ADC_INSTANCE);
@@ -76,7 +76,7 @@ errors:
 ANALOG_status_t ANALOG_convert_channel(ANALOG_channel_t channel, int32_t* analog_data) {
     // Local variables.
     ANALOG_status_t status = ANALOG_SUCCESS;
-#ifndef ANALOG_MEASURE_ENABLE
+#ifndef MPMCM_ANALOG_MEASURE_ENABLE
     ADC_status_t adc_status = ADC_SUCCESS;
     int32_t adc_data_12bits = 0;
 #endif
@@ -89,7 +89,7 @@ ANALOG_status_t ANALOG_convert_channel(ANALOG_channel_t channel, int32_t* analog
     switch (channel) {
     case ANALOG_CHANNEL_VMCU_MV:
         // MCU voltage.
-#ifndef ANALOG_MEASURE_ENABLE
+#ifndef MPMCM_ANALOG_MEASURE_ENABLE
         adc_status = ADC_SGL_convert_channel(ANALOG_ADC_INSTANCE, ADC_CHANNEL_VBAT, &adc_data_12bits);
         ADC_exit_error(ANALOG_ERROR_BASE_ADC);
         // Convert to mV.
@@ -103,7 +103,7 @@ ANALOG_status_t ANALOG_convert_channel(ANALOG_channel_t channel, int32_t* analog
         break;
     case ANALOG_CHANNEL_TMCU_DEGREES:
         // MCU temperature.
-#ifndef ANALOG_MEASURE_ENABLE
+#ifndef MPMCM_ANALOG_MEASURE_ENABLE
         adc_status = ADC_SGL_convert_channel(ANALOG_ADC_INSTANCE, ADC_CHANNEL_TEMPERATURE_SENSOR, &adc_data_12bits);
         ADC_exit_error(ANALOG_ERROR_BASE_ADC);
         // Convert to degrees.

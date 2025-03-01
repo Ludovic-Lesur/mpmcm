@@ -13,7 +13,7 @@
 #include "dma.h"
 #include "led.h"
 #include "maths.h"
-#include "mode.h"
+#include "mpmcm_flags.h"
 #include "power.h"
 #include "rcc.h"
 #include "tim.h"
@@ -107,7 +107,7 @@ MEASURE_state_t MEASURE_get_state(void);
  *******************************************************************/
 MEASURE_status_t MEASURE_set_gains(uint16_t transformer_gain, uint16_t current_sensors_gain[MEASURE_NUMBER_OF_ACI_CHANNELS]);
 
-#ifdef ANALOG_MEASURE_ENABLE
+#ifdef MPMCM_ANALOG_MEASURE_ENABLE
 /*!******************************************************************
  * \fn MEASURE_status_t MEASURE_tick_second(void)
  * \brief Function to call every second.

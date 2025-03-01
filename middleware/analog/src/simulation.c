@@ -9,10 +9,10 @@
 
 #include "adc.h"
 #include "measure.h"
-#include "mode.h"
+#include "mpmcm_flags.h"
 #include "types.h"
 
-#ifdef ANALOG_SIMULATION
+#ifdef MPMCM_ANALOG_SIMULATION
 
 /*** SIMULATION global variables ***/
 
@@ -104,4 +104,4 @@ const int16_t SIMULATION_ACI_BUFFER[SIMULATION_BUFFER_SIZE] = {
     323, 338, 353, 368, 382, 397, 411, 425, 439, 453
 };
 
-#endif /* ANALOG_SIMULATION */
+#endif /* MPMCM_ANALOG_SIMULATION */

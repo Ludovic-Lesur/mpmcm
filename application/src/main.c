@@ -30,7 +30,7 @@
 #include "cli.h"
 #include "node.h"
 // Applicative.
-#include "mode.h"
+#include "mpmcm_flags.h"
 
 #include "rcc_registers.h"
 
@@ -65,7 +65,7 @@ static void _MPMCM_init_hw(void) {
     LED_status_t led_status = LED_SUCCESS;
     NODE_status_t node_status = NODE_SUCCESS;
     CLI_status_t cli_status = CLI_SUCCESS;
-#ifndef DEBUG
+#ifndef MPMCM_DEBUG
     IWDG_status_t iwdg_status = IWDG_SUCCESS;
 #endif
     // Init error stack
@@ -81,7 +81,7 @@ static void _MPMCM_init_hw(void) {
     // Init GPIOs.
     GPIO_init();
     EXTI_init();
-#ifndef DEBUG
+#ifndef MPMCM_DEBUG
     // Start independent watchdog.
     iwdg_status = IWDG_init();
     IWDG_stack_error(ERROR_BASE_IWDG);
@@ -118,19 +118,19 @@ int main(void) {
     // Init board.
     _MPMCM_init_hw();
     // Local variables.
-#ifdef ANALOG_MEASURE_ENABLE
+#ifdef MPMCM_ANALOG_MEASURE_ENABLE
     MEASURE_status_t measure_status = MEASURE_SUCCESS;
 #endif
     NODE_status_t node_status = NODE_SUCCESS;
     CLI_status_t cli_status = CLI_SUCCESS;
-#ifdef LINKY_TIC_ENABLE
+#ifdef MPMCM_LINKY_TIC_ENABLE
     TIC_status_t tic_status = TIC_SUCCESS;
 #endif
     // Main loop.
     while (1) {
         // Enter sleep mode.
         IWDG_reload();
-#ifndef DEBUG
+#ifndef MPMCM_DEBUG
         // Check modules state.
         if ((TIC_get_state() == TIC_STATE_OFF) && (MEASURE_get_state() == MEASURE_STATE_OFF) && (LED_get_state() == LED_STATE_OFF)) {
             PWR_enter_deepsleep_mode(PWR_DEEPSLEEP_MODE_STOP_1);
@@ -144,17 +144,17 @@ int main(void) {
         if (mpmcm_ctx.rtc_wakeup_timer_flag != 0) {
             // Clear flag.
             mpmcm_ctx.rtc_wakeup_timer_flag = 0;
-#ifdef ANALOG_MEASURE_ENABLE
+#ifdef MPMCM_ANALOG_MEASURE_ENABLE
             // Call measure tick.
             measure_status = MEASURE_tick_second();
             MEASURE_stack_error(ERROR_BASE_MEASURE);
 #endif
-#ifdef LINKY_TIC_ENABLE
+#ifdef MPMCM_LINKY_TIC_ENABLE
             // Call TIC interface tick.
             TIC_tick_second();
 #endif
         }
-#ifdef LINKY_TIC_ENABLE
+#ifdef MPMCM_LINKY_TIC_ENABLE
         // Process TIC interface.
         tic_status = TIC_process();
         TIC_stack_error(ERROR_BASE_TIC);

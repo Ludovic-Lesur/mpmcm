@@ -12,7 +12,7 @@
 #include "error.h"
 #include "error_base.h"
 #include "measure.h"
-#include "mode.h"
+#include "mpmcm_flags.h"
 #include "mpmcm_registers.h"
 #include "node.h"
 #include "swreg.h"
@@ -26,22 +26,22 @@ static void _MPMCM_load_fixed_configuration(void) {
     uint32_t reg_value = 0;
     uint32_t reg_mask = 0;
     // Analog measure enable flag.
-#ifdef ANALOG_MEASURE_ENABLE
+#ifdef MPMCM_ANALOG_MEASURE_ENABLE
     SWREG_write_field(&reg_value, &reg_mask, 0b1, MPMCM_REGISTER_CONFIGURATION_0_MASK_AME);
 #else
     SWREG_write_field(&reg_value, &reg_mask, 0b0, MPMCM_REGISTER_CONFIGURATION_0_MASK_AME);
 #endif
     // Linky TIC enable flag.
-#ifdef LINKY_TIC_ENABLE
+#ifdef MPMCM_LINKY_TIC_ENABLE
     SWREG_write_field(&reg_value, &reg_mask, 0b1, MPMCM_REGISTER_CONFIGURATION_0_MASK_LTE);
 #else
     SWREG_write_field(&reg_value, &reg_mask, 0b0, MPMCM_REGISTER_CONFIGURATION_0_MASK_LTE);
 #endif
     // Linky TIC mode.
-#ifdef LINKY_TIC_MODE_HISTORIC
+#ifdef MPMCM_LINKY_TIC_MODE_HISTORIC
     SWREG_write_field(&reg_value, &reg_mask, 0b0, MPMCM_REGISTER_CONFIGURATION_0_MASK_LTM);
 #endif
-#ifdef LINKY_TIC_MODE_STANDARD
+#ifdef MPMCM_LINKY_TIC_MODE_STANDARD
     SWREG_write_field(&reg_value, &reg_mask, 0b1, MPMCM_REGISTER_CONFIGURATION_0_MASK_LTM);
 #endif
     // Transformer attenuation ratio.
@@ -116,7 +116,7 @@ static void _MPMCM_set_tic_sampling_period(void) {
 NODE_status_t MPMCM_init_registers(void) {
     // Local variables.
     NODE_status_t status = NODE_SUCCESS;
-#ifdef NVM_FACTORY_RESET
+#ifdef MPMCM_NVM_FACTORY_RESET
     uint32_t reg_value = 0;
     uint32_t reg_mask = 0;
     uint16_t mpmcm_sct013_gain[MEASURE_NUMBER_OF_ACI_CHANNELS] = MPMCM_SCT013_GAIN;

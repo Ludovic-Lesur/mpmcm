@@ -10,10 +10,10 @@
 
 #include "adc.h"
 #include "measure.h"
-#include "mode.h"
+#include "mpmcm_flags.h"
 #include "types.h"
 
-#ifdef ANALOG_SIMULATION
+#ifdef MPMCM_ANALOG_SIMULATION
 
 /*** SIMULATION macros ***/
 
@@ -26,6 +26,6 @@ extern const uint8_t SIMULATION_GPIO_ACI_DETECT[MEASURE_NUMBER_OF_ACI_CHANNELS];
 extern const int16_t SIMULATION_ACV_BUFFER[SIMULATION_BUFFER_SIZE];
 extern const int16_t SIMULATION_ACI_BUFFER[SIMULATION_BUFFER_SIZE];
 
-#endif /* ANALOG_SIMULATION */
+#endif /* MPMCM_ANALOG_SIMULATION */
 
 #endif /* __SIMULATION_H__ */

@@ -13,6 +13,7 @@
 #include "gpsm_registers.h"
 #include "led.h"
 #include "mpmcm.h"
+#include "mpmcm_flags.h"
 #include "mpmcm_registers.h"
 #include "nvm.h"
 #include "nvm_address.h"
@@ -20,7 +21,6 @@
 #include "rtc.h"
 #include "swreg.h"
 #include "una.h"
-#include "mode.h"
 
 /*** NODE local structures ***/
 
@@ -76,10 +76,10 @@ NODE_status_t NODE_init(void) {
         node_ctx.registers[idx] = 0;
     }
     node_ctx.state = NODE_STATE_IDLE;
-#ifdef NVM_FACTORY_RESET
+#ifdef MPMCM_NVM_FACTORY_RESET
     nvm_status = NVM_erase();
     NVM_exit_error(NODE_ERROR_BASE_NVM);
-    nvm_status = NVM_write_word(NVM_ADDRESS_SELF_ADDRESS, (uint32_t) NODE_ADDRESS);
+    nvm_status = NVM_write_word(NVM_ADDRESS_SELF_ADDRESS, (uint32_t) MPMCM_NODE_ADDRESS);
     NVM_exit_error(NODE_ERROR_BASE_NVM);
 #endif
     // Read self address in NVM.

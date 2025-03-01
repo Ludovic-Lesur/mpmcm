@@ -24,7 +24,7 @@
 #include "gpio_mapping.h"
 #include "led.h"
 #include "maths.h"
-#include "mode.h"
+#include "mpmcm_flags.h"
 #include "nvic.h"
 #include "nvic_priority.h"
 #include "power.h"
@@ -137,7 +137,7 @@ typedef struct {
     uint32_t sampled_period_count;
     uint8_t period_compute_enable;
     uint32_t tick_led_seconds_count;
-#ifdef ANALOG_SIMULATION
+#ifdef MPMCM_ANALOG_SIMULATION
     uint8_t random_divider;
 #endif
 } MEASURE_context_t;
@@ -148,7 +148,7 @@ const uint8_t MEASURE_SCT013_ATTEN[MEASURE_NUMBER_OF_ACI_CHANNELS] = MPMCM_SCT01
 
 /*** MEASURE local global variables ***/
 
-#ifdef ANALOG_MEASURE_ENABLE
+#ifdef MPMCM_ANALOG_MEASURE_ENABLE
 static const ADC_channel_configuration_t MEASURE_ADC_MASTER_SEQUENCE[MEASURE_NUMBER_OF_ACI_CHANNELS] = {
     { GPIO_ADC_CHANNEL_ACV_SAMPLING, 0 },
     { GPIO_ADC_CHANNEL_ACV_SAMPLING, 0 },
@@ -195,7 +195,7 @@ static void _MEASURE_reset(void) {
     measure_ctx.sampled_period_count = 0;
     measure_ctx.period_compute_enable = 0;
     measure_ctx.tick_led_seconds_count = 0;
-#ifdef ANALOG_SIMULATION
+#ifdef MPMCM_ANALOG_SIMULATION
     measure_ctx.random_divider = 1;
 #endif
     // Reset sampling buffers.
@@ -224,7 +224,7 @@ static void _MEASURE_reset(void) {
     }
 }
 
-#ifdef ANALOG_MEASURE_ENABLE
+#ifdef MPMCM_ANALOG_MEASURE_ENABLE
 /*******************************************************************/
 static MEASURE_status_t _MEASURE_start_analog_transfer(void) {
     // Local variables.
@@ -248,7 +248,7 @@ errors:
 }
 #endif
 
-#ifdef ANALOG_MEASURE_ENABLE
+#ifdef MPMCM_ANALOG_MEASURE_ENABLE
 /*******************************************************************/
 static MEASURE_status_t _MEASURE_stop_analog_transfer(void) {
     // Local variables.
@@ -271,7 +271,7 @@ static MEASURE_status_t _MEASURE_stop_analog_transfer(void) {
 }
 #endif
 
-#ifdef ANALOG_MEASURE_ENABLE
+#ifdef MPMCM_ANALOG_MEASURE_ENABLE
 /*******************************************************************/
 static MEASURE_status_t _MEASURE_start(void) {
     // Local variables.
@@ -331,7 +331,7 @@ errors:
 }
 #endif
 
-#ifdef ANALOG_MEASURE_ENABLE
+#ifdef MPMCM_ANALOG_MEASURE_ENABLE
 /*******************************************************************/
 static MEASURE_status_t _MEASURE_stop(void) {
     // Local variables.
@@ -374,7 +374,7 @@ static MEASURE_status_t _MEASURE_stop(void) {
 }
 #endif
 
-#ifdef ANALOG_MEASURE_ENABLE
+#ifdef MPMCM_ANALOG_MEASURE_ENABLE
 /*******************************************************************/
 static MEASURE_status_t _MEASURE_switch_dma_buffer(void) {
     // Local variables.
@@ -403,7 +403,7 @@ errors:
 }
 #endif
 
-#ifdef ANALOG_MEASURE_ENABLE
+#ifdef MPMCM_ANALOG_MEASURE_ENABLE
 /*******************************************************************/
 static void _MEASURE_compute_period_data(void) {
     // Local variables.
@@ -437,7 +437,7 @@ static void _MEASURE_compute_period_data(void) {
         }
     }
     // Get size.
-#ifdef ANALOG_SIMULATION
+#ifdef MPMCM_ANALOG_SIMULATION
     acv_buffer_size = (SIMULATION_BUFFER_SIZE / MEASURE_NUMBER_OF_ACI_CHANNELS);
     aci_buffer_size = (SIMULATION_BUFFER_SIZE / MEASURE_NUMBER_OF_ACI_CHANNELS);
 #else
@@ -456,7 +456,7 @@ static void _MEASURE_compute_period_data(void) {
         for (idx = 0; idx < (measure_data.period_acxx_buffer_size); idx++) {
             // Copy samples by channel and convert to Q31 type.
             sample_idx = (MEASURE_NUMBER_OF_ACI_CHANNELS * idx) + chx_idx;
-#ifdef ANALOG_SIMULATION
+#ifdef MPMCM_ANALOG_SIMULATION
             measure_data.period_acvx_buffer_f32[idx] = (float32_t) (SIMULATION_ACV_BUFFER[sample_idx]);
             measure_data.period_acix_buffer_f32[idx] = (float32_t) (SIMULATION_ACI_BUFFER[sample_idx] / measure_ctx.random_divider);
 #else
@@ -534,7 +534,7 @@ errors:
 }
 #endif
 
-#ifdef ANALOG_MEASURE_ENABLE
+#ifdef MPMCM_ANALOG_MEASURE_ENABLE
 /*******************************************************************/
 static void _MEASURE_compute_run_data(void) {
     // Local variables.
@@ -551,7 +551,7 @@ static void _MEASURE_compute_run_data(void) {
 }
 #endif
 
-#ifdef ANALOG_MEASURE_ENABLE
+#ifdef MPMCM_ANALOG_MEASURE_ENABLE
 /*******************************************************************/
 static void _MEASURE_compute_accumulated_data(void) {
     // Local variables.
@@ -580,7 +580,7 @@ static void _MEASURE_compute_accumulated_data(void) {
 }
 #endif
 
-#ifdef ANALOG_MEASURE_ENABLE
+#ifdef MPMCM_ANALOG_MEASURE_ENABLE
 /*******************************************************************/
 static MEASURE_status_t _MEASURE_led_single_pulse(void) {
     // Local variables.
@@ -608,7 +608,7 @@ errors:
 }
 #endif
 
-#ifdef ANALOG_MEASURE_ENABLE
+#ifdef MPMCM_ANALOG_MEASURE_ENABLE
 /*******************************************************************/
 static MEASURE_status_t _MEASURE_internal_process(void) {
     // Local variables.
@@ -662,7 +662,7 @@ errors:
 }
 #endif
 
-#ifdef ANALOG_MEASURE_ENABLE
+#ifdef MPMCM_ANALOG_MEASURE_ENABLE
 /*******************************************************************/
 static void _MEASURE_increment_zero_cross_count(void) {
     // Local variables.
@@ -675,7 +675,7 @@ static void _MEASURE_increment_zero_cross_count(void) {
 }
 #endif
 
-#ifdef ANALOG_MEASURE_ENABLE
+#ifdef MPMCM_ANALOG_MEASURE_ENABLE
 /*******************************************************************/
 static void _MEASURE_set_dma_transfer_end_flag(void) {
     // Local variables.
@@ -694,7 +694,7 @@ static void _MEASURE_set_dma_transfer_end_flag(void) {
 MEASURE_status_t MEASURE_init(void) {
     // Local variables.
     MEASURE_status_t status = MEASURE_SUCCESS;
-#ifdef ANALOG_MEASURE_ENABLE
+#ifdef MPMCM_ANALOG_MEASURE_ENABLE
     DMA_status_t dma_status = DMA_SUCCESS;
     DMA_configuration_t dma_config;
     uint8_t chx_idx = 0;
@@ -704,7 +704,7 @@ MEASURE_status_t MEASURE_init(void) {
     measure_ctx.tick_led_seconds_count = 0;
     // Reset data.
     _MEASURE_reset();
-#ifdef ANALOG_MEASURE_ENABLE
+#ifdef MPMCM_ANALOG_MEASURE_ENABLE
     // Init detect pins.
     for (chx_idx = 0; chx_idx < MEASURE_NUMBER_OF_ACI_CHANNELS; chx_idx++) {
         GPIO_configure(MEASURE_GPIO_ACI_DETECT[chx_idx], GPIO_MODE_INPUT, GPIO_TYPE_PUSH_PULL, GPIO_SPEED_LOW, GPIO_PULL_NONE);
@@ -750,7 +750,7 @@ MEASURE_status_t MEASURE_init(void) {
     DMA_exit_error(MEASURE_ERROR_BASE_DMA);
     // Turn analog front-end on to have VREF+ for ADC calibration.
     POWER_enable(POWER_REQUESTER_ID_MEASURE, POWER_DOMAIN_ANALOG, LPTIM_DELAY_MODE_SLEEP);
-#ifdef ANALOG_SIMULATION
+#ifdef MPMCM_ANALOG_SIMULATION
     // Init zero cross emulation timer.
     TIM_STD_init(MEASURE_SIMULATION_TIM_INSTANCE, NVIC_PRIORITY_SIMULATION);
     TIM_STD_start(MEASURE_SIMULATION_TIM_INSTANCE, RCC_CLOCK_LSE, (MEASURE_MAINS_PERIOD_US / MEASURE_ZERO_CROSS_PER_PERIOD), TIM_UNIT_US, &_MEASURE_increment_zero_cross_count);
@@ -766,7 +766,7 @@ errors:
 
 /*******************************************************************/
 MEASURE_state_t MEASURE_get_state(void) {
-#ifdef ANALOG_SIMULATION
+#ifdef MPMCM_ANALOG_SIMULATION
     return MEASURE_STATE_ACTIVE;
 #else
     return (measure_ctx.state);
@@ -806,14 +806,14 @@ errors:
     return status;
 }
 
-#ifdef ANALOG_MEASURE_ENABLE
+#ifdef MPMCM_ANALOG_MEASURE_ENABLE
 /*******************************************************************/
 MEASURE_status_t MEASURE_tick_second(void) {
     // Local variables.
     MEASURE_status_t status = MEASURE_SUCCESS;
     // Increment seconds count.
     measure_ctx.tick_led_seconds_count++;
-#ifdef ANALOG_SIMULATION
+#ifdef MPMCM_ANALOG_SIMULATION
     measure_ctx.random_divider = 1 + ((measure_ctx.random_divider + 1) % 100);
 #endif
     // Check state.
@@ -845,8 +845,8 @@ MEASURE_status_t MEASURE_get_probe_detect_flag(uint8_t channel_index, uint8_t* c
         goto errors;
     }
     // Update flag.
-#ifdef ANALOG_MEASURE_ENABLE
-#ifdef ANALOG_SIMULATION
+#ifdef MPMCM_ANALOG_MEASURE_ENABLE
+#ifdef MPMCM_ANALOG_SIMULATION
     (*current_sensor_connected) = SIMULATION_GPIO_ACI_DETECT[channel_index];
 #else
     (*current_sensor_connected) = GPIO_read(MEASURE_GPIO_ACI_DETECT[channel_index]);
@@ -964,7 +964,7 @@ MEASURE_status_t MEASURE_get_channel_accumulated_data(uint8_t channel, DATA_accu
     DATA_reset_accumulated_channel(measure_data.chx_accumulated_data[channel]);
     DATA_reset_run(measure_data.active_energy_mws_sum[channel]);
     DATA_reset_run(measure_data.apparent_energy_mvas_sum[channel]);
-#ifdef ANALOG_SIMULATION
+#ifdef MPMCM_ANALOG_SIMULATION
     measure_ctx.random_divider = 1;
 #endif
 errors:

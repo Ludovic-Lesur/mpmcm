@@ -12,7 +12,7 @@
 #include "dma.h"
 #include "led.h"
 #include "maths.h"
-#include "mode.h"
+#include "mpmcm_flags.h"
 #include "power.h"
 #include "types.h"
 #include "usart.h"
@@ -66,7 +66,7 @@ typedef enum {
  *******************************************************************/
 TIC_status_t TIC_init(void);
 
-#ifdef LINKY_TIC_ENABLE
+#ifdef MPMCM_LINKY_TIC_ENABLE
 /*!******************************************************************
  * \fn TIC_status_t TIC_process(void)
  * \brief Process TIC driver.
@@ -95,7 +95,7 @@ TIC_state_t TIC_get_state(void);
  *******************************************************************/
 TIC_status_t TIC_set_sampling_period(uint32_t period_seconds);
 
-#ifdef LINKY_TIC_ENABLE
+#ifdef MPMCM_LINKY_TIC_ENABLE
 /*!******************************************************************
  * \fn TIC_status_t TIC_tick_second(void)
  * \brief Function to call every second.

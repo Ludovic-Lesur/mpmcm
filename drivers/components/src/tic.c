@@ -15,7 +15,7 @@
 #include "gpio_mapping.h"
 #include "led.h"
 #include "maths.h"
-#include "mode.h"
+#include "mpmcm_flags.h"
 #include "nvic_priority.h"
 #include "parser.h"
 #include "power.h"
@@ -38,7 +38,7 @@
 
 #define TIC_LED_PULSE_DURATION_MS           50
 
-#ifdef LINKY_TIC_MODE_HISTORIC
+#ifdef MPMCM_LINKY_TIC_MODE_HISTORIC
 #define TIC_BAUD_RATE                       1200
 #define TIC_NUMBER_OF_DATA                  11
 #define TIC_FRAME_SEPARATOR_CHAR            STRING_CHAR_SPACE
@@ -99,8 +99,8 @@ typedef struct {
 
 /*** TIC local global variables ***/
 
-#ifdef LINKY_TIC_ENABLE
-#ifdef LINKY_TIC_MODE_HISTORIC
+#ifdef MPMCM_LINKY_TIC_ENABLE
+#ifdef MPMCM_LINKY_TIC_MODE_HISTORIC
 static const TIC_sample_t TIC_SAMPLE[TIC_SAMPLE_INDEX_LAST] = {
     { "PAPP ", STRING_FORMAT_DECIMAL }
 };
@@ -111,7 +111,7 @@ static TIC_context_t tic_ctx;
 
 /*** TIC local functions ***/
 
-#ifdef LINKY_TIC_ENABLE
+#ifdef MPMCM_LINKY_TIC_ENABLE
 /*******************************************************************/
 static void _TIC_switch_dma_buffer(uint8_t line_end_flag) {
     // Stop and start DMA transfer to switch buffer.
@@ -134,7 +134,7 @@ static void _TIC_switch_dma_buffer(uint8_t line_end_flag) {
 }
 #endif
 
-#ifdef LINKY_TIC_ENABLE
+#ifdef MPMCM_LINKY_TIC_ENABLE
 /*******************************************************************/
 static void _TIC_usart_cm_irq_callback(void) {
     // Switch buffer.
@@ -142,7 +142,7 @@ static void _TIC_usart_cm_irq_callback(void) {
 }
 #endif
 
-#ifdef LINKY_TIC_ENABLE
+#ifdef MPMCM_LINKY_TIC_ENABLE
 /*******************************************************************/
 static void _TIC_dma_tc_irq_callback(void) {
     // Switch buffer.
@@ -150,7 +150,7 @@ static void _TIC_dma_tc_irq_callback(void) {
 }
 #endif
 
-#ifdef LINKY_TIC_ENABLE
+#ifdef MPMCM_LINKY_TIC_ENABLE
 /*******************************************************************/
 static void _TIC_build_frame(void) {
     // Local variables.
@@ -189,7 +189,7 @@ static void _TIC_reset_parser(void) {
     tic_ctx.parser.start_index = 0;
 }
 
-#ifdef LINKY_TIC_ENABLE
+#ifdef MPMCM_LINKY_TIC_ENABLE
 /*******************************************************************/
 static TIC_status_t _TIC_decode_sample(TIC_sample_index_t sample_index) {
     // Local variables.
@@ -225,7 +225,7 @@ errors:
 }
 #endif
 
-#ifdef LINKY_TIC_ENABLE
+#ifdef MPMCM_LINKY_TIC_ENABLE
 /*******************************************************************/
 static TIC_status_t _TIC_start(void) {
     // Local variables.
@@ -251,7 +251,7 @@ errors:
 }
 #endif
 
-#ifdef LINKY_TIC_ENABLE
+#ifdef MPMCM_LINKY_TIC_ENABLE
 /*******************************************************************/
 static TIC_status_t _TIC_stop(void) {
     // Local variables.
@@ -275,7 +275,7 @@ static TIC_status_t _TIC_stop(void) {
 TIC_status_t TIC_init(void) {
     // Local variables.
     TIC_status_t status = TIC_SUCCESS;
-#ifdef LINKY_TIC_ENABLE
+#ifdef MPMCM_LINKY_TIC_ENABLE
     DMA_status_t dma_status = DMA_SUCCESS;
     USART_status_t usart_status = USART_SUCCESS;
     DMA_configuration_t dma_config;
@@ -299,7 +299,7 @@ TIC_status_t TIC_init(void) {
     DATA_reset_accumulated_channel(tic_data.accumulated);
     DATA_reset_run(tic_data.active_energy_mws_sum);
     DATA_reset_run(tic_data.apparent_energy_mvas_sum);
-#ifdef LINKY_TIC_ENABLE
+#ifdef MPMCM_LINKY_TIC_ENABLE
     // Init USART interface.
     usart_config.clock = RCC_CLOCK_HSI;
     usart_config.baud_rate = TIC_BAUD_RATE;
@@ -330,12 +330,12 @@ errors:
     return status;
 }
 
-#ifdef LINKY_TIC_ENABLE
+#ifdef MPMCM_LINKY_TIC_ENABLE
 /*******************************************************************/
 TIC_status_t TIC_process(void) {
     // Local variables.
     TIC_status_t status = TIC_SUCCESS;
-#ifndef ANALOG_MEASURE_ENABLE
+#ifndef MPMCM_ANALOG_MEASURE_ENABLE
     LED_status_t led_status = LED_SUCCESS;
     LED_color_t led_color = LED_COLOR_OFF;
 #endif
@@ -374,7 +374,7 @@ TIC_status_t TIC_process(void) {
             // Stop acquisition.
             status = _TIC_stop();
             if (status != TIC_SUCCESS) goto errors;
-#ifndef ANALOG_MEASURE_ENABLE
+#ifndef MPMCM_ANALOG_MEASURE_ENABLE
             // Perform LED pulse.
             if (tic_ctx.flags.irq_received == 0) {
                 led_color = LED_COLOR_RED;
@@ -424,7 +424,7 @@ errors:
     return status;
 }
 
-#ifdef LINKY_TIC_ENABLE
+#ifdef MPMCM_LINKY_TIC_ENABLE
 /*******************************************************************/
 void TIC_tick_second(void) {
     // Increment seconds.
@@ -443,7 +443,7 @@ TIC_status_t TIC_get_detect_flag(uint8_t* linky_tic_connected) {
         status = TIC_ERROR_NULL_PARAMETER;
         goto errors;
     }
-#ifdef LINKY_TIC_ENABLE
+#ifdef MPMCM_LINKY_TIC_ENABLE
     (*linky_tic_connected) = (tic_ctx.second_count_inactivity > TIC_INACTIVITY_TIMER_SECONDS) ? 0 : 1;
 #else
     (*linky_tic_connected) = 0;
