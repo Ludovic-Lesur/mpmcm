@@ -11,7 +11,7 @@
 #include "error_base.h"
 #include "gpio.h"
 #include "gpio_mapping.h"
-#include "math.h"
+#include "maths.h"
 #include "nvic_priority.h"
 #include "tim.h"
 #include "types.h"
@@ -51,6 +51,7 @@ LED_status_t LED_single_pulse(uint32_t pulse_duration_ms, LED_color_t color) {
     // Local variables.
     LED_status_t status = LED_SUCCESS;
     TIM_status_t tim_status = TIM_SUCCESS;
+    uint8_t channels_mask = 0;
     uint8_t idx = 0;
     // Check parameters.
     if (pulse_duration_ms == 0) {
@@ -64,12 +65,11 @@ LED_status_t LED_single_pulse(uint32_t pulse_duration_ms, LED_color_t color) {
     // Make pulse on required channels.
     for (idx = 0; idx < GPIO_LED_TIM_CHANNEL_INDEX_LAST; idx++) {
         // Apply color mask.
-        if ((color & (0b1 << idx)) != 0) {
-            // Make pulse on channel.
-            tim_status = TIM_OPM_make_pulse(LED_TIM_INSTANCE, (GPIO_LED_TIM.list[idx])->channel, 0, (pulse_duration_ms * MATH_POWER_10[6]));
-            TIM_stack_error(ERROR_BASE_TIM_LED);
-        }
+        channels_mask |= (((color >> idx) & 0x01) << ((GPIO_LED_TIM.list[idx])->channel));
     }
+    // Make pulse on channel.
+    tim_status = TIM_OPM_make_pulse(LED_TIM_INSTANCE, channels_mask, 0, (pulse_duration_ms * MATH_POWER_10[6]));
+    TIM_stack_error(ERROR_BASE_TIM_LED);
 errors:
     return status;
 }
