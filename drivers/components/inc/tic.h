@@ -9,8 +9,9 @@
 #define __TIC_H__
 
 #include "data.h"
+#include "dma.h"
 #include "led.h"
-#include "math_custom.h"
+#include "maths.h"
 #include "mode.h"
 #include "power.h"
 #include "types.h"
@@ -35,8 +36,9 @@ typedef enum {
 	TIC_ERROR_SAMPLING_PERIOD_UNDERFLOW,
 	TIC_ERROR_SAMPLING_PERIOD_OVERFLOW,
 	// Low level drivers errors.
-	TIC_ERROR_BASE_USART2 = 0x0100,
-	TIC_ERROR_BASE_MATH = (TIC_ERROR_BASE_USART2 + USART_ERROR_BASE_LAST),
+	TIC_ERROR_BASE_DMA = 0x0100,
+	TIC_ERROR_BASE_USART = (TIC_ERROR_BASE_DMA + DMA_ERROR_BASE_LAST),
+	TIC_ERROR_BASE_MATH = (TIC_ERROR_BASE_USART + USART_ERROR_BASE_LAST),
 	TIC_ERROR_BASE_POWER = (TIC_ERROR_BASE_MATH + MATH_ERROR_BASE_LAST),
 	TIC_ERROR_BASE_LED = (TIC_ERROR_BASE_POWER + POWER_ERROR_BASE_LAST),
 	// Last base value.
@@ -132,12 +134,12 @@ TIC_status_t TIC_get_channel_run_data(DATA_run_channel_t* channel_run_data);
 TIC_status_t TIC_get_channel_accumulated_data(DATA_accumulated_channel_t* channel_accumulated_data);
 
 /*******************************************************************/
-#define TIC_exit_error(error_base) { if (tic_status != TIC_SUCCESS) { status = error_base + tic_status; goto errors; } }
+#define TIC_exit_error(base) { ERROR_check_exit(tic_status, TIC_SUCCESS, base) }
 
 /*******************************************************************/
-#define TIC_stack_error() { if (tic_status != TIC_SUCCESS) { ERROR_stack_add(ERROR_BASE_TIC + tic_status); } }
+#define TIC_stack_error(base) { ERROR_check_stack(tic_status, TIC_SUCCESS, base) }
 
 /*******************************************************************/
-#define TIC_stack_exit_error(error_code) { if (tic_status != TIC_SUCCESS) { ERROR_stack_add(ERROR_BASE_TIC + tic_status); status = error_code; goto errors; }
+#define TIC_stack_exit_error(base, code) { ERROR_check_stack_exit(tic_status, TIC_SUCCESS, base, code) }
 
 #endif /* __TIC_H__ */

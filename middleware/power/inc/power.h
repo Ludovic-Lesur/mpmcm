@@ -8,9 +8,12 @@
 #ifndef __POWER_H__
 #define __POWER_H__
 
-#include "adc.h"
 #include "lptim.h"
 #include "types.h"
+
+/*** POWER macros ***/
+
+#define POWER_ON_DELAY_MS_ANALOG    2000
 
 /*** POWER structures ***/
 
@@ -19,25 +22,39 @@
  * \brief POWER driver error codes.
  *******************************************************************/
 typedef enum {
-	// Driver errors.
-	POWER_SUCCESS,
-	POWER_ERROR_NULL_PARAMETER,
-	POWER_ERROR_DOMAIN,
-	// Low level drivers errors.
-	POWER_ERROR_BASE_LPTIM1 = 0x0100,
-	// Last base value.
-	POWER_ERROR_BASE_LAST = (POWER_ERROR_BASE_LPTIM1 + LPTIM_ERROR_BASE_LAST)
+    // Driver errors.
+    POWER_SUCCESS,
+    POWER_ERROR_REQUESTER_ID,
+    POWER_ERROR_DOMAIN,
+    // Low level drivers errors.
+    POWER_ERROR_DRIVER_ANALOG,
+    POWER_ERROR_DRIVER_LPTIM,
+    // Last base value.
+    POWER_ERROR_BASE_LAST = 0x0100
 } POWER_status_t;
+
+/*!******************************************************************
+ * \enum POWER_requester_id_t
+ * \brief Calling driver identifier.
+ *******************************************************************/
+typedef enum {
+    POWER_REQUESTER_ID_NODE = 0,
+    POWER_REQUESTER_ID_COMMON,
+    POWER_REQUESTER_ID_MPMCM,
+    POWER_REQUESTER_ID_MEASURE,
+    POWER_REQUESTER_ID_TIC,
+    POWER_REQUESTER_ID_LAST
+} POWER_requester_id_t;
 
 /*!******************************************************************
  * \enum POWER_domain_t
  * \brief Board external power domains list.
  *******************************************************************/
 typedef enum {
-	POWER_DOMAIN_MCU_TCXO = 0,
-	POWER_DOMAIN_ANALOG,
-	POWER_DOMAIN_TIC,
-	POWER_DOMAIN_LAST
+    POWER_DOMAIN_MCU_TCXO = 0,
+    POWER_DOMAIN_ANALOG,
+    POWER_DOMAIN_TIC,
+    POWER_DOMAIN_LAST
 } POWER_domain_t;
 
 /*** POWER functions ***/
@@ -45,47 +62,40 @@ typedef enum {
 /*!******************************************************************
  * \fn void POWER_init(void)
  * \brief Init power control module.
- * \param[in]  	none
- * \param[out] 	none
- * \retval		none
+ * \param[in]   none
+ * \param[out]  none
+ * \retval      none
  *******************************************************************/
 void POWER_init(void);
 
 /*!******************************************************************
- * \fn POWER_status_t POWER_enable(POWER_domain_t domain, LPTIM_delay_mode_t delay_mode)
+ * \fn void POWER_enable(POWER_requester_id_t requester_id, POWER_domain_t domain, LPTIM_delay_mode_t delay_mode)
  * \brief Turn power domain on.
- * \param[in]  	domain: Power domain to enable.
- * \param[in]	delay_mode: Power on delay waiting mode.
- * \param[out] 	none
- * \retval		Function execution status.
+ * \param[in]   requester_id: Identifier of the calling driver.
+ * \param[in]   domain: Power domain to enable.
+ * \param[in]   delay_mode: Power on delay waiting mode.
+ * \param[out]  none
+ * \retval      none
  *******************************************************************/
-POWER_status_t POWER_enable(POWER_domain_t domain, LPTIM_delay_mode_t delay_mode);
+void POWER_enable(POWER_requester_id_t requester_id, POWER_domain_t domain, LPTIM_delay_mode_t delay_mode);
 
 /*!******************************************************************
- * \fn POWER_status_t POWER_disable(POWER_domain_t domain)
+ * \fn void POWER_disable(POWER_requester_id_t requester_id, POWER_domain_t domain)
  * \brief Turn power domain off.
- * \param[in]  	domain: Power domain to disable.
- * \param[out] 	none
- * \retval		Function execution status.
+ * \param[in]   requester_id: Identifier of the calling driver.
+ * \param[in]   domain: Power domain to disable.
+ * \param[out]  none
+ * \retval      none
  *******************************************************************/
-POWER_status_t POWER_disable(POWER_domain_t domain);
+void POWER_disable(POWER_requester_id_t requester_id, POWER_domain_t domain);
 
 /*!******************************************************************
- * \fn POWER_status_t POWER_get_state(POWER_domain_t domain, uint8_t* state)
+ * \fn uint8_t POWER_get_state(POWER_domain_t domain)
  * \brief Return the current state of a power domain.
- * \param[in]  	domain: Power domain to check.
- * \param[out] 	state: Pointer to the state.
- * \retval		Function execution status.
+ * \param[in]   domain: Power domain to check.
+ * \param[out]  none
+ * \retval      Power domain state.
  *******************************************************************/
-POWER_status_t POWER_get_state(POWER_domain_t domain, uint8_t* state);
-
-/*******************************************************************/
-#define POWER_exit_error(error_base) { if (power_status != POWER_SUCCESS) { status = (error_base + power_status); goto errors; } }
-
-/*******************************************************************/
-#define POWER_stack_error(void) { if (power_status != POWER_SUCCESS) { ERROR_stack_add(ERROR_BASE_POWER + power_status); } }
-
-/*******************************************************************/
-#define POWER_stack_exit_error(error_code) { if (power_status != POWER_SUCCESS) { ERROR_stack_add(ERROR_BASE_POWER + power_status); status = error_code; goto errors; } }
+uint8_t POWER_get_state(POWER_domain_t domain);
 
 #endif /* __POWER_H__ */

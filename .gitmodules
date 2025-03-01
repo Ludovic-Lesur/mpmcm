@@ -1,3 +1,27 @@
+[submodule "stm32g4xx-device"]
+    path = drivers/device/stm32g4xx-device
+    url = https://github.com/Ludovic-Lesur/stm32g4xx-device.git
+[submodule "stm32g4xx-registers"]
+    path = drivers/registers/stm32g4xx-registers
+    url = https://github.com/Ludovic-Lesur/stm32g4xx-registers.git
+[submodule "stm32g4xx-drivers"]
+    path = drivers/peripherals/stm32g4xx-drivers
+    url = https://github.com/Ludovic-Lesur/stm32g4xx-drivers.git
+[submodule "lmac-driver"]
+    path = drivers/mac/lmac-driver
+    url = https://github.com/Ludovic-Lesur/lmac-driver.git
+[submodule "CMSIS_6"]
+    path = drivers/utils/CMSIS_6
+    url = https://github.com/ARM-software/CMSIS_6.git
 [submodule "CMSIS-DSP"]
     path = drivers/utils/CMSIS-DSP
     url = https://github.com/ARM-software/CMSIS-DSP.git
+[submodule "embedded-utils"]
+    path = drivers/utils/embedded-utils
+    url = https://github.com/Ludovic-Lesur/embedded-utils.git
+[submodule "una-lib"]
+    path = middleware/node/una-lib
+    url = https://github.com/Ludovic-Lesur/una-lib.git
+[submodule "una-at"]
+    path = middleware/node/una-at
+    url = https://github.com/Ludovic-Lesur/una-at.git

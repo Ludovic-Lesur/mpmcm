@@ -149,14 +149,14 @@ typedef struct {
 	/* Check source data */ \
 	if (source.number_of_samples > 0) { \
 		/* Compute absolute value of new sample */ \
-		MATH_abs(source.value, sample_abs); \
+		MATH_abs(source.value, sample_abs, float64_t); \
 		/* Min */ \
-		MATH_abs(data.min, ref_abs); \
+		MATH_abs(data.min, ref_abs, float64_t); \
 		if (sample_abs < ref_abs) { \
 			data.min = source.value; \
 		} \
 		/* Max */ \
-		MATH_abs(data.max, ref_abs); \
+		MATH_abs(data.max, ref_abs, float64_t); \
 		if (sample_abs > ref_abs) { \
 			data.max = source.value; \
 		} \
@@ -170,14 +170,14 @@ typedef struct {
 	/* Check source data */ \
 	if (source.number_of_samples > 0) { \
 		/* Compute absolute value of new sample */ \
-		MATH_abs(source.value, sample_abs); \
+		MATH_abs(source.value, sample_abs, float64_t); \
 		/* Min */ \
-		MATH_abs(channel.data.min, ref_abs); \
+		MATH_abs(channel.data.min, ref_abs, float64_t); \
 		if (sample_abs < ref_abs) { \
 			channel.data.min = source.value; \
 		} \
 		/* Max */ \
-		MATH_abs(channel.data.max, ref_abs); \
+		MATH_abs(channel.data.max, ref_abs, float64_t); \
 		if (sample_abs > ref_abs) { \
 			channel.data.max = source.value; \
 		} \

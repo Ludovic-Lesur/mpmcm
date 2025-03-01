@@ -1,77 +1,89 @@
 /*
  * led.c
  *
- *  Created on: 01 oct. 2023
+ *  Created on: 22 aug. 2020
  *      Author: Ludo
  */
 
 #include "led.h"
 
+#include "error.h"
+#include "error_base.h"
 #include "gpio.h"
-#include "mapping.h"
-#include "mode.h"
+#include "gpio_mapping.h"
+#include "math.h"
+#include "nvic_priority.h"
 #include "tim.h"
 #include "types.h"
 
-/*** LED local functions ***/
+/*** LED local macros ***/
 
-/*******************************************************************/
-static void _LED_off(void) {
-	// Configure pins as output high.
-	GPIO_write(&GPIO_LED_RED, 1);
-	GPIO_write(&GPIO_LED_GREEN, 1);
-	GPIO_write(&GPIO_LED_BLUE, 1);
-	GPIO_configure(&GPIO_LED_RED, GPIO_MODE_OUTPUT, GPIO_TYPE_PUSH_PULL, GPIO_SPEED_LOW, GPIO_PULL_NONE);
-	GPIO_configure(&GPIO_LED_GREEN, GPIO_MODE_OUTPUT, GPIO_TYPE_PUSH_PULL, GPIO_SPEED_LOW, GPIO_PULL_NONE);
-	GPIO_configure(&GPIO_LED_BLUE, GPIO_MODE_OUTPUT, GPIO_TYPE_PUSH_PULL, GPIO_SPEED_LOW, GPIO_PULL_NONE);
-}
+#define LED_TIM_INSTANCE    TIM_INSTANCE_TIM4
 
 /*** LED functions ***/
 
 /*******************************************************************/
 LED_status_t LED_init(void) {
-	// Local variables.
-	LED_status_t status = LED_SUCCESS;
-	TIM_status_t tim4_status = TIM_SUCCESS;
-	// Init timer.
-	tim4_status = TIM4_init();
-	TIM4_exit_error(LED_ERROR_BASE_TIM4);
+    // Local variables.
+    LED_status_t status = LED_SUCCESS;
+    TIM_status_t tim_status = TIM_SUCCESS;
+    // Init timers.
+    tim_status = TIM_OPM_init(LED_TIM_INSTANCE, (TIM_gpio_t*) &GPIO_LED_TIM);
+    TIM_exit_error(LED_ERROR_BASE_TIM_OPM);
 errors:
-	// Turn LED off.
-	_LED_off();
-	return status;
+    return status;
+}
+
+/*******************************************************************/
+LED_status_t LED_de_init(void) {
+    // Local variables.
+    LED_status_t status = LED_SUCCESS;
+    TIM_status_t tim_status = TIM_SUCCESS;
+    // Release timers.
+    tim_status = TIM_OPM_de_init(LED_TIM_INSTANCE, (TIM_gpio_t*) &GPIO_LED_TIM);
+    TIM_exit_error(LED_ERROR_BASE_TIM_OPM);
+errors:
+    return status;
 }
 
 /*******************************************************************/
 LED_status_t LED_single_pulse(uint32_t pulse_duration_ms, LED_color_t color) {
-	// Local variables.
-	LED_status_t status = LED_SUCCESS;
-	GPIO_mode_t gpio_mode = GPIO_MODE_OUTPUT;
-	// Check parameters.
-	if (pulse_duration_ms == 0) {
-		status = LED_ERROR_NULL_DURATION;
-		goto errors;
-	}
-	if (color >= LED_COLOR_LAST) {
-		status = LED_ERROR_COLOR;
-		goto errors;
-	}
-	// Link required GPIOs to timer.
-	gpio_mode = (color & TIM4_CHANNEL_MASK_RED) ? GPIO_MODE_ALTERNATE_FUNCTION : GPIO_MODE_OUTPUT;
-	GPIO_configure(&GPIO_LED_RED, gpio_mode, GPIO_TYPE_PUSH_PULL, GPIO_SPEED_LOW, GPIO_PULL_NONE);
-	gpio_mode = (color & TIM4_CHANNEL_MASK_GREEN) ? GPIO_MODE_ALTERNATE_FUNCTION : GPIO_MODE_OUTPUT;
-	GPIO_configure(&GPIO_LED_GREEN, gpio_mode, GPIO_TYPE_PUSH_PULL, GPIO_SPEED_LOW, GPIO_PULL_NONE);
-	gpio_mode = (color & TIM4_CHANNEL_MASK_BLUE) ? GPIO_MODE_ALTERNATE_FUNCTION : GPIO_MODE_OUTPUT;
-	GPIO_configure(&GPIO_LED_BLUE, gpio_mode, GPIO_TYPE_PUSH_PULL, GPIO_SPEED_LOW, GPIO_PULL_NONE);
-	// Make pulse.
-	TIM4_single_pulse(pulse_duration_ms, (TIM4_channel_mask_t) color);
+    // Local variables.
+    LED_status_t status = LED_SUCCESS;
+    TIM_status_t tim_status = TIM_SUCCESS;
+    uint8_t idx = 0;
+    // Check parameters.
+    if (pulse_duration_ms == 0) {
+        status = LED_ERROR_NULL_DURATION;
+        goto errors;
+    }
+    if (color >= LED_COLOR_LAST) {
+        status = LED_ERROR_COLOR;
+        goto errors;
+    }
+    // Make pulse on required channels.
+    for (idx = 0; idx < GPIO_LED_TIM_CHANNEL_INDEX_LAST; idx++) {
+        // Apply color mask.
+        if ((color & (0b1 << idx)) != 0) {
+            // Make pulse on channel.
+            tim_status = TIM_OPM_make_pulse(LED_TIM_INSTANCE, (GPIO_LED_TIM.list[idx])->channel, 0, (pulse_duration_ms * MATH_POWER_10[6]));
+            TIM_stack_error(ERROR_BASE_TIM_LED);
+        }
+    }
 errors:
-	return status;
+    return status;
 }
 
 /*******************************************************************/
 LED_state_t LED_get_state(void) {
-	// Local variables.
-	LED_state_t state = (TIM4_is_single_pulse_done() == 0) ? LED_STATE_ACTIVE : LED_STATE_OFF;
-	return state;
+    // Local variables.
+    LED_state_t state = LED_STATE_OFF;
+    TIM_status_t tim_status = TIM_SUCCESS;
+    uint8_t pulse_is_done = 0;
+    // Get status.
+    tim_status = TIM_OPM_get_pulse_status(LED_TIM_INSTANCE, &pulse_is_done);
+    TIM_stack_error(ERROR_BASE_TIM_LED);
+    // Update state.
+    state = (pulse_is_done == 0) ? LED_STATE_ACTIVE : LED_STATE_OFF;
+    return state;
 }

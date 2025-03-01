@@ -12,16 +12,25 @@
 #include "data.h"
 #include "dma.h"
 #include "led.h"
-#include "math_custom.h"
+#include "maths.h"
 #include "mode.h"
 #include "power.h"
 #include "rcc.h"
 #include "tim.h"
 #include "types.h"
 
+/*** MEASURE macros ***/
+
+#define MEASURE_MAINS_PERIOD_US             20000
+
+#define MEASURE_NUMBER_OF_ACI_CHANNELS      4
+#define MEASURE_ACV_ACI_SAMPLING_PERIOD_US  200
+
+#define MEASURE_PERIOD_BUFFER_SIZE          (MEASURE_MAINS_PERIOD_US / MEASURE_ACV_ACI_SAMPLING_PERIOD_US)
+
 /*** MEASURE global variables ***/
 
-extern const uint8_t MEASURE_SCT013_ATTEN[ADC_NUMBER_OF_ACI_CHANNELS];
+extern const uint8_t MEASURE_SCT013_ATTEN[MEASURE_NUMBER_OF_ACI_CHANNELS];
 
 /*** MEASURE structures ***/
 
@@ -39,9 +48,9 @@ typedef enum {
 	MEASURE_ERROR_AC_CHANNEL,
 	// Low level drivers errors.
 	MEASURE_ERROR_BASE_ADC = 0x0100,
-	MEASURE_ERROR_BASE_TIM2 = (MEASURE_ERROR_BASE_ADC + ADC_ERROR_BASE_LAST),
-	MEASURE_ERROR_BASE_TIM6 = (MEASURE_ERROR_BASE_TIM2 + TIM_ERROR_BASE_LAST),
-	MEASURE_ERROR_BASE_RCC = (MEASURE_ERROR_BASE_TIM6 + TIM_ERROR_BASE_LAST),
+	MEASURE_ERROR_BASE_DMA = (MEASURE_ERROR_BASE_ADC + ADC_ERROR_BASE_LAST),
+	MEASURE_ERROR_BASE_TIM = (MEASURE_ERROR_BASE_DMA + DMA_ERROR_BASE_LAST),
+	MEASURE_ERROR_BASE_RCC = (MEASURE_ERROR_BASE_TIM + TIM_ERROR_BASE_LAST),
 	MEASURE_ERROR_BASE_MATH = (MEASURE_ERROR_BASE_RCC + RCC_ERROR_BASE_LAST),
 	MEASURE_ERROR_BASE_POWER = (MEASURE_ERROR_BASE_MATH + MATH_ERROR_BASE_LAST),
 	MEASURE_ERROR_BASE_LED = (MEASURE_ERROR_BASE_POWER + POWER_ERROR_BASE_LAST),
@@ -89,14 +98,14 @@ MEASURE_status_t MEASURE_init(void);
 MEASURE_state_t MEASURE_get_state(void);
 
 /*!******************************************************************
- * \fn void MEASURE_set_gains(uint16_t transformer_gain, uint16_t current_sensors_gain[ADC_NUMBER_OF_ACI_CHANNELS])
+ * \fn void MEASURE_set_gains(uint16_t transformer_gain, uint16_t current_sensors_gain[MEASURE_NUMBER_OF_ACI_CHANNELS])
  * \brief Set ACV and ACI measurements gains.
  * \param[in]	transformer_gain: Transformer gain in (10 * V/V).
  * \param[in] 	current_sensors_gain: Current sensors gain table in (10 * A/V).
  * \param[out]	none
  * \retval		Function execution status.
  *******************************************************************/
-MEASURE_status_t MEASURE_set_gains(uint16_t transformer_gain, uint16_t current_sensors_gain[ADC_NUMBER_OF_ACI_CHANNELS]);
+MEASURE_status_t MEASURE_set_gains(uint16_t transformer_gain, uint16_t current_sensors_gain[MEASURE_NUMBER_OF_ACI_CHANNELS]);
 
 #ifdef ANALOG_MEASURE_ENABLE
 /*!******************************************************************
@@ -164,12 +173,12 @@ MEASURE_status_t MEASURE_get_channel_run_data(uint8_t channel, DATA_run_channel_
 MEASURE_status_t MEASURE_get_channel_accumulated_data(uint8_t channel, DATA_accumulated_channel_t* channel_accumulated_data);
 
 /*******************************************************************/
-#define MEASURE_exit_error(error_base) { if (measure_status != MEASURE_SUCCESS) { status = error_base + measure_status; goto errors; } }
+#define MEASURE_exit_error(base) { ERROR_check_exit(measure_status, MEASURE_SUCCESS, base) }
 
 /*******************************************************************/
-#define MEASURE_stack_error() { if (measure_status != MEASURE_SUCCESS) { ERROR_stack_add(ERROR_BASE_MEASURE + measure_status); } }
+#define MEASURE_stack_error(base) { ERROR_check_stack(measure_status, MEASURE_SUCCESS, base) }
 
 /*******************************************************************/
-#define MEASURE_stack_exit_error(error_code) { if (measure_status != MEASURE_SUCCESS) { ERROR_stack_add(ERROR_BASE_MEASURE + measure_status); status = error_code; goto errors; }
+#define MEASURE_stack_exit_error(base, code) { ERROR_check_stack_exit(measure_status, MEASURE_SUCCESS, base, code) }
 
 #endif /* __MEASURE_H__ */

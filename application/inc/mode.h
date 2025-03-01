@@ -10,8 +10,6 @@
 
 /*** Board modes ***/
 
-//#define ATM
-//#define HIGH_SPEED_LOG
 //#define DEBUG
 //#define NVM_FACTORY_RESET
 //#define ANALOG_SIMULATION
@@ -19,7 +17,7 @@
 /*** Board options ***/
 
 #ifdef NVM_FACTORY_RESET
-#define NODE_ADDRESS				0x7F
+#define NODE_ADDRESS				0x1C
 #endif
 
 #define ANALOG_MEASURE_ENABLE

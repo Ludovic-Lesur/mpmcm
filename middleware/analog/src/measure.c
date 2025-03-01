@@ -7,19 +7,26 @@
 
 #include "measure.h"
 
+#ifndef STM32G4XX_DRIVERS_DISABLE_FLAGS_FILE
+#include "stm32g4xx_drivers_flags.h"
+#endif
 #include "adc.h"
 #include "data.h"
 #include "dma.h"
+#include "dma_channel.h"
+#include "dmamux.h"
 #include "dsp/basic_math_functions.h"
 #include "dsp/statistics_functions.h"
 #include "error.h"
+#include "error_base.h"
 #include "exti.h"
 #include "gpio.h"
+#include "gpio_mapping.h"
 #include "led.h"
-#include "mapping.h"
-#include "math_custom.h"
+#include "maths.h"
 #include "mode.h"
 #include "nvic.h"
+#include "nvic_priority.h"
 #include "power.h"
 #include "rcc.h"
 #include "simulation.h"
@@ -28,10 +35,19 @@
 
 /*** MEASURE local macros ***/
 
-#define MEASURE_MAINS_PERIOD_US							20000
+#define MEASURE_ACV_ACI_ADC_INSTANCE                    ADC_INSTANCE_ADC1
+#define MEASURE_ACV_ACI_SAMPLING_FREQUENCY_HZ           (MATH_POWER_10[6] / MEASURE_ACV_ACI_SAMPLING_PERIOD_US)
+#define MEASURE_ACV_ACI_TIM_INSTANCE                    TIM_INSTANCE_TIM6
+
+#define MEASURE_ADC_OFFSET_12_BITS                      ((ADC_FULL_SCALE >> 1) + 1)
+
+#define MEASURE_ACV_FREQUENCY_TIM_INSTANCE              TIM_INSTANCE_TIM2
+#define MEASURE_ACV_FREQUENCY_SAMPLING_HZ               1000000
+
 #define MEASURE_ZERO_CROSS_PER_PERIOD					2
-#define MEASURE_ZERO_CROSS_FREQUENCY_HZ					((MEASURE_ZERO_CROSS_PER_PERIOD * 1000000) / (MEASURE_MAINS_PERIOD_US))
-#define MEASURE_ZERO_CROSS_START_THRESHOLD				((1000000 * MEASURE_ZERO_CROSS_PER_PERIOD) / (MEASURE_MAINS_PERIOD_US)) // Wait for 1 second of mains voltage presence.
+
+// Wait for 1 second of mains voltage presence before sampling.
+#define MEASURE_ZERO_CROSS_START_THRESHOLD				((MATH_POWER_10[6] * MEASURE_ZERO_CROSS_PER_PERIOD) / (MEASURE_MAINS_PERIOD_US))
 
 #define MEASURE_TRANSFORMER_GAIN_FACTOR					10	// For (10 * V/V) input unit.
 #define MEASURE_CURRENT_SENSOR_GAIN_FACTOR				10	// For (10 * A/V) input unit.
@@ -39,11 +55,13 @@
 // Note: this factor is used to add a margin to the buffer length (more than 1 mains periods long).
 // Buffer switch then is triggered by zero cross detection instead of a fixed number of samples.
 #define MEASURE_PERIOD_PER_BUFFER						2
-
-#define MEASURE_PERIOD_BUFFER_SIZE						(MEASURE_MAINS_PERIOD_US / ADC_SAMPLING_PERIOD_US)
 #define MEASURE_PERIOD_ADCX_BUFFER_SIZE					(MEASURE_PERIOD_PER_BUFFER * MEASURE_PERIOD_BUFFER_SIZE)
-#define MEASURE_PERIOD_ADCX_DMA_BUFFER_SIZE				(ADC_NUMBER_OF_ACI_CHANNELS * MEASURE_PERIOD_ADCX_BUFFER_SIZE)
+#define MEASURE_PERIOD_ADCX_DMA_BUFFER_SIZE				(MEASURE_NUMBER_OF_ACI_CHANNELS * MEASURE_PERIOD_ADCX_BUFFER_SIZE)
 #define MEASURE_PERIOD_ADCX_DMA_BUFFER_DEPTH			2
+#define MEASURE_PERIOD_TIMX_DMA_BUFFER_SIZE             3
+
+// Wait for 1 second of sampling before computing run and accumulated data.
+#define MEASURE_SAMPLED_PERIOD_START_THRESHOLD          (MATH_POWER_10[6] / MEASURE_MAINS_PERIOD_US)
 
 // ADC buffers with size out of this range are not computed.
 // Warning: it limits the acceptable input frequency range around 50Hz.
@@ -51,13 +69,10 @@
 
 #define MEASURE_POWER_FACTOR_MULTIPLIER					100
 
-#define MEASURE_ACV_FREQUENCY_SAMPLING_HZ				1000000
-#define MEASURE_PERIOD_TIM2_DMA_BUFFER_SIZE				3
-
 #define MEASURE_LED_PULSE_DURATION_MS					50
 #define MEASURE_LED_PULSE_PERIOD_SECONDS				5
 
-#define MEASURE_TIMEOUT_COUNT							10000000
+#define MEASURE_SIMULATION_TIM_INSTANCE                 TIM_INSTANCE_TIM15
 
 /*** MEASURE local structures ***/
 
@@ -76,8 +91,8 @@ typedef struct {
 	MEASURE_buffer_t aci[MEASURE_PERIOD_ADCX_DMA_BUFFER_DEPTH];
 	uint8_t aci_read_idx;
 	uint8_t aci_write_idx;
-	// Raw buffer filled by TIM2 and DMA.
-	uint32_t tim2_ccr1[MEASURE_PERIOD_TIM2_DMA_BUFFER_SIZE];
+	// Raw buffer filled by timer and DMA.
+	uint32_t acv_frequency_capture[MEASURE_PERIOD_TIMX_DMA_BUFFER_SIZE];
 } MEASURE_sampling_t;
 
 /*******************************************************************/
@@ -85,9 +100,9 @@ typedef struct {
 	// Factors.
 	float64_t acv_factor_num;
 	float64_t acv_factor_den;
-	float64_t aci_factor_num[ADC_NUMBER_OF_ACI_CHANNELS];
+	float64_t aci_factor_num[MEASURE_NUMBER_OF_ACI_CHANNELS];
 	float64_t aci_factor_den;
-	float64_t acp_factor_num[ADC_NUMBER_OF_ACI_CHANNELS];
+	float64_t acp_factor_num[MEASURE_NUMBER_OF_ACI_CHANNELS];
 	float64_t acp_factor_den;
 	// Temporary variables for individual channel processing on 1 period.
 	float32_t period_acvx_buffer_f32[MEASURE_PERIOD_ADCX_BUFFER_SIZE];
@@ -102,11 +117,11 @@ typedef struct {
 	float32_t period_apparent_power_f32;
 	float32_t period_power_factor_f32;
 	// AC channels results.
-	DATA_run_channel_t chx_rolling_mean[ADC_NUMBER_OF_ACI_CHANNELS];
-	DATA_run_channel_t chx_run_data[ADC_NUMBER_OF_ACI_CHANNELS];
-	DATA_accumulated_channel_t chx_accumulated_data[ADC_NUMBER_OF_ACI_CHANNELS];
-	DATA_run_t active_energy_mws_sum[ADC_NUMBER_OF_ACI_CHANNELS];
-	DATA_run_t apparent_energy_mvas_sum[ADC_NUMBER_OF_ACI_CHANNELS];
+	DATA_run_channel_t chx_rolling_mean[MEASURE_NUMBER_OF_ACI_CHANNELS];
+	DATA_run_channel_t chx_run_data[MEASURE_NUMBER_OF_ACI_CHANNELS];
+	DATA_accumulated_channel_t chx_accumulated_data[MEASURE_NUMBER_OF_ACI_CHANNELS];
+	DATA_run_t active_energy_mws_sum[MEASURE_NUMBER_OF_ACI_CHANNELS];
+	DATA_run_t apparent_energy_mvas_sum[MEASURE_NUMBER_OF_ACI_CHANNELS];
 	// Mains frequency.
 	DATA_run_t acv_frequency_rolling_mean;
 	DATA_run_t acv_frequency_run_data;
@@ -117,8 +132,10 @@ typedef struct {
 typedef struct {
 	MEASURE_state_t state;
 	uint8_t processing_enable;
-	uint8_t zero_cross_count;
+	uint32_t zero_cross_count;
 	uint8_t dma_transfer_end_flag;
+	uint32_t sampled_period_count;
+	uint8_t period_compute_enable;
 	uint32_t tick_led_seconds_count;
 #ifdef ANALOG_SIMULATION
 	uint8_t random_divider;
@@ -127,12 +144,29 @@ typedef struct {
 
 /*** MEASURE global variables ***/
 
-const uint8_t MEASURE_SCT013_ATTEN[ADC_NUMBER_OF_ACI_CHANNELS] = MPMCM_SCT013_ATTEN;
+const uint8_t MEASURE_SCT013_ATTEN[MEASURE_NUMBER_OF_ACI_CHANNELS] = MPMCM_SCT013_ATTEN;
 
 /*** MEASURE local global variables ***/
 
 #ifdef ANALOG_MEASURE_ENABLE
-static const GPIO_pin_t* MEASURE_GPIO_ACI_DETECT[ADC_NUMBER_OF_ACI_CHANNELS] = {&GPIO_ACI1_DETECT, &GPIO_ACI2_DETECT, &GPIO_ACI3_DETECT, &GPIO_ACI4_DETECT};
+static const ADC_channel_configuration_t MEASURE_ADC_MASTER_SEQUENCE[MEASURE_NUMBER_OF_ACI_CHANNELS] = {
+    { GPIO_ADC_CHANNEL_ACV_SAMPLING, 0 },
+    { GPIO_ADC_CHANNEL_ACV_SAMPLING, 0 },
+    { GPIO_ADC_CHANNEL_ACV_SAMPLING, 0 },
+    { GPIO_ADC_CHANNEL_ACV_SAMPLING, 0 }
+};
+static const ADC_channel_configuration_t MEASURE_ADC_SLAVE_SEQUENCE[MEASURE_NUMBER_OF_ACI_CHANNELS] = {
+    { GPIO_ADC_CHANNEL_ACI1_SAMPLING, MEASURE_ADC_OFFSET_12_BITS },
+    { GPIO_ADC_CHANNEL_ACI2_SAMPLING, MEASURE_ADC_OFFSET_12_BITS },
+    { GPIO_ADC_CHANNEL_ACI3_SAMPLING, MEASURE_ADC_OFFSET_12_BITS },
+    { GPIO_ADC_CHANNEL_ACI4_SAMPLING, MEASURE_ADC_OFFSET_12_BITS }
+};
+static const GPIO_pin_t* MEASURE_GPIO_ACI_DETECT[MEASURE_NUMBER_OF_ACI_CHANNELS] = {
+    &GPIO_ACI1_DETECT,
+    &GPIO_ACI2_DETECT,
+    &GPIO_ACI3_DETECT,
+    &GPIO_ACI4_DETECT
+};
 #endif
 static volatile MEASURE_sampling_t measure_sampling;
 static volatile MEASURE_data_t measure_data __attribute__((section(".bss_ccmsram")));
@@ -152,8 +186,12 @@ static void _MEASURE_reset(void) {
 	measure_sampling.aci_write_idx = 0;
 	measure_sampling.aci_read_idx = 0;
 	// Reset flags.
+	measure_ctx.processing_enable = 0;
 	measure_ctx.zero_cross_count = 0;
 	measure_ctx.dma_transfer_end_flag = 0;
+	measure_ctx.sampled_period_count = 0;
+	measure_ctx.period_compute_enable = 0;
+	measure_ctx.tick_led_seconds_count = 0;
 #ifdef ANALOG_SIMULATION
 	measure_ctx.random_divider = 1;
 #endif
@@ -165,7 +203,7 @@ static void _MEASURE_reset(void) {
 		}
 	}
 	// Reset channels data.
-	for (chx_idx=0 ; chx_idx<ADC_NUMBER_OF_ACI_CHANNELS ; chx_idx++) {
+	for (chx_idx=0 ; chx_idx<MEASURE_NUMBER_OF_ACI_CHANNELS ; chx_idx++) {
 		// Clear all data.
 		DATA_reset_run_channel(measure_data.chx_rolling_mean[chx_idx]);
 		DATA_reset_run_channel(measure_data.chx_run_data[chx_idx]);
@@ -178,8 +216,8 @@ static void _MEASURE_reset(void) {
 	DATA_reset_run(measure_data.acv_frequency_run_data);
 	DATA_reset_accumulated(measure_data.acv_frequency_accumulated_data);
 	// Reset sampling buffers.
-	for (idx1=0 ; idx1<MEASURE_PERIOD_TIM2_DMA_BUFFER_SIZE ; idx1++) {
-		measure_sampling.tim2_ccr1[idx1] = 0;
+	for (idx1=0 ; idx1<MEASURE_PERIOD_TIMX_DMA_BUFFER_SIZE ; idx1++) {
+		measure_sampling.acv_frequency_capture[idx1] = 0;
 	}
 }
 
@@ -189,13 +227,19 @@ static MEASURE_status_t _MEASURE_start_analog_transfer(void) {
 	// Local variables.
 	MEASURE_status_t status = MEASURE_SUCCESS;
 	ADC_status_t adc_status = ADC_SUCCESS;
+	DMA_status_t dma_status = DMA_SUCCESS;
+	TIM_status_t tim_status = TIM_SUCCESS;
 	// Start ADC.
-	adc_status = ADC_start();
+	adc_status = ADC_SQC_start(MEASURE_ACV_ACI_ADC_INSTANCE);
 	ADC_exit_error(MEASURE_ERROR_BASE_ADC);
 	// Start DMA.
-	DMA1_adcx_start();
+	dma_status = DMA_start(DMA_INSTANCE_ACV_SAMPLING, DMA_CHANNEL_ACV_SAMPLING);
+	DMA_exit_error(MEASURE_ERROR_BASE_DMA);
+	dma_status = DMA_start(DMA_INSTANCE_ACI_SAMPLING, DMA_CHANNEL_ACI_SAMPLING);
+    DMA_exit_error(MEASURE_ERROR_BASE_DMA);
 	// Start trigger.
-	TIM6_start();
+    tim_status = TIM_STD_start(MEASURE_ACV_ACI_TIM_INSTANCE, RCC_CLOCK_SYSTEM, MEASURE_ACV_ACI_SAMPLING_PERIOD_US, TIM_UNIT_US, NULL);
+    TIM_exit_error(MEASURE_ERROR_BASE_TIM);
 errors:
 	return status;
 }
@@ -207,14 +251,19 @@ static MEASURE_status_t _MEASURE_stop_analog_transfer(void) {
 	// Local variables.
 	MEASURE_status_t status = MEASURE_SUCCESS;
 	ADC_status_t adc_status = ADC_SUCCESS;
+	DMA_status_t dma_status = DMA_SUCCESS;
+	TIM_status_t tim_status = TIM_SUCCESS;
 	// Stop trigger.
-	TIM6_stop();
+	tim_status = TIM_STD_stop(MEASURE_ACV_ACI_TIM_INSTANCE);
+	TIM_stack_error(ERROR_BASE_MEASURE + MEASURE_ERROR_BASE_TIM);
 	// Stop DMA.
-	DMA1_adcx_stop();
+	dma_status = DMA_stop(DMA_INSTANCE_ACV_SAMPLING, DMA_CHANNEL_ACV_SAMPLING);
+    DMA_stack_error(ERROR_BASE_MEASURE + MEASURE_ERROR_BASE_DMA);
+    dma_status = DMA_stop(DMA_INSTANCE_ACI_SAMPLING, DMA_CHANNEL_ACI_SAMPLING);
+    DMA_stack_error(ERROR_BASE_MEASURE + MEASURE_ERROR_BASE_DMA);
 	// Stop ADC.
-	adc_status = ADC_stop();
-	ADC_exit_error(MEASURE_ERROR_BASE_ADC);
-errors:
+	adc_status = ADC_SQC_stop(MEASURE_ACV_ACI_ADC_INSTANCE);
+	ADC_stack_error(ERROR_BASE_MEASURE + MEASURE_ERROR_BASE_ADC);
 	return status;
 }
 #endif
@@ -226,28 +275,52 @@ static MEASURE_status_t _MEASURE_start(void) {
 	MEASURE_status_t status = MEASURE_SUCCESS;
 	RCC_status_t rcc_status = RCC_SUCCESS;
 	ADC_status_t adc_status = ADC_SUCCESS;
+	DMA_status_t dma_status = DMA_SUCCESS;
 	LED_status_t led_status = LED_SUCCESS;
-	TIM_status_t tim2_status = TIM_SUCCESS;
-	TIM_status_t tim6_status = TIM_SUCCESS;
-	// Switch to PLL.
-	rcc_status = RCC_switch_to_pll();
+	TIM_status_t tim_status = TIM_SUCCESS;
+	RCC_pll_configuration_t pll_config;
+	ADC_SQC_configuration_t adc_config;
+	// Turn TCXO on.
+	POWER_enable(POWER_REQUESTER_ID_MEASURE, POWER_DOMAIN_MCU_TCXO, LPTIM_DELAY_MODE_ACTIVE);
+	// Switch to PLL (system clock 120MHz, ADC clock 8MHz).
+	pll_config.source = RCC_CLOCK_HSE;
+	pll_config.hse_mode = RCC_HSE_MODE_BYPASS;
+	pll_config.m = 2;
+	pll_config.n = 30;
+	pll_config.r = RCC_PLL_RQ_2;
+	pll_config.p = 30;
+	pll_config.q = RCC_PLL_RQ_8;
+	rcc_status = RCC_switch_to_pll(&pll_config);
 	RCC_exit_error(MEASURE_ERROR_BASE_RCC);
 	// Init ADC.
-	adc_status = ADC_init();
+	adc_config.clock = ADC_CLOCK_PLL;
+	adc_config.clock_prescaler = ADC_CLOCK_PRESCALER_NONE;
+	adc_config.master_sequence = (ADC_channel_configuration_t*) MEASURE_ADC_MASTER_SEQUENCE;
+	adc_config.slave_sequence = (ADC_channel_configuration_t*) MEASURE_ADC_SLAVE_SEQUENCE;
+	adc_config.sequence_length = MEASURE_NUMBER_OF_ACI_CHANNELS;
+	adc_config.sampling_frequency_hz = MEASURE_ACV_ACI_SAMPLING_FREQUENCY_HZ;
+	adc_config.trigger = ADC_TRIGGER_TIM6_TRGO;
+	adc_config.trigger_detection = ADC_TRIGGER_DETECTION_RISING_EDGE;
+	adc_status = ADC_SQC_init(MEASURE_ACV_ACI_ADC_INSTANCE, &GPIO_ADC, &adc_config);
 	ADC_exit_error(MEASURE_ERROR_BASE_ADC);
 	// Init frequency measurement timer and ADC timer.
-	tim2_status = TIM2_init(MEASURE_ACV_FREQUENCY_SAMPLING_HZ);
-	TIM2_exit_error(MEASURE_ERROR_BASE_TIM2);
-	tim6_status = TIM6_init();
-	TIM6_exit_error(MEASURE_ERROR_BASE_TIM6);
+	tim_status = TIM_IC_init(MEASURE_ACV_FREQUENCY_TIM_INSTANCE, (TIM_gpio_t*) &GPIO_ACV_FREQUENCY_TIM);
+	TIM_exit_error(MEASURE_ERROR_BASE_TIM);
+	tim_status = TIM_STD_init(MEASURE_ACV_ACI_TIM_INSTANCE, NVIC_PRIORITY_ADC_TRIGGER);
+	TIM_exit_error(MEASURE_ERROR_BASE_TIM);
 	// Re-init LED to update clock frequency.
+	led_status = LED_de_init();
+	LED_exit_error(MEASURE_ERROR_BASE_LED);
 	led_status = LED_init();
 	LED_exit_error(MEASURE_ERROR_BASE_LED);
 	// Start frequency measurement timer.
-	TIM2_start();
-	DMA1_tim2_start();
+	tim_status = TIM_IC_start_channel(MEASURE_ACV_FREQUENCY_TIM_INSTANCE, GPIO_TIM_CHANNEL_ACV_FREQUENCY, MEASURE_ACV_FREQUENCY_SAMPLING_HZ, TIM_CAPTURE_PRESCALER_2);
+	TIM_exit_error(MEASURE_ERROR_BASE_TIM);
+	dma_status = DMA_start(DMA_INSTANCE_ACV_FREQUENCY, DMA_CHANNEL_ACV_FREQUENCY);
+	DMA_exit_error(MEASURE_ERROR_BASE_DMA);
 	// Start analog measurements.
 	status = _MEASURE_start_analog_transfer();
+	if (status != MEASURE_SUCCESS) goto errors;
 	// Update flag.
 	measure_ctx.processing_enable = 1;
 errors:
@@ -260,36 +333,40 @@ errors:
 static MEASURE_status_t _MEASURE_stop(void) {
 	// Local variables.
 	MEASURE_status_t status = MEASURE_SUCCESS;
+	MEASURE_status_t measure_status = MEASURE_SUCCESS;
 	RCC_status_t rcc_status = RCC_SUCCESS;
 	ADC_status_t adc_status = ADC_SUCCESS;
+	DMA_status_t dma_status = DMA_SUCCESS;
+	TIM_status_t tim_status = TIM_SUCCESS;
 	LED_status_t led_status = LED_SUCCESS;
 	// Update flag.
 	measure_ctx.processing_enable = 0;
-	// Stop frequency measurement timer.
-	DMA1_tim2_stop();
-	TIM2_stop();
 	// Start analog measurements.
-	status = _MEASURE_stop_analog_transfer();
-	if (status != MEASURE_SUCCESS) goto errors;
+	measure_status = _MEASURE_stop_analog_transfer();
+	MEASURE_stack_error(ERROR_BASE_MEASURE);
+	// Stop frequency measurement timer.
+	dma_status = DMA_stop(DMA_INSTANCE_ACV_FREQUENCY, DMA_CHANNEL_ACV_FREQUENCY);
+    DMA_stack_error(ERROR_BASE_MEASURE + MEASURE_ERROR_BASE_DMA);
+    tim_status = TIM_IC_stop_channel(MEASURE_ACV_FREQUENCY_TIM_INSTANCE, GPIO_TIM_CHANNEL_ACV_FREQUENCY);
+    TIM_stack_error(ERROR_BASE_MEASURE + MEASURE_ERROR_BASE_TIM);
 	// Release ADC.
-	adc_status = ADC_de_init();
-	ADC_exit_error(MEASURE_ERROR_BASE_ADC);
+	adc_status = ADC_SQC_de_init(MEASURE_ACV_ACI_ADC_INSTANCE);
+	ADC_stack_error(ERROR_BASE_MEASURE + MEASURE_ERROR_BASE_ADC);
 	// Release timers.
-	TIM2_de_init();
-	TIM6_de_init();
+	tim_status = TIM_IC_de_init(MEASURE_ACV_FREQUENCY_TIM_INSTANCE, (TIM_gpio_t*) &GPIO_ACV_FREQUENCY_TIM);
+    TIM_stack_error(ERROR_BASE_MEASURE + MEASURE_ERROR_BASE_TIM);
+    tim_status = TIM_STD_de_init(MEASURE_ACV_ACI_TIM_INSTANCE);
+    TIM_stack_error(ERROR_BASE_MEASURE + MEASURE_ERROR_BASE_TIM);
 	// Switch to HSI.
 	rcc_status = RCC_switch_to_hsi();
-	RCC_exit_error(MEASURE_ERROR_BASE_RCC);
+	RCC_stack_error(ERROR_BASE_MEASURE + MEASURE_ERROR_BASE_RCC);
+	// Turn TCXO off.
+    POWER_disable(POWER_REQUESTER_ID_MEASURE, POWER_DOMAIN_MCU_TCXO);
 	// Re-init LED to update clock frequency.
+    led_status = LED_de_init();
+    LED_stack_error(ERROR_BASE_MEASURE + MEASURE_ERROR_BASE_LED);
 	led_status = LED_init();
-	LED_exit_error(MEASURE_ERROR_BASE_LED);
-	return status;
-errors:
-	ADC_de_init();
-	TIM2_de_init();
-	TIM6_de_init();
-	RCC_switch_to_hsi();
-	LED_init();
+	LED_stack_error(ERROR_BASE_MEASURE + MEASURE_ERROR_BASE_LED);
 	return status;
 }
 #endif
@@ -299,16 +376,23 @@ errors:
 static MEASURE_status_t _MEASURE_switch_dma_buffer(void) {
 	// Local variables.
 	MEASURE_status_t status = MEASURE_SUCCESS;
+	DMA_status_t dma_status = DMA_SUCCESS;
 	// Stop ADC and DMA.
 	status = _MEASURE_stop_analog_transfer();
 	if (status != MEASURE_SUCCESS) goto errors;
 	// Retrieve number of transfered data.
-	DMA1_adcx_get_number_of_transfered_data((uint16_t*) &(measure_sampling.acv[measure_sampling.acv_write_idx].size), (uint16_t*) &(measure_sampling.aci[measure_sampling.acv_write_idx].size));
+	dma_status = DMA_get_number_of_transfered_data(DMA_INSTANCE_ACV_SAMPLING, DMA_CHANNEL_ACV_SAMPLING, (uint16_t*) &(measure_sampling.acv[measure_sampling.acv_write_idx].size));
+	DMA_stack_error(ERROR_BASE_MEASURE + ERROR_BASE_DMA);
+	dma_status = DMA_get_number_of_transfered_data(DMA_INSTANCE_ACI_SAMPLING, DMA_CHANNEL_ACI_SAMPLING, (uint16_t*) &(measure_sampling.aci[measure_sampling.aci_write_idx].size));
+    DMA_stack_error(ERROR_BASE_MEASURE + ERROR_BASE_DMA);
 	// Update write indexes.
 	measure_sampling.acv_write_idx = ((measure_sampling.acv_write_idx + 1) % MEASURE_PERIOD_ADCX_DMA_BUFFER_DEPTH);
 	measure_sampling.aci_write_idx = ((measure_sampling.aci_write_idx + 1) % MEASURE_PERIOD_ADCX_DMA_BUFFER_DEPTH);
 	// Set new address.
-	DMA1_adcx_set_destination_address((uint32_t) &(measure_sampling.acv[measure_sampling.acv_write_idx].data), (uint32_t) &(measure_sampling.aci[measure_sampling.aci_write_idx].data), MEASURE_PERIOD_ADCX_DMA_BUFFER_SIZE);
+	dma_status = DMA_set_memory_address(DMA_INSTANCE_ACV_SAMPLING, DMA_CHANNEL_ACV_SAMPLING, (uint32_t) &(measure_sampling.acv[measure_sampling.acv_write_idx].data), MEASURE_PERIOD_ADCX_DMA_BUFFER_SIZE);
+	DMA_stack_error(ERROR_BASE_MEASURE + ERROR_BASE_DMA);
+	dma_status = DMA_set_memory_address(DMA_INSTANCE_ACI_SAMPLING, DMA_CHANNEL_ACI_SAMPLING, (uint32_t) &(measure_sampling.aci[measure_sampling.aci_write_idx].data), MEASURE_PERIOD_ADCX_DMA_BUFFER_SIZE);
+    DMA_stack_error(ERROR_BASE_MEASURE + ERROR_BASE_DMA);
 	// Restart DMA.
 	status = _MEASURE_start_analog_transfer();
 errors:
@@ -329,7 +413,7 @@ static void _MEASURE_compute_period_data(void) {
 	float64_t rms_current_ma = 0.0;
 	float64_t apparent_power_mva = 0.0;
 	float64_t power_factor = 0.0;
-	uint32_t tim2_ccr1_delta = 0;
+	uint32_t acv_frequency_capture_delta = 0;
 	float64_t frequency_mhz = 0.0;
 	float64_t temp_f64 = 0.0;
 	uint8_t chx_idx = 0;
@@ -337,13 +421,25 @@ static void _MEASURE_compute_period_data(void) {
 	uint32_t idx = 0;
 	// Check enable flag.
 	if (measure_ctx.processing_enable == 0) goto errors;
+	// Check compute flag.
+    if (measure_ctx.period_compute_enable == 0) {
+        // Increment sampled period count.
+        measure_ctx.sampled_period_count++;
+        // Enable period computing after the given number of sampled periods.
+        if (measure_ctx.sampled_period_count >= MEASURE_SAMPLED_PERIOD_START_THRESHOLD) {
+           measure_ctx.period_compute_enable = 1;
+        }
+        else {
+            goto errors;
+        }
+    }
 	// Get size.
 #ifdef ANALOG_SIMULATION
-	acv_buffer_size = (SIMULATION_BUFFER_SIZE / ADC_NUMBER_OF_ACI_CHANNELS);
-	aci_buffer_size = (SIMULATION_BUFFER_SIZE / ADC_NUMBER_OF_ACI_CHANNELS);
+	acv_buffer_size = (SIMULATION_BUFFER_SIZE / MEASURE_NUMBER_OF_ACI_CHANNELS);
+	aci_buffer_size = (SIMULATION_BUFFER_SIZE / MEASURE_NUMBER_OF_ACI_CHANNELS);
 #else
-	acv_buffer_size = (uint32_t) ((measure_sampling.acv[measure_sampling.acv_read_idx].size) / (ADC_NUMBER_OF_ACI_CHANNELS));
-	aci_buffer_size = (uint32_t) ((measure_sampling.aci[measure_sampling.acv_read_idx].size) / (ADC_NUMBER_OF_ACI_CHANNELS));
+	acv_buffer_size = (uint32_t) ((measure_sampling.acv[measure_sampling.acv_read_idx].size) / (MEASURE_NUMBER_OF_ACI_CHANNELS));
+	aci_buffer_size = (uint32_t) ((measure_sampling.aci[measure_sampling.acv_read_idx].size) / (MEASURE_NUMBER_OF_ACI_CHANNELS));
 #endif
 	// Take the minimum size between voltage and current.
 	measure_data.period_acxx_buffer_size = (acv_buffer_size < aci_buffer_size) ? acv_buffer_size : aci_buffer_size;
@@ -353,11 +449,11 @@ static void _MEASURE_compute_period_data(void) {
 		goto errors;
 	}
 	// Processing each channel.
-	for (chx_idx=0 ; chx_idx<ADC_NUMBER_OF_ACI_CHANNELS ; chx_idx++) {
+	for (chx_idx=0 ; chx_idx<MEASURE_NUMBER_OF_ACI_CHANNELS ; chx_idx++) {
 		// Compute channel buffer.
 		for (idx=0 ; idx<(measure_data.period_acxx_buffer_size) ; idx++) {
 			// Copy samples by channel and convert to Q31 type.
-			sample_idx = (ADC_NUMBER_OF_ACI_CHANNELS * idx) + chx_idx;
+			sample_idx = (MEASURE_NUMBER_OF_ACI_CHANNELS * idx) + chx_idx;
 #ifdef ANALOG_SIMULATION
 			measure_data.period_acvx_buffer_f32[idx] = (float32_t) (SIMULATION_ACV_BUFFER[sample_idx]);
 			measure_data.period_acix_buffer_f32[idx] = (float32_t) (SIMULATION_ACI_BUFFER[sample_idx] / measure_ctx.random_divider);
@@ -413,21 +509,19 @@ static void _MEASURE_compute_period_data(void) {
 		DATA_add_run_channel_sample(measure_data.chx_rolling_mean[chx_idx], power_factor, power_factor);
 	}
 	// Compute mains frequency.
-	idx = 0;
-	while (idx < MEASURE_PERIOD_TIM2_DMA_BUFFER_SIZE) {
+	for (idx = 0; idx < MEASURE_PERIOD_TIMX_DMA_BUFFER_SIZE; idx++) {
 		// Search two valid consecutive samples.
-		if (measure_sampling.tim2_ccr1[idx] < measure_sampling.tim2_ccr1[(idx + 1) % MEASURE_PERIOD_TIM2_DMA_BUFFER_SIZE]) {
+		if (measure_sampling.acv_frequency_capture[idx] < measure_sampling.acv_frequency_capture[(idx + 1) % MEASURE_PERIOD_TIMX_DMA_BUFFER_SIZE]) {
 			// Compute delta.
-			tim2_ccr1_delta	= measure_sampling.tim2_ccr1[(idx + 1) % MEASURE_PERIOD_TIM2_DMA_BUFFER_SIZE] - measure_sampling.tim2_ccr1[idx];
+		    acv_frequency_capture_delta	= measure_sampling.acv_frequency_capture[(idx + 1) % MEASURE_PERIOD_TIMX_DMA_BUFFER_SIZE] - measure_sampling.acv_frequency_capture[idx];
 			// Avoid rollover case (clamp to 1Hz).
-			if (tim2_ccr1_delta < MEASURE_ACV_FREQUENCY_SAMPLING_HZ) break;
+			if (acv_frequency_capture_delta < MEASURE_ACV_FREQUENCY_SAMPLING_HZ) break;
 		}
-		idx++;
 	}
 	// Check index.
-	if (idx < MEASURE_PERIOD_TIM2_DMA_BUFFER_SIZE) {
+	if (idx < MEASURE_PERIOD_TIMX_DMA_BUFFER_SIZE) {
 		// Compute mains frequency.
-		frequency_mhz = (((float64_t) (MEASURE_ACV_FREQUENCY_SAMPLING_HZ * 1000)) / ((float64_t) tim2_ccr1_delta));
+		frequency_mhz = (((float64_t) (MEASURE_ACV_FREQUENCY_SAMPLING_HZ * 1000)) / ((float64_t) acv_frequency_capture_delta));
 		// Update accumulated data.
 		DATA_add_run_sample(measure_data.acv_frequency_rolling_mean, frequency_mhz);
 	}
@@ -444,7 +538,7 @@ static void _MEASURE_compute_run_data(void) {
 	// Local variables.
 	uint8_t chx_idx = 0;
 	// Compute AC channels run data.
-	for (chx_idx=0 ; chx_idx<ADC_NUMBER_OF_ACI_CHANNELS ; chx_idx++) {
+	for (chx_idx=0 ; chx_idx<MEASURE_NUMBER_OF_ACI_CHANNELS ; chx_idx++) {
 		// Copy all rolling means and reset.
 		DATA_copy_run_channel(measure_data.chx_rolling_mean[chx_idx], measure_data.chx_run_data[chx_idx]);
 		DATA_reset_run_channel(measure_data.chx_rolling_mean[chx_idx]);
@@ -463,7 +557,7 @@ static void _MEASURE_compute_accumulated_data(void) {
 	float64_t ref_abs = 0.0;
 	uint8_t chx_idx = 0;
 	// Compute AC channels accumulated data.
-	for (chx_idx=0 ; chx_idx<ADC_NUMBER_OF_ACI_CHANNELS ; chx_idx++) {
+	for (chx_idx=0 ; chx_idx<MEASURE_NUMBER_OF_ACI_CHANNELS ; chx_idx++) {
 		// Copy all rolling means.
 		DATA_add_accumulated_channel_sample(measure_data.chx_accumulated_data[chx_idx], active_power_mw, measure_data.chx_run_data[chx_idx].active_power_mw);
 		DATA_add_accumulated_channel_sample(measure_data.chx_accumulated_data[chx_idx], rms_voltage_mv, measure_data.chx_run_data[chx_idx].rms_voltage_mv);
@@ -545,13 +639,16 @@ static MEASURE_status_t _MEASURE_internal_process(void) {
 		}
 		// Check DMA transfer end flag.
 		if (measure_ctx.dma_transfer_end_flag != 0) {
-			// Clear counters.
+			// Clear counters and flags.
 			measure_ctx.zero_cross_count = 0;
 			measure_ctx.dma_transfer_end_flag = 0;
-			// Stop measure.
-			_MEASURE_stop();
+			measure_ctx.sampled_period_count = 0;
+			measure_ctx.period_compute_enable = 0;
 			// Update state.
-			measure_ctx.state = MEASURE_STATE_OFF;
+            measure_ctx.state = MEASURE_STATE_OFF;
+			// Stop measure.
+			status = _MEASURE_stop();
+			if (status != MEASURE_SUCCESS) goto errors;
 		}
 		break;
 	default:
@@ -572,7 +669,7 @@ static void _MEASURE_increment_zero_cross_count(void) {
 	measure_ctx.zero_cross_count++;
 	// Process measure.
 	measure_status = _MEASURE_internal_process();
-	MEASURE_stack_error();
+	MEASURE_stack_error(ERROR_BASE_MEASURE);
 }
 #endif
 
@@ -585,7 +682,7 @@ static void _MEASURE_set_dma_transfer_end_flag(void) {
 	measure_ctx.dma_transfer_end_flag = 1;
 	// Process measure.
 	measure_status = _MEASURE_internal_process();
-	MEASURE_stack_error();
+	MEASURE_stack_error(ERROR_BASE_MEASURE);
 }
 #endif
 
@@ -596,7 +693,8 @@ MEASURE_status_t MEASURE_init(void) {
 	// Local variables.
 	MEASURE_status_t status = MEASURE_SUCCESS;
 #ifdef ANALOG_MEASURE_ENABLE
-	POWER_status_t power_status = POWER_SUCCESS;
+	DMA_status_t dma_status = DMA_SUCCESS;
+    DMA_configuration_t dma_config;
 	uint8_t chx_idx = 0;
 #endif
 	// Init context.
@@ -606,28 +704,58 @@ MEASURE_status_t MEASURE_init(void) {
 	_MEASURE_reset();
 #ifdef ANALOG_MEASURE_ENABLE
 	// Init detect pins.
-	for (chx_idx=0 ; chx_idx<ADC_NUMBER_OF_ACI_CHANNELS ; chx_idx++) {
+	for (chx_idx=0 ; chx_idx<MEASURE_NUMBER_OF_ACI_CHANNELS ; chx_idx++) {
 		GPIO_configure(MEASURE_GPIO_ACI_DETECT[chx_idx], GPIO_MODE_INPUT, GPIO_TYPE_PUSH_PULL, GPIO_SPEED_LOW, GPIO_PULL_NONE);
 	}
-	// Init ADC DMA.
-	DMA1_adcx_init(&_MEASURE_set_dma_transfer_end_flag);
-	DMA1_adcx_set_destination_address((uint32_t) &(measure_sampling.acv[measure_sampling.acv_write_idx].data), (uint32_t) &(measure_sampling.aci[measure_sampling.aci_write_idx].data), MEASURE_PERIOD_ADCX_DMA_BUFFER_SIZE);
-	// Init timer DMA.
-	DMA1_tim2_init();
-	DMA1_tim2_set_destination_address((uint32_t) &(measure_sampling.tim2_ccr1), MEASURE_PERIOD_TIM2_DMA_BUFFER_SIZE);
+	// Init DMA for master ADC.
+	dma_config.direction = DMA_DIRECTION_PERIPHERAL_TO_MEMORY;
+	dma_config.flags.all = 0;
+	dma_config.flags.memory_increment = 1;
+	dma_config.memory_address = (uint32_t) &(measure_sampling.acv[measure_sampling.acv_write_idx].data);
+	dma_config.memory_data_size = DMA_DATA_SIZE_16_BITS;
+	dma_config.peripheral_address = ADC_get_master_dr_register_address(MEASURE_ACV_ACI_ADC_INSTANCE);
+	dma_config.peripheral_data_size = DMA_DATA_SIZE_16_BITS;
+	dma_config.number_of_data = MEASURE_PERIOD_ADCX_DMA_BUFFER_SIZE;
+	dma_config.priority = DMA_PRIORITY_VERY_HIGH;
+	dma_config.request_id = DMAMUX_PERIPHERAL_REQUEST_ADC1;
+	dma_config.tc_irq_callback = &_MEASURE_set_dma_transfer_end_flag;
+	dma_config.nvic_priority = NVIC_PRIORITY_DMA_ACV_SAMPLING;
+	dma_status = DMA_init(DMA_INSTANCE_ACV_SAMPLING, DMA_CHANNEL_ACV_SAMPLING, &dma_config);
+	DMA_exit_error(MEASURE_ERROR_BASE_DMA);
+	// Init DMA for slave ADC.
+	dma_config.memory_address = (uint32_t) &(measure_sampling.aci[measure_sampling.aci_write_idx].data);
+    dma_config.peripheral_address = ADC_get_slave_dr_register_address(MEASURE_ACV_ACI_ADC_INSTANCE);
+    dma_config.number_of_data = MEASURE_PERIOD_ADCX_DMA_BUFFER_SIZE;
+    dma_config.priority = DMA_PRIORITY_HIGH;
+    dma_config.request_id = DMAMUX_PERIPHERAL_REQUEST_ADC2;
+    dma_config.nvic_priority = NVIC_PRIORITY_DMA_ACI_SAMPLING;
+	dma_status = DMA_init(DMA_INSTANCE_ACI_SAMPLING, DMA_CHANNEL_ACI_SAMPLING, &dma_config);
+	DMA_exit_error(MEASURE_ERROR_BASE_DMA);
+	// Init DMA for ACV frequency capture timer.
+	dma_config.flags.all = 0;
+    dma_config.flags.memory_increment = 1;
+    dma_config.flags.circular_mode = 1;
+    dma_config.memory_address = (uint32_t) &(measure_sampling.acv_frequency_capture);
+    dma_config.memory_data_size = DMA_DATA_SIZE_32_BITS;
+    dma_config.peripheral_address = TIM_get_ccr_register_address(MEASURE_ACV_FREQUENCY_TIM_INSTANCE, GPIO_TIM_CHANNEL_ACV_FREQUENCY);
+    dma_config.peripheral_data_size = DMA_DATA_SIZE_32_BITS;
+    dma_config.number_of_data = MEASURE_PERIOD_TIMX_DMA_BUFFER_SIZE;
+    dma_config.priority = DMA_PRIORITY_MEDIUM;
+    dma_config.request_id = DMAMUX_PERIPHERAL_REQUEST_TIM2_CH1;
+    dma_config.tc_irq_callback = NULL;
+    dma_config.nvic_priority = NVIC_PRIORITY_DMA_ACV_FREQUENCY;
+    dma_status = DMA_init(DMA_INSTANCE_ACV_FREQUENCY, DMA_CHANNEL_ACV_FREQUENCY, &dma_config);
+    DMA_exit_error(MEASURE_ERROR_BASE_DMA);
 	// Turn analog front-end on to have VREF+ for ADC calibration.
-	power_status = POWER_enable(POWER_DOMAIN_ANALOG, LPTIM_DELAY_MODE_SLEEP);
-	POWER_exit_error(MEASURE_ERROR_BASE_POWER);
-	// Init zero cross pulse GPIO.
-	GPIO_configure(&GPIO_ZERO_CROSS_PULSE, GPIO_MODE_INPUT, GPIO_TYPE_PUSH_PULL, GPIO_SPEED_LOW, GPIO_PULL_DOWN);
+	POWER_enable(POWER_REQUESTER_ID_MEASURE, POWER_DOMAIN_ANALOG, LPTIM_DELAY_MODE_SLEEP);
 #ifdef ANALOG_SIMULATION
 	// Init zero cross emulation timer.
-	TIM15_init(MEASURE_ZERO_CROSS_FREQUENCY_HZ, &_MEASURE_increment_zero_cross_count);
-	TIM15_start();
+	TIM_STD_init(MEASURE_SIMULATION_TIM_INSTANCE, NVIC_PRIORITY_SIMULATION);
+	TIM_STD_start(MEASURE_SIMULATION_TIM_INSTANCE, RCC_CLOCK_LSE, (MEASURE_MAINS_PERIOD_US / MEASURE_ZERO_CROSS_PER_PERIOD), TIM_UNIT_US, &_MEASURE_increment_zero_cross_count);
 #else
 	// Init zero cross interrupt from external circuit.
-	EXTI_configure_gpio(&GPIO_ZERO_CROSS_PULSE, EXTI_TRIGGER_RISING_EDGE, &_MEASURE_increment_zero_cross_count);
-	NVIC_enable_interrupt(NVIC_INTERRUPT_EXTI2, NVIC_PRIORITY_EXTI2);
+	EXTI_configure_gpio(&GPIO_ZERO_CROSS_PULSE, GPIO_PULL_DOWN, EXTI_TRIGGER_RISING_EDGE, &_MEASURE_increment_zero_cross_count, NVIC_PRIORITY_ZERO_CROSS);
+	EXTI_enable_gpio_interrupt(&GPIO_ZERO_CROSS_PULSE);
 #endif
 errors:
 #endif
@@ -637,14 +765,14 @@ errors:
 /*******************************************************************/
 MEASURE_state_t MEASURE_get_state(void) {
 #ifdef ANALOG_SIMULATION
-	return (MEASURE_STATE_ACTIVE);
+    return MEASURE_STATE_ACTIVE;
 #else
 	return (measure_ctx.state);
 #endif
 }
 
 /*******************************************************************/
-MEASURE_status_t MEASURE_set_gains(uint16_t transformer_gain, uint16_t current_sensors_gain[ADC_NUMBER_OF_ACI_CHANNELS]) {
+MEASURE_status_t MEASURE_set_gains(uint16_t transformer_gain, uint16_t current_sensors_gain[MEASURE_NUMBER_OF_ACI_CHANNELS]) {
 	// Local variables.
 	MEASURE_status_t status = MEASURE_SUCCESS;
 	uint8_t chx_idx = 0;
@@ -654,15 +782,15 @@ MEASURE_status_t MEASURE_set_gains(uint16_t transformer_gain, uint16_t current_s
 		goto errors;
 	}
 	// ACV.
-	measure_data.acv_factor_num = ((float64_t) transformer_gain * (float64_t) MPMCM_TRANSFORMER_ATTEN * (float64_t) ADC_VREF_MV);
+	measure_data.acv_factor_num = ((float64_t) transformer_gain * (float64_t) MPMCM_TRANSFORMER_ATTEN * (float64_t) STM32G4XX_DRIVERS_ADC_VREF_MV);
 	measure_data.acv_factor_den = ((float64_t) MEASURE_TRANSFORMER_GAIN_FACTOR * (float64_t) ADC_FULL_SCALE);
 	// ACI.
-	for (chx_idx=0 ; chx_idx<ADC_NUMBER_OF_ACI_CHANNELS ; chx_idx++) {
-		measure_data.aci_factor_num[chx_idx] = ((float64_t) current_sensors_gain[chx_idx] * (float64_t) MEASURE_SCT013_ATTEN[chx_idx] * (float64_t) ADC_VREF_MV);
+	for (chx_idx=0 ; chx_idx<MEASURE_NUMBER_OF_ACI_CHANNELS ; chx_idx++) {
+		measure_data.aci_factor_num[chx_idx] = ((float64_t) current_sensors_gain[chx_idx] * (float64_t) MEASURE_SCT013_ATTEN[chx_idx] * (float64_t) STM32G4XX_DRIVERS_ADC_VREF_MV);
 	}
 	measure_data.aci_factor_den = ((float64_t) MEASURE_CURRENT_SENSOR_GAIN_FACTOR * (float64_t) ADC_FULL_SCALE);
 	// ACP.
-	for (chx_idx=0 ; chx_idx<ADC_NUMBER_OF_ACI_CHANNELS ; chx_idx++) {
+	for (chx_idx=0 ; chx_idx<MEASURE_NUMBER_OF_ACI_CHANNELS ; chx_idx++) {
 		// Note: 1000 factor is used to get mW from mV and mA.
 		// Conversion is done here to limit numerator value and avoid overflow during power computation.
 		// There is no precision loss since ACV and ACI factors multiplication is necessarily a multiple of 1000 thanks to ADC_VREF_MV.
@@ -687,7 +815,7 @@ MEASURE_status_t MEASURE_tick_second(void) {
 	measure_ctx.random_divider = 1 + ((measure_ctx.random_divider + 1) % 100);
 #endif
 	// Check state.
-	if (measure_ctx.state != MEASURE_STATE_OFF) {
+	if ((measure_ctx.state != MEASURE_STATE_OFF) && (measure_ctx.period_compute_enable != 0)) {
 		// Compute run data from last second.
 		measure_ctx.processing_enable = 0;
 		_MEASURE_compute_run_data();
@@ -706,7 +834,7 @@ MEASURE_status_t MEASURE_get_probe_detect_flag(uint8_t channel_index, uint8_t* c
 	// Local variables.
 	MEASURE_status_t status = MEASURE_SUCCESS;
 	// Check parameters.
-	if (channel_index >= ADC_NUMBER_OF_ACI_CHANNELS) {
+	if (channel_index >= MEASURE_NUMBER_OF_ACI_CHANNELS) {
 		status = MEASURE_ERROR_AC_CHANNEL;
 		goto errors;
 	}
@@ -799,7 +927,7 @@ MEASURE_status_t MEASURE_get_channel_run_data(uint8_t channel, DATA_run_channel_
 		status = MEASURE_ERROR_NULL_PARAMETER;
 		goto errors;
 	}
-	if (channel >= ADC_NUMBER_OF_ACI_CHANNELS) {
+	if (channel >= MEASURE_NUMBER_OF_ACI_CHANNELS) {
 		status = MEASURE_ERROR_AC_CHANNEL;
 		goto errors;
 	}
@@ -818,7 +946,7 @@ MEASURE_status_t MEASURE_get_channel_accumulated_data(uint8_t channel, DATA_accu
 		status = MEASURE_ERROR_NULL_PARAMETER;
 		goto errors;
 	}
-	if (channel >= ADC_NUMBER_OF_ACI_CHANNELS) {
+	if (channel >= MEASURE_NUMBER_OF_ACI_CHANNELS) {
 		status = MEASURE_ERROR_AC_CHANNEL;
 		goto errors;
 	}

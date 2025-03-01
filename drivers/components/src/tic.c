@@ -8,18 +8,24 @@
 #include "tic.h"
 
 #include "error.h"
+#include "error_base.h"
 #include "data.h"
 #include "dma.h"
+#include "dma_channel.h"
+#include "gpio_mapping.h"
 #include "led.h"
-#include "math_custom.h"
+#include "maths.h"
 #include "mode.h"
+#include "nvic_priority.h"
 #include "parser.h"
 #include "power.h"
-#include "usart.h"
-#include "string_custom.h"
+#include "strings.h"
 #include "types.h"
+#include "usart.h"
 
 /*** TIC local macros ***/
+
+#define TIC_USART_INSTANCE                  USART_INSTANCE_USART2
 
 #define TIC_RX_BUFFER_SIZE					64
 
@@ -82,8 +88,8 @@ typedef struct {
 	volatile uint32_t second_count_inactivity;
 	volatile TIC_flags_t flags;
 	// DMA Buffers.
-	volatile char_t dma_buffer0[TIC_RX_BUFFER_SIZE]; // TIC input messages buffer 1.
-	volatile char_t dma_buffer1[TIC_RX_BUFFER_SIZE]; // TIC input messages buffer 2.
+	volatile char_t dma_buffer0[TIC_RX_BUFFER_SIZE];
+	volatile char_t dma_buffer1[TIC_RX_BUFFER_SIZE];
 	// Parsing buffer.
 	char_t frame[TIC_RX_BUFFER_SIZE];
 	uint8_t frame_size;
@@ -109,14 +115,14 @@ static TIC_context_t tic_ctx;
 /*******************************************************************/
 static void _TIC_switch_dma_buffer(uint8_t line_end_flag) {
 	// Stop and start DMA transfer to switch buffer.
-	DMA1_usart2_stop();
+    DMA_stop(DMA_INSTANCE_TIC, DMA_CHANNEL_TIC);
 	// Switch buffer.
 	if (tic_ctx.flags.fill_buffer0 == 0) {
-		DMA1_usart2_set_destination_address((uint32_t) &(tic_ctx.dma_buffer0), TIC_RX_BUFFER_SIZE); // Switch to buffer 0.
+	    DMA_set_memory_address(DMA_INSTANCE_TIC, DMA_CHANNEL_TIC, (uint32_t) &(tic_ctx.dma_buffer0), TIC_RX_BUFFER_SIZE);
 		tic_ctx.flags.fill_buffer0 = 1;
 	}
 	else {
-		DMA1_usart2_set_destination_address((uint32_t) &(tic_ctx.dma_buffer1), TIC_RX_BUFFER_SIZE); // Switch to buffer 1.
+	    DMA_set_memory_address(DMA_INSTANCE_TIC, DMA_CHANNEL_TIC, (uint32_t) &(tic_ctx.dma_buffer1), TIC_RX_BUFFER_SIZE);
 		tic_ctx.flags.fill_buffer0 = 0;
 	}
 	// Update flags.
@@ -124,7 +130,7 @@ static void _TIC_switch_dma_buffer(uint8_t line_end_flag) {
 	tic_ctx.flags.frame_received = line_end_flag;
 	tic_ctx.second_count_inactivity = 0;
 	// Restart DMA transfer.
-	DMA1_usart2_start();
+	DMA_start(DMA_INSTANCE_TIC, DMA_CHANNEL_TIC);
 }
 #endif
 
@@ -179,8 +185,8 @@ static void _TIC_reset_parser(void) {
 	// Reset parser.
 	tic_ctx.parser.buffer = (char_t*) tic_ctx.frame;
 	tic_ctx.parser.buffer_size = tic_ctx.frame_size;
-	tic_ctx.parser.separator_idx = 0;
-	tic_ctx.parser.start_idx = 0;
+	tic_ctx.parser.separator_index = 0;
+	tic_ctx.parser.start_index = 0;
 }
 
 #ifdef LINKY_TIC_ENABLE
@@ -224,19 +230,22 @@ errors:
 static TIC_status_t _TIC_start(void) {
 	// Local variables.
 	TIC_status_t status = TIC_SUCCESS;
-	POWER_status_t power_status = POWER_SUCCESS;
+	DMA_status_t dma_status = DMA_SUCCESS;
+	USART_status_t usart_status = USART_SUCCESS;
 	// Turn TIC interface on.
-	power_status = POWER_enable(POWER_DOMAIN_TIC, LPTIM_DELAY_MODE_ACTIVE);
-	POWER_exit_error(TIC_ERROR_BASE_POWER);
+	POWER_enable(POWER_REQUESTER_ID_TIC, POWER_DOMAIN_TIC, LPTIM_DELAY_MODE_ACTIVE);
 	// Clear flags.
 	tic_ctx.flags.all = 0;
 	tic_ctx.flags.fill_buffer0 = 1;
 	tic_ctx.decoding_count = 0;
 	// Start with buffer 1.
-	DMA1_usart2_set_destination_address((uint32_t) &(tic_ctx.dma_buffer0), TIC_RX_BUFFER_SIZE);
+	dma_status = DMA_set_memory_address(DMA_INSTANCE_TIC, DMA_CHANNEL_TIC, (uint32_t) &(tic_ctx.dma_buffer0), TIC_RX_BUFFER_SIZE);
+	DMA_exit_error(TIC_ERROR_BASE_DMA);
 	// Start DMA transfer.
-	DMA1_usart2_start();
-	USART2_enable_rx();
+	dma_status = DMA_start(DMA_INSTANCE_TIC, DMA_CHANNEL_TIC);
+	DMA_exit_error(TIC_ERROR_BASE_DMA);
+	usart_status = USART_enable_rx(TIC_USART_INSTANCE);
+	USART_exit_error(TIC_ERROR_BASE_USART);
 errors:
 	return status;
 }
@@ -247,14 +256,15 @@ errors:
 static TIC_status_t _TIC_stop(void) {
 	// Local variables.
 	TIC_status_t status = TIC_SUCCESS;
-	POWER_status_t power_status = POWER_SUCCESS;
+	DMA_status_t dma_status = DMA_SUCCESS;
+    USART_status_t usart_status = USART_SUCCESS;
 	// Stop DMA transfer.
-	USART2_disable_rx();
-	DMA1_usart2_stop();
-	// Turn TIC interface off.
-	power_status = POWER_disable(POWER_DOMAIN_TIC);
-	POWER_exit_error(TIC_ERROR_BASE_POWER);
-errors:
+    usart_status = USART_disable_rx(TIC_USART_INSTANCE);
+    USART_stack_error(ERROR_BASE_TIC + TIC_ERROR_BASE_USART);
+    dma_status = DMA_stop(DMA_INSTANCE_TIC, DMA_CHANNEL_TIC);
+    DMA_stack_error(ERROR_BASE_TIC + TIC_ERROR_BASE_DMA);
+    // Turn TIC interface off.
+    POWER_disable(POWER_REQUESTER_ID_TIC, POWER_DOMAIN_TIC);
 	return status;
 }
 #endif
@@ -266,7 +276,10 @@ TIC_status_t TIC_init(void) {
 	// Local variables.
 	TIC_status_t status = TIC_SUCCESS;
 #ifdef LINKY_TIC_ENABLE
-	USART_status_t usart2_status = USART_SUCCESS;
+	DMA_status_t dma_status = DMA_SUCCESS;
+	USART_status_t usart_status = USART_SUCCESS;
+	DMA_configuration_t dma_config;
+	USART_configuration_t usart_config;
 #endif
 	uint32_t idx = 0;
 	// Init context.
@@ -286,10 +299,30 @@ TIC_status_t TIC_init(void) {
 	DATA_reset_run(tic_data.apparent_energy_mvas_sum);
 #ifdef LINKY_TIC_ENABLE
 	// Init USART interface.
-	usart2_status = USART2_init(TIC_BAUD_RATE, TIC_FRAME_END_CHAR, &_TIC_usart_cm_irq_callback);
-	USART2_exit_error(TIC_ERROR_BASE_USART2);
+	usart_config.clock = RCC_CLOCK_HSI;
+	usart_config.baud_rate = TIC_BAUD_RATE;
+	usart_config.parity = USART_PARITY_EVEN;
+	usart_config.nvic_priority = NVIC_PRIORITY_TIC;
+	usart_config.rxne_irq_callback = NULL;
+	usart_config.cm_irq_callback = &_TIC_usart_cm_irq_callback;
+	usart_config.match_character = TIC_FRAME_END_CHAR;
+	usart_status = USART_init(TIC_USART_INSTANCE, &GPIO_TIC_USART, &usart_config);
+	USART_exit_error(TIC_ERROR_BASE_USART);
 	// Init DMA.
-	DMA1_usart2_init(&_TIC_dma_tc_irq_callback);
+	dma_config.direction = DMA_DIRECTION_PERIPHERAL_TO_MEMORY;
+    dma_config.flags.all = 0;
+    dma_config.flags.memory_increment = 1;
+    dma_config.memory_address = (uint32_t) &(tic_ctx.dma_buffer0);
+    dma_config.memory_data_size = DMA_DATA_SIZE_8_BITS;
+    dma_config.peripheral_address = USART_get_rdr_register_address(TIC_USART_INSTANCE);
+    dma_config.peripheral_data_size = DMA_DATA_SIZE_8_BITS;
+    dma_config.number_of_data = TIC_RX_BUFFER_SIZE;
+    dma_config.priority = DMA_PRIORITY_VERY_HIGH;
+    dma_config.request_id = DMAMUX_PERIPHERAL_REQUEST_USART2_RX;
+    dma_config.tc_irq_callback = &_TIC_dma_tc_irq_callback;
+    dma_config.nvic_priority = NVIC_PRIORITY_DMA_TIC;
+	dma_status = DMA_init(DMA_INSTANCE_TIC, DMA_CHANNEL_TIC, &dma_config);
+	DMA_exit_error(TIC_ERROR_BASE_DMA);
 errors:
 #endif
 	return status;
@@ -321,6 +354,8 @@ TIC_status_t TIC_process(void) {
 		break;
 	case TIC_STATE_ACTIVE:
 		if (tic_ctx.flags.frame_received != 0) {
+		    // Clear flag.
+		    tic_ctx.flags.frame_received = 0;
 			// Build frame.
 			_TIC_build_frame();
 			_TIC_reset_parser();
