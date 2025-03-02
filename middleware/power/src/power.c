@@ -10,8 +10,8 @@
 #include "error.h"
 #include "error_base.h"
 #include "gpio.h"
-#include "gpio_mapping.h"
 #include "lptim.h"
+#include "mcu_mapping.h"
 #include "types.h"
 
 /*** POWER local global variables ***/

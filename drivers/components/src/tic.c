@@ -11,10 +11,9 @@
 #include "error_base.h"
 #include "data.h"
 #include "dma.h"
-#include "dma_channel.h"
-#include "gpio_mapping.h"
 #include "led.h"
 #include "maths.h"
+#include "mcu_mapping.h"
 #include "mpmcm_flags.h"
 #include "nvic_priority.h"
 #include "parser.h"
@@ -24,8 +23,6 @@
 #include "usart.h"
 
 /*** TIC local macros ***/
-
-#define TIC_USART_INSTANCE                  USART_INSTANCE_USART2
 
 #define TIC_RX_BUFFER_SIZE                  64
 
@@ -244,7 +241,7 @@ static TIC_status_t _TIC_start(void) {
     // Start DMA transfer.
     dma_status = DMA_start(DMA_INSTANCE_TIC, DMA_CHANNEL_TIC);
     DMA_exit_error(TIC_ERROR_BASE_DMA);
-    usart_status = USART_enable_rx(TIC_USART_INSTANCE);
+    usart_status = USART_enable_rx(USART_INSTANCE_TIC);
     USART_exit_error(TIC_ERROR_BASE_USART);
 errors:
     return status;
@@ -259,7 +256,7 @@ static TIC_status_t _TIC_stop(void) {
     DMA_status_t dma_status = DMA_SUCCESS;
     USART_status_t usart_status = USART_SUCCESS;
     // Stop DMA transfer.
-    usart_status = USART_disable_rx(TIC_USART_INSTANCE);
+    usart_status = USART_disable_rx(USART_INSTANCE_TIC);
     USART_stack_error(ERROR_BASE_TIC + TIC_ERROR_BASE_USART);
     dma_status = DMA_stop(DMA_INSTANCE_TIC, DMA_CHANNEL_TIC);
     DMA_stack_error(ERROR_BASE_TIC + TIC_ERROR_BASE_DMA);
@@ -308,7 +305,7 @@ TIC_status_t TIC_init(void) {
     usart_config.rxne_irq_callback = NULL;
     usart_config.cm_irq_callback = &_TIC_usart_cm_irq_callback;
     usart_config.match_character = TIC_FRAME_END_CHAR;
-    usart_status = USART_init(TIC_USART_INSTANCE, &GPIO_TIC_USART, &usart_config);
+    usart_status = USART_init(USART_INSTANCE_TIC, &USART_GPIO_TIC, &usart_config);
     USART_exit_error(TIC_ERROR_BASE_USART);
     // Init DMA.
     dma_config.direction = DMA_DIRECTION_PERIPHERAL_TO_MEMORY;
@@ -316,7 +313,7 @@ TIC_status_t TIC_init(void) {
     dma_config.flags.memory_increment = 1;
     dma_config.memory_address = (uint32_t) &(tic_ctx.dma_buffer0);
     dma_config.memory_data_size = DMA_DATA_SIZE_8_BITS;
-    dma_config.peripheral_address = USART_get_rdr_register_address(TIC_USART_INSTANCE);
+    dma_config.peripheral_address = USART_get_rdr_register_address(USART_INSTANCE_TIC);
     dma_config.peripheral_data_size = DMA_DATA_SIZE_8_BITS;
     dma_config.number_of_data = TIC_RX_BUFFER_SIZE;
     dma_config.priority = DMA_PRIORITY_VERY_HIGH;
