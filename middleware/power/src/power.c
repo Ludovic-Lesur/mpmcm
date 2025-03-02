@@ -73,7 +73,6 @@ void POWER_enable(POWER_requester_id_t requester_id, POWER_domain_t domain, LPTI
     case POWER_DOMAIN_ANALOG:
         // Turn analog front-end on.
         GPIO_write(&GPIO_ANA_POWER_ENABLE, 1);
-        delay_ms = POWER_ON_DELAY_MS_ANALOG;
         break;
     case POWER_DOMAIN_TIC:
         // Turn TIC interface on.

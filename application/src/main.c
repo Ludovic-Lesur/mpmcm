@@ -159,6 +159,7 @@ int main(void) {
         tic_status = TIC_process();
         TIC_stack_error(ERROR_BASE_TIC);
 #endif
+
         // Perform node tasks.
         node_status = NODE_process();
         NODE_stack_error(ERROR_BASE_NODE);

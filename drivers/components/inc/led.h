@@ -79,10 +79,11 @@ LED_status_t LED_de_init(void);
  * \brief Start single pulse.
  * \param[in]   pulse_duration_ms: Pulse duration in ms.
  * \param[in]   color: LED color.
+ * \param[in]   pulse_completion_event: Enable internal interrupt at the end of the pulse.
  * \param[out]  none
  * \retval      Function execution status.
  *******************************************************************/
-LED_status_t LED_single_pulse(uint32_t pulse_duration_ms, LED_color_t color);
+LED_status_t LED_single_pulse(uint32_t pulse_duration_ms, LED_color_t color, uint8_t pulse_completion_event);
 
 /*!******************************************************************
  * \fn LED_state_t LED_get_state(void)

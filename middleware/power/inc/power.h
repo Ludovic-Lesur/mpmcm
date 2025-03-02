@@ -11,10 +11,6 @@
 #include "lptim.h"
 #include "types.h"
 
-/*** POWER macros ***/
-
-#define POWER_ON_DELAY_MS_ANALOG    2000
-
 /*** POWER structures ***/
 
 /*!******************************************************************

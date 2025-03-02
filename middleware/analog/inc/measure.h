@@ -64,6 +64,8 @@ typedef enum {
  *******************************************************************/
 typedef enum {
     MEASURE_STATE_OFF = 0,
+    MEASURE_STATE_ANALOG_POWER_DELAY,
+    MEASURE_STATE_MAINS_DETECT,
     MEASURE_STATE_ACTIVE,
     MEASURE_STATE_LAST
 } MEASURE_state_t;
@@ -87,6 +89,15 @@ typedef enum {
  * \retval      Function execution status.
  *******************************************************************/
 MEASURE_status_t MEASURE_init(void);
+
+/*!******************************************************************
+ * \fn MEASURE_status_t MEASURE_de_init(void)
+ * \brief Release MEASURE driver.
+ * \param[in]   none
+ * \param[out]  none
+ * \retval      Function execution status.
+ *******************************************************************/
+MEASURE_status_t MEASURE_de_init(void);
 
 /*!******************************************************************
  * \fn MEASURE_state_t MEASURE_get_state(void)
