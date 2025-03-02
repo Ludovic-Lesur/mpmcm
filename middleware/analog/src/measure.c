@@ -271,12 +271,12 @@ static MEASURE_status_t _MEASURE_start_analog_transfer(void) {
     ADC_exit_error(MEASURE_ERROR_BASE_ADC);
     // Start DMA.
     dma_status = DMA_start(DMA_INSTANCE_ACV_SAMPLING, DMA_CHANNEL_ACV_SAMPLING);
-    DMA_exit_error(MEASURE_ERROR_BASE_DMA);
+    DMA_exit_error(MEASURE_ERROR_BASE_DMA_ACV_SAMPLING);
     dma_status = DMA_start(DMA_INSTANCE_ACI_SAMPLING, DMA_CHANNEL_ACI_SAMPLING);
-    DMA_exit_error(MEASURE_ERROR_BASE_DMA);
+    DMA_exit_error(MEASURE_ERROR_BASE_DMA_ACI_SAMPLING);
     // Start trigger.
     tim_status = TIM_STD_start(TIM_INSTANCE_ADC_TRIGGER, RCC_CLOCK_SYSTEM, MEASURE_ACV_ACI_SAMPLING_PERIOD_US, TIM_UNIT_US, NULL);
-    TIM_exit_error(MEASURE_ERROR_BASE_TIM);
+    TIM_exit_error(MEASURE_ERROR_BASE_TIM_ADC_TRIGGER);
 errors:
     return status;
 }
@@ -292,12 +292,12 @@ static MEASURE_status_t _MEASURE_stop_analog_transfer(void) {
     TIM_status_t tim_status = TIM_SUCCESS;
     // Stop trigger.
     tim_status = TIM_STD_stop(TIM_INSTANCE_ADC_TRIGGER);
-    TIM_stack_error(ERROR_BASE_MEASURE + MEASURE_ERROR_BASE_TIM);
+    TIM_stack_error(ERROR_BASE_MEASURE + MEASURE_ERROR_BASE_TIM_ADC_TRIGGER);
     // Stop DMA.
     dma_status = DMA_stop(DMA_INSTANCE_ACV_SAMPLING, DMA_CHANNEL_ACV_SAMPLING);
-    DMA_stack_error(ERROR_BASE_MEASURE + MEASURE_ERROR_BASE_DMA);
+    DMA_stack_error(ERROR_BASE_MEASURE + MEASURE_ERROR_BASE_DMA_ACV_SAMPLING);
     dma_status = DMA_stop(DMA_INSTANCE_ACI_SAMPLING, DMA_CHANNEL_ACI_SAMPLING);
-    DMA_stack_error(ERROR_BASE_MEASURE + MEASURE_ERROR_BASE_DMA);
+    DMA_stack_error(ERROR_BASE_MEASURE + MEASURE_ERROR_BASE_DMA_ACI_SAMPLING);
     // Stop ADC.
     adc_status = ADC_SQC_stop(ADC_INSTANCE_ACX_SAMPLING);
     ADC_stack_error(ERROR_BASE_MEASURE + MEASURE_ERROR_BASE_ADC);
@@ -344,7 +344,7 @@ static MEASURE_status_t _MEASURE_start(void) {
     dma_config.tc_irq_callback = &_MEASURE_set_dma_transfer_end_flag;
     dma_config.nvic_priority = NVIC_PRIORITY_DMA_ACV_SAMPLING;
     dma_status = DMA_init(DMA_INSTANCE_ACV_SAMPLING, DMA_CHANNEL_ACV_SAMPLING, &dma_config);
-    DMA_exit_error(MEASURE_ERROR_BASE_DMA);
+    DMA_exit_error(MEASURE_ERROR_BASE_DMA_ACV_SAMPLING);
     // Init DMA for slave ADC.
     dma_config.memory_address = (uint32_t) &(measure_sampling.aci[measure_sampling.aci_write_idx].data);
     dma_config.peripheral_address = ADC_get_slave_dr_register_address(ADC_INSTANCE_ACX_SAMPLING);
@@ -353,7 +353,7 @@ static MEASURE_status_t _MEASURE_start(void) {
     dma_config.request_id = DMAMUX_PERIPHERAL_REQUEST_ADC2;
     dma_config.nvic_priority = NVIC_PRIORITY_DMA_ACI_SAMPLING;
     dma_status = DMA_init(DMA_INSTANCE_ACI_SAMPLING, DMA_CHANNEL_ACI_SAMPLING, &dma_config);
-    DMA_exit_error(MEASURE_ERROR_BASE_DMA);
+    DMA_exit_error(MEASURE_ERROR_BASE_DMA_ACI_SAMPLING);
     // Init DMA for ACV frequency capture timer.
     dma_config.flags.all = 0;
     dma_config.flags.memory_increment = 1;
@@ -368,7 +368,7 @@ static MEASURE_status_t _MEASURE_start(void) {
     dma_config.tc_irq_callback = NULL;
     dma_config.nvic_priority = NVIC_PRIORITY_DMA_ACV_FREQUENCY;
     dma_status = DMA_init(DMA_INSTANCE_ACV_FREQUENCY, DMA_CHANNEL_ACV_FREQUENCY, &dma_config);
-    DMA_exit_error(MEASURE_ERROR_BASE_DMA);
+    DMA_exit_error(MEASURE_ERROR_BASE_DMA_ACV_FREQUENCY);
     // Init ADC.
     adc_config.clock = ADC_CLOCK_PLL;
     adc_config.clock_prescaler = ADC_CLOCK_PRESCALER_NONE;
@@ -382,9 +382,9 @@ static MEASURE_status_t _MEASURE_start(void) {
     ADC_exit_error(MEASURE_ERROR_BASE_ADC);
     // Init frequency measurement timer and ADC timer.
     tim_status = TIM_IC_init(TIM_INSTANCE_ACV_FREQUENCY, (TIM_gpio_t*) &TIM_GPIO_ACV_FREQUENCY);
-    TIM_exit_error(MEASURE_ERROR_BASE_TIM);
+    TIM_exit_error(MEASURE_ERROR_BASE_TIM_ACV_FREQUENCY);
     tim_status = TIM_STD_init(TIM_INSTANCE_ADC_TRIGGER, NVIC_PRIORITY_ADC_TRIGGER);
-    TIM_exit_error(MEASURE_ERROR_BASE_TIM);
+    TIM_exit_error(MEASURE_ERROR_BASE_TIM_ADC_TRIGGER);
     // Re-init LED to update clock frequency.
     led_status = LED_de_init();
     LED_exit_error(MEASURE_ERROR_BASE_LED);
@@ -392,9 +392,9 @@ static MEASURE_status_t _MEASURE_start(void) {
     LED_exit_error(MEASURE_ERROR_BASE_LED);
     // Start frequency measurement timer.
     tim_status = TIM_IC_start_channel(TIM_INSTANCE_ACV_FREQUENCY, TIM_CHANNEL_ACV_FREQUENCY, MEASURE_ACV_FREQUENCY_SAMPLING_HZ, TIM_CAPTURE_PRESCALER_2);
-    TIM_exit_error(MEASURE_ERROR_BASE_TIM);
+    TIM_exit_error(MEASURE_ERROR_BASE_TIM_ACV_FREQUENCY);
     dma_status = DMA_start(DMA_INSTANCE_ACV_FREQUENCY, DMA_CHANNEL_ACV_FREQUENCY);
-    DMA_exit_error(MEASURE_ERROR_BASE_DMA);
+    DMA_exit_error(MEASURE_ERROR_BASE_DMA_ACV_FREQUENCY);
     // Start analog measurements.
     status = _MEASURE_start_analog_transfer();
     if (status != MEASURE_SUCCESS) goto errors;
@@ -422,24 +422,24 @@ static void _MEASURE_stop(void) {
     MEASURE_stack_error(ERROR_BASE_MEASURE);
     // Stop frequency measurement timer.
     dma_status = DMA_stop(DMA_INSTANCE_ACV_FREQUENCY, DMA_CHANNEL_ACV_FREQUENCY);
-    DMA_stack_error(ERROR_BASE_MEASURE + MEASURE_ERROR_BASE_DMA);
+    DMA_stack_error(ERROR_BASE_MEASURE + MEASURE_ERROR_BASE_DMA_ACV_FREQUENCY);
     tim_status = TIM_IC_stop_channel(TIM_INSTANCE_ACV_FREQUENCY, TIM_CHANNEL_ACV_FREQUENCY);
-    TIM_stack_error(ERROR_BASE_MEASURE + MEASURE_ERROR_BASE_TIM);
+    TIM_stack_error(ERROR_BASE_MEASURE + MEASURE_ERROR_BASE_TIM_ACV_FREQUENCY);
     // Release ADC.
     adc_status = ADC_SQC_de_init(ADC_INSTANCE_ACX_SAMPLING);
     ADC_stack_error(ERROR_BASE_MEASURE + MEASURE_ERROR_BASE_ADC);
     // Release timers.
     tim_status = TIM_IC_de_init(TIM_INSTANCE_ACV_FREQUENCY, (TIM_gpio_t*) &TIM_GPIO_ACV_FREQUENCY);
-    TIM_stack_error(ERROR_BASE_MEASURE + MEASURE_ERROR_BASE_TIM);
+    TIM_stack_error(ERROR_BASE_MEASURE + MEASURE_ERROR_BASE_TIM_ACV_FREQUENCY);
     tim_status = TIM_STD_de_init(TIM_INSTANCE_ADC_TRIGGER);
-    TIM_stack_error(ERROR_BASE_MEASURE + MEASURE_ERROR_BASE_TIM);
+    TIM_stack_error(ERROR_BASE_MEASURE + MEASURE_ERROR_BASE_TIM_ADC_TRIGGER);
     // Release DMA.
     dma_status = DMA_de_init(DMA_INSTANCE_ACV_SAMPLING, DMA_CHANNEL_ACV_SAMPLING);
-    DMA_stack_error(ERROR_BASE_MEASURE + MEASURE_ERROR_BASE_DMA);
+    DMA_stack_error(ERROR_BASE_MEASURE + MEASURE_ERROR_BASE_DMA_ACV_SAMPLING);
     dma_status = DMA_de_init(DMA_INSTANCE_ACI_SAMPLING, DMA_CHANNEL_ACI_SAMPLING);
-    DMA_stack_error(ERROR_BASE_MEASURE + MEASURE_ERROR_BASE_DMA);
+    DMA_stack_error(ERROR_BASE_MEASURE + MEASURE_ERROR_BASE_DMA_ACI_SAMPLING);
     dma_status = DMA_de_init(DMA_INSTANCE_ACV_FREQUENCY, DMA_CHANNEL_ACV_FREQUENCY);
-    DMA_stack_error(ERROR_BASE_MEASURE + MEASURE_ERROR_BASE_DMA);
+    DMA_stack_error(ERROR_BASE_MEASURE + MEASURE_ERROR_BASE_DMA_ACV_FREQUENCY);
     // Switch to HSI.
     rcc_status = RCC_switch_to_hsi();
     RCC_stack_error(ERROR_BASE_MEASURE + MEASURE_ERROR_BASE_RCC);
