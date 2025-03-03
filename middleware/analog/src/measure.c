@@ -132,6 +132,7 @@ typedef struct {
 /*******************************************************************/
 typedef struct {
     MEASURE_state_t state;
+    uint8_t probe_detect_flag[MEASURE_NUMBER_OF_ACI_CHANNELS];
     uint8_t processing_enable;
     uint32_t zero_cross_count;
     uint8_t dma_transfer_end_flag;
@@ -556,8 +557,10 @@ static void _MEASURE_compute_period_data(void) {
 #else
             measure_data.period_acvx_buffer_f32[idx] = (float32_t) (measure_sampling.acv[measure_sampling.acv_read_idx].data[sample_idx]);
             measure_data.period_acix_buffer_f32[idx] = (float32_t) (measure_sampling.aci[measure_sampling.aci_read_idx].data[sample_idx]);
+            // Update current probe detect flag.
+            measure_ctx.probe_detect_flag[chx_idx] = GPIO_read(MEASURE_GPIO_ACI_DETECT[chx_idx]);
             // Force current to 0 if sensor is not connected.
-            if (GPIO_read(MEASURE_GPIO_ACI_DETECT[chx_idx]) == 0) {
+            if (measure_ctx.probe_detect_flag[chx_idx] == 0) {
                 measure_data.period_acix_buffer_f32[idx] = 0.0;
             }
 #endif
@@ -707,6 +710,7 @@ static MEASURE_status_t _MEASURE_internal_process(void) {
     // Local variables.
     MEASURE_status_t status = MEASURE_SUCCESS;
     uint32_t uptime_seconds = RTC_get_uptime_seconds();
+    uint8_t chx_idx = 0;
     // Perform state machine.
     switch (measure_ctx.state) {
     case MEASURE_STATE_OFF:
@@ -734,6 +738,10 @@ static MEASURE_status_t _MEASURE_internal_process(void) {
             EXTI_configure_gpio(&GPIO_ZERO_CROSS_PULSE, GPIO_PULL_DOWN, EXTI_TRIGGER_RISING_EDGE, &_MEASURE_increment_zero_cross_count, NVIC_PRIORITY_ZERO_CROSS);
             EXTI_enable_gpio_interrupt(&GPIO_ZERO_CROSS_PULSE);
 #endif
+            // Update current probes detect flag.
+            for (chx_idx = 0; chx_idx < MEASURE_NUMBER_OF_ACI_CHANNELS; chx_idx++) {
+                measure_ctx.probe_detect_flag[chx_idx] = GPIO_read(MEASURE_GPIO_ACI_DETECT[chx_idx]);
+            }
             // Update detect window start time.
             measure_ctx.mains_detect_start_time_second = uptime_seconds;
             // Update state.
@@ -819,6 +827,7 @@ MEASURE_status_t MEASURE_init(void) {
     // Init detect pins.
     for (chx_idx = 0; chx_idx < MEASURE_NUMBER_OF_ACI_CHANNELS; chx_idx++) {
         GPIO_configure(MEASURE_GPIO_ACI_DETECT[chx_idx], GPIO_MODE_INPUT, GPIO_TYPE_PUSH_PULL, GPIO_SPEED_LOW, GPIO_PULL_NONE);
+        measure_ctx.probe_detect_flag[chx_idx] = 0;
     }
 #endif
     return status;
@@ -928,7 +937,7 @@ MEASURE_status_t MEASURE_get_probe_detect_flag(uint8_t channel_index, uint8_t* c
 #ifdef MPMCM_ANALOG_SIMULATION
     (*current_sensor_connected) = SIMULATION_GPIO_ACI_DETECT[channel_index];
 #else
-    (*current_sensor_connected) = GPIO_read(MEASURE_GPIO_ACI_DETECT[channel_index]);
+    (*current_sensor_connected) = measure_ctx.probe_detect_flag[channel_index];
 #endif
 #else
     (*current_sensor_connected) = 0;
