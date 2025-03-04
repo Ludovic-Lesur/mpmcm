@@ -956,7 +956,7 @@ MEASURE_status_t MEASURE_get_mains_detect_flag(uint8_t* mains_voltage_detected) 
         goto errors;
     }
     // Update flag.
-    (*mains_voltage_detected) = (measure_ctx.state == MEASURE_STATE_OFF) ? 0 : 1;
+    (*mains_voltage_detected) = (measure_ctx.state == MEASURE_STATE_ACTIVE) ? 1 : 0;
 errors:
     return status;
 }
