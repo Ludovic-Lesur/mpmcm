@@ -66,6 +66,15 @@ typedef enum {
  *******************************************************************/
 TIC_status_t TIC_init(void);
 
+/*!******************************************************************
+ * \fn TIC_status_t TIC_de_init(void)
+ * \brief Release TIC driver.
+ * \param[in]   none
+ * \param[out]  none
+ * \retval      Function execution status.
+ *******************************************************************/
+TIC_status_t TIC_de_init(void);
+
 #ifdef MPMCM_LINKY_TIC_ENABLE
 /*!******************************************************************
  * \fn TIC_status_t TIC_process(void)

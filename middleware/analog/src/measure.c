@@ -73,7 +73,9 @@
 
 /*** MEASURE static functions declaration ***/
 
+#ifdef MPMCM_ANALOG_MEASURE_ENABLE
 static MEASURE_status_t _MEASURE_internal_process(void);
+#endif
 
 /*** MEASURE local structures ***/
 
@@ -454,6 +456,7 @@ static void _MEASURE_stop(void) {
 }
 #endif
 
+#ifdef MPMCM_ANALOG_MEASURE_ENABLE
 /*******************************************************************/
 static void _MEASURE_power_off(void) {
 #ifdef MPMCM_ANALOG_SIMULATION
@@ -468,6 +471,7 @@ static void _MEASURE_power_off(void) {
     // Turn analog front-end off.
     POWER_disable(POWER_REQUESTER_ID_MEASURE, POWER_DOMAIN_ANALOG);
 }
+#endif
 
 #ifdef MPMCM_ANALOG_MEASURE_ENABLE
 /*******************************************************************/
@@ -480,17 +484,17 @@ static MEASURE_status_t _MEASURE_switch_dma_buffer(void) {
     if (status != MEASURE_SUCCESS) goto errors;
     // Retrieve number of transfered data.
     dma_status = DMA_get_number_of_transfered_data(DMA_INSTANCE_ACV_SAMPLING, DMA_CHANNEL_ACV_SAMPLING, (uint16_t*) &(measure_sampling.acv[measure_sampling.acv_write_idx].size));
-    DMA_stack_error(ERROR_BASE_MEASURE + ERROR_BASE_DMA);
+    DMA_stack_error(ERROR_BASE_MEASURE + MEASURE_ERROR_BASE_DMA_ACV_SAMPLING);
     dma_status = DMA_get_number_of_transfered_data(DMA_INSTANCE_ACI_SAMPLING, DMA_CHANNEL_ACI_SAMPLING, (uint16_t*) &(measure_sampling.aci[measure_sampling.aci_write_idx].size));
-    DMA_stack_error(ERROR_BASE_MEASURE + ERROR_BASE_DMA);
+    DMA_stack_error(ERROR_BASE_MEASURE + MEASURE_ERROR_BASE_DMA_ACI_SAMPLING);
     // Update write indexes.
     measure_sampling.acv_write_idx = ((measure_sampling.acv_write_idx + 1) % MEASURE_PERIOD_ADCX_DMA_BUFFER_DEPTH);
     measure_sampling.aci_write_idx = ((measure_sampling.aci_write_idx + 1) % MEASURE_PERIOD_ADCX_DMA_BUFFER_DEPTH);
     // Set new address.
     dma_status = DMA_set_memory_address(DMA_INSTANCE_ACV_SAMPLING, DMA_CHANNEL_ACV_SAMPLING, (uint32_t) &(measure_sampling.acv[measure_sampling.acv_write_idx].data), MEASURE_PERIOD_ADCX_DMA_BUFFER_SIZE);
-    DMA_stack_error(ERROR_BASE_MEASURE + ERROR_BASE_DMA);
+    DMA_stack_error(ERROR_BASE_MEASURE + MEASURE_ERROR_BASE_DMA_ACV_SAMPLING);
     dma_status = DMA_set_memory_address(DMA_INSTANCE_ACI_SAMPLING, DMA_CHANNEL_ACI_SAMPLING, (uint32_t) &(measure_sampling.aci[measure_sampling.aci_write_idx].data), MEASURE_PERIOD_ADCX_DMA_BUFFER_SIZE);
-    DMA_stack_error(ERROR_BASE_MEASURE + ERROR_BASE_DMA);
+    DMA_stack_error(ERROR_BASE_MEASURE + MEASURE_ERROR_BASE_DMA_ACI_SAMPLING);
     // Restart DMA.
     status = _MEASURE_start_analog_transfer();
 errors:

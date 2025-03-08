@@ -327,6 +327,23 @@ errors:
     return status;
 }
 
+/*******************************************************************/
+TIC_status_t TIC_de_init(void) {
+    // Local variables.
+    TIC_status_t status = TIC_SUCCESS;
+#ifdef MPMCM_LINKY_TIC_ENABLE
+    DMA_status_t dma_status = DMA_SUCCESS;
+    USART_status_t usart_status = USART_SUCCESS;
+    // Release USART interface.
+    usart_status = USART_de_init(USART_INSTANCE_TIC, &USART_GPIO_TIC);
+    USART_stack_error(ERROR_BASE_TIC + TIC_ERROR_BASE_USART);
+    // Release DMA.
+    dma_status = DMA_de_init(DMA_INSTANCE_TIC, DMA_CHANNEL_TIC);
+    DMA_stack_error(ERROR_BASE_TIC + TIC_ERROR_BASE_DMA);
+#endif
+    return status;
+}
+
 #ifdef MPMCM_LINKY_TIC_ENABLE
 /*******************************************************************/
 TIC_status_t TIC_process(void) {
@@ -379,7 +396,7 @@ TIC_status_t TIC_process(void) {
             else {
                 led_color = (tic_ctx.flags.decode_success) ? LED_COLOR_GREEN : LED_COLOR_YELLOW;
             }
-            led_status = LED_single_pulse(TIC_LED_PULSE_DURATION_MS, led_color);
+            led_status = LED_single_pulse(TIC_LED_PULSE_DURATION_MS, led_color, 1);
             LED_exit_error(TIC_ERROR_BASE_LED);
 #endif
         }

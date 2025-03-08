@@ -80,6 +80,7 @@ static void _MPMCM_init_hw(void) {
     RCC_stack_error(ERROR_BASE_RCC);
     // Init GPIOs.
     GPIO_init();
+    POWER_init();
     EXTI_init();
 #ifndef MPMCM_DEBUG
     // Start independent watchdog.
@@ -96,8 +97,6 @@ static void _MPMCM_init_hw(void) {
     // Init delay timer.
     lptim_status = LPTIM_init(NVIC_PRIORITY_DELAY);
     LPTIM_stack_error(ERROR_BASE_LPTIM);
-    // Init components.
-    POWER_init();
     led_status = LED_init();
     LED_stack_error(ERROR_BASE_LED);
     measure_status = MEASURE_init();
