@@ -9,6 +9,7 @@
 #define __ANALOG_H__
 
 #include "adc.h"
+#include "error.h"
 #include "types.h"
 
 /*** ANALOG structures ***/
@@ -25,7 +26,7 @@ typedef enum {
     ANALOG_ERROR_CALIBRATION_MISSING,
     ANALOG_ERROR_GAIN_TYPE,
     // Low level drivers errors.
-    ANALOG_ERROR_BASE_ADC = 0x0100,
+    ANALOG_ERROR_BASE_ADC = ERROR_BASE_STEP,
     // Last base value.
     ANALOG_ERROR_BASE_LAST = (ANALOG_ERROR_BASE_ADC + ADC_ERROR_BASE_LAST),
 } ANALOG_status_t;

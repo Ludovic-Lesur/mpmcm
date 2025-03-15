@@ -8,6 +8,7 @@
 #ifndef __CLI_H__
 #define __CLI_H__
 
+#include "error.h"
 #include "types.h"
 #include "una_at.h"
 
@@ -21,7 +22,7 @@ typedef enum {
     // Driver errors.
     CLI_SUCCESS = 0,
     // Low level drivers errors.
-    CLI_ERROR_BASE_UNA_AT = 0x0100,
+    CLI_ERROR_BASE_UNA_AT = ERROR_BASE_STEP,
     // Last base value.
     CLI_ERROR_BASE_LAST = (CLI_ERROR_BASE_UNA_AT + UNA_AT_ERROR_BASE_LAST)
 } CLI_status_t;

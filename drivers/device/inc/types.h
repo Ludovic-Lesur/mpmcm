@@ -5,19 +5,25 @@
  *      Author: Ludo
  */
 
-#include "stddef.h"
-#include "stdint.h"
-#include "arm_math_types.h"
-
 #ifndef __TYPES_H__
 #define __TYPES_H__
+
+#include "stdint.h"
 
 /*!******************************************************************
  * \brief Custom variables types.
  *******************************************************************/
 
-typedef char        char_t;
+typedef char                char_t;
 
-#define UNUSED(x)   ((void) x)
+typedef signed long long    int64_t;
+typedef unsigned long long  uint64_t;
+
+typedef float               float32_t;
+typedef double              float64_t;
+
+#define NULL                ((void*) 0)
+
+#define UNUSED(x)           ((void) x)
 
 #endif /* __TYPES_H__ */

@@ -9,6 +9,7 @@
 #define __NODE_H__
 
 #include "analog.h"
+#include "error.h"
 #include "lptim.h"
 #include "measure.h"
 #include "nvm.h"
@@ -38,7 +39,7 @@ typedef enum {
     NODE_ERROR_SIGFOX_RF_API,
     NODE_ERROR_SIGFOX_EP_API,
     // Low level drivers errors.
-    NODE_ERROR_BASE_NVM = 0x0100,
+    NODE_ERROR_BASE_NVM = ERROR_BASE_STEP,
     NODE_ERROR_BASE_LPTIM = (NODE_ERROR_BASE_NVM + NVM_ERROR_BASE_LAST),
     NODE_ERROR_BASE_ANALOG = (NODE_ERROR_BASE_LPTIM + LPTIM_ERROR_BASE_LAST),
     NODE_ERROR_BASE_MEASURE = (NODE_ERROR_BASE_ANALOG + ANALOG_ERROR_BASE_LAST),

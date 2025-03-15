@@ -14,7 +14,7 @@
 #include "tim.h"
 #include "usart.h"
 
-/*** MCU mapping macros ***/
+/*** MCU MAPPING macros ***/
 
 #define ADC_INSTANCE_ACX_SAMPLING   ADC_INSTANCE_ADC1
 #define ADC_CHANNEL_ACV_SAMPLING    ADC_CHANNEL_IN1
@@ -53,7 +53,10 @@
 
 /*** MCU MAPPING structures ***/
 
-/*******************************************************************/
+/*!******************************************************************
+ * \enum ADC_channel_index_t
+ * \brief ADC channels index.
+ *******************************************************************/
 typedef enum {
     ADC_CHANNEL_INDEX_ACV_SAMPLING = 0,
     ADC_CHANNEL_INDEX_ACI1_SAMPLING,
@@ -63,7 +66,10 @@ typedef enum {
     ADC_CHANNEL_INDEX_LAST
 } ADC_channel_index_t;
 
-/*******************************************************************/
+/*!******************************************************************
+ * \enum TIM_channel_index_led_t
+ * \brief TIM RGB LED channels index.
+ *******************************************************************/
 typedef enum {
     TIM_CHANNEL_INDEX_LED_RED = 0,
     TIM_CHANNEL_INDEX_LED_GREEN,
@@ -71,7 +77,10 @@ typedef enum {
     TIM_CHANNEL_INDEX_LED_LAST
 } TIM_channel_index_led_t;
 
-/*******************************************************************/
+/*!******************************************************************
+ * \enum TIM_channel_index_acv_frequency_t
+ * \brief TIM ACV frequency channels index.
+ *******************************************************************/
 typedef enum {
     TIM_CHANNEL_INDEX_ACV_FREQUENCY = 0,
     TIM_CHANNEL_INDEX_ACV_FREQUENCY_LAST

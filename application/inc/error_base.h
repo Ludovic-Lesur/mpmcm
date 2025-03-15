@@ -13,6 +13,8 @@
 #include "lptim.h"
 #include "rcc.h"
 #include "rtc.h"
+// Utils.
+#include "error.h"
 // Components.
 #include "led.h"
 #include "tic.h"
@@ -32,7 +34,7 @@
 typedef enum {
     SUCCESS = 0,
     // Peripherals.
-    ERROR_BASE_IWDG = 0x0100,
+    ERROR_BASE_IWDG = ERROR_BASE_STEP,
     ERROR_BASE_LPTIM = (ERROR_BASE_IWDG + IWDG_ERROR_BASE_LAST),
     ERROR_BASE_RCC = (ERROR_BASE_LPTIM + LPTIM_ERROR_BASE_LAST),
     ERROR_BASE_RTC = (ERROR_BASE_RCC + RCC_ERROR_BASE_LAST),

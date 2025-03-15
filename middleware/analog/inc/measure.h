@@ -11,6 +11,7 @@
 #include "adc.h"
 #include "data.h"
 #include "dma.h"
+#include "error.h"
 #include "led.h"
 #include "maths.h"
 #include "mpmcm_flags.h"
@@ -46,7 +47,7 @@ typedef enum {
     MEASURE_ERROR_DATA_TYPE,
     MEASURE_ERROR_AC_CHANNEL,
     // Low level drivers errors.
-    MEASURE_ERROR_BASE_ADC = 0x0100,
+    MEASURE_ERROR_BASE_ADC = ERROR_BASE_STEP,
     MEASURE_ERROR_BASE_DMA_ACV_SAMPLING = (MEASURE_ERROR_BASE_ADC + ADC_ERROR_BASE_LAST),
     MEASURE_ERROR_BASE_DMA_ACI_SAMPLING = (MEASURE_ERROR_BASE_DMA_ACV_SAMPLING + DMA_ERROR_BASE_LAST),
     MEASURE_ERROR_BASE_DMA_ACV_FREQUENCY = (MEASURE_ERROR_BASE_DMA_ACI_SAMPLING + DMA_ERROR_BASE_LAST),
