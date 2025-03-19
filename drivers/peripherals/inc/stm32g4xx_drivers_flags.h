@@ -8,8 +8,6 @@
 #ifndef __STM32G4XX_DRIVERS_FLAGS_H__
 #define __STM32G4XX_DRIVERS_FLAGS_H__
 
-#include "nvm_address.h"
-
 /*** STM32G4xx drivers compilation flags ***/
 
 #define STM32G4XX_DRIVERS_ADC_MODE_MASK                 0x03
@@ -33,5 +31,6 @@
 #define STM32G4XX_DRIVERS_TIM_MODE_MASK                 0x3F
 
 //#define STM32G4XX_DRIVERS_USART_RS485
+#define STM32G4XX_DRIVERS_USART_DISABLE_TX_0
 
 #endif /* __STM32G4XX_DRIVERS_FLAGS_H__ */
