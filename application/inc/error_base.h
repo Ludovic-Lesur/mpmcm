@@ -13,6 +13,8 @@
 #include "lptim.h"
 #include "rcc.h"
 #include "rtc.h"
+// MAC.
+#include "lmac.h"
 // Utils.
 #include "error.h"
 // Components.
@@ -38,8 +40,10 @@ typedef enum {
     ERROR_BASE_LPTIM = (ERROR_BASE_IWDG + IWDG_ERROR_BASE_LAST),
     ERROR_BASE_RCC = (ERROR_BASE_LPTIM + LPTIM_ERROR_BASE_LAST),
     ERROR_BASE_RTC = (ERROR_BASE_RCC + RCC_ERROR_BASE_LAST),
+    // MAC.
+    ERROR_BASE_LMAC = (ERROR_BASE_RTC + RTC_ERROR_BASE_LAST),
     // Components.
-    ERROR_BASE_LED = (ERROR_BASE_RTC + RTC_ERROR_BASE_LAST),
+    ERROR_BASE_LED = (ERROR_BASE_LMAC + LMAC_ERROR_BASE_LAST),
     ERROR_BASE_TIC = (ERROR_BASE_LED + LED_ERROR_BASE_LAST),
     // Middleware.
     ERROR_BASE_ANALOG = (ERROR_BASE_TIC + TIC_ERROR_BASE_LAST),
